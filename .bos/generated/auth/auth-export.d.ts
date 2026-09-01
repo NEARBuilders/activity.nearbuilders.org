@@ -1,0 +1,15 @@
+export type Auth = any;
+export type AuthOrganizationContext = any;
+export type AuthOrganization = any;
+export type AuthOrganizationSummary = any;
+export type AuthOrganizationMember = any;
+export type AuthApiKey = any;
+export type AuthInvitation = any;
+export type AuthTeam = any;
+export type GetActiveMemberInput = any;
+export type GetFullOrganizationInput = any;
+export type ListMembersInput = any;
+export type ListInvitationsInput = any;
+export type ListApiKeysInput = any;
+export type AuthServices = any;
+export type createAuthInstance = any;

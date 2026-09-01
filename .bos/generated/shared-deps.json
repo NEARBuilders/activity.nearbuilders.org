@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "kind": "everything-dev/shared-deps",
+  "generatedAt": "2026-09-01T20:16:16.942Z",
+  "deps": {},
+  "fingerprintSha256": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+  "inputs": {
+    "mode": "catalog->bos",
+    "hostMode": "local"
+  }
+}

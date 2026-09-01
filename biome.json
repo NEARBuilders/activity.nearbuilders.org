@@ -51,7 +51,8 @@
     "includes": [
       "**",
       "!!**/.agents",
-      "!!**/ui/src/routeTree.gen.ts",
+      "!!**/*.gen.ts",
+      "!!**/.bos/generated",
       "!!**/plugins/**/types/**/*.d.ts",
       "!!**/env.d.ts",
       "!!**/virtual-modules.d.ts",
