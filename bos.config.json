@@ -19,8 +19,15 @@
     },
     "api": {
       "development": "local:api",
+      "variables": {
+        "activityNostrBindingContract": "contextual.near",
+        "activityNostrBindingRelay": "wss://relay.nearbuilders.org",
+        "activityNostrKvApiUrl": "https://kv.main.fastnear.com"
+      },
       "secrets": [
-        "API_DATABASE_URL"
+        "API_DATABASE_URL",
+        "ACTIVITY_SIGNING_MASTER_KEYS",
+        "ACTIVITY_SIGNING_ACTIVE_KEY_VERSION"
       ]
     }
   },

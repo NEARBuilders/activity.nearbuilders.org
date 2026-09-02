@@ -1,4 +1,5 @@
 import { RadioTower } from "lucide-react";
+import type { ReactNode } from "react";
 import { ActivitySourceCard, ActivitySourceReviewCard } from "@/components/activity-source-cards";
 import { ActivitySourceRegistration } from "@/components/activity-source-registration";
 import type {
@@ -24,6 +25,7 @@ interface ActivitySourcesDashboardProps {
   isSubmitting: boolean;
   onCreate: (input: CreateActivitySourceInput) => void | Promise<void>;
   onReview: (input: ReviewActivitySourceInput) => void | Promise<void>;
+  renderCredentials?: (source: ActivitySourceView) => ReactNode;
 }
 
 export function ActivitySourcesDashboard({
@@ -34,6 +36,7 @@ export function ActivitySourcesDashboard({
   isSubmitting,
   onCreate,
   onReview,
+  renderCredentials,
 }: ActivitySourcesDashboardProps) {
   return (
     <div className="space-y-8">
@@ -69,7 +72,11 @@ export function ActivitySourcesDashboard({
         ) : (
           <div className="grid gap-4 lg:grid-cols-2">
             {sources.map((source) => (
-              <ActivitySourceCard key={source.sourceId} source={source} />
+              <ActivitySourceCard
+                key={source.sourceId}
+                source={source}
+                credentials={renderCredentials?.(source)}
+              />
             ))}
           </div>
         )}

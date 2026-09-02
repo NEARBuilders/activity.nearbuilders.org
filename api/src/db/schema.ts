@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import {
   boolean,
   index,
@@ -46,6 +47,11 @@ export const activitySourceReviewDecision = pgEnum("activity_source_review_decis
   "approved",
   "rejected",
 ]);
+
+export const activitySigningIdentityBindingStatus = pgEnum(
+  "activity_signing_identity_binding_status",
+  ["pending", "bound"],
+);
 
 export const activitySources = pgTable(
   "activity_sources",
@@ -109,5 +115,52 @@ export const activitySourceReviews = pgTable(
       table.sourceRecordId,
       table.reviewedAt,
     ),
+  }),
+);
+
+export const activitySigningIdentities = pgTable(
+  "activity_signing_identities",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sourceRecordId: uuid("source_record_id")
+      .notNull()
+      .references(() => activitySources.id, { onDelete: "cascade" }),
+    publicKey: text("public_key").notNull().unique(),
+    encryptedPrivateKey: text("encrypted_private_key").notNull(),
+    encryptionIv: text("encryption_iv").notNull(),
+    encryptionAuthTag: text("encryption_auth_tag").notNull(),
+    encryptionKeyVersion: text("encryption_key_version").notNull(),
+    bindingStatus: activitySigningIdentityBindingStatus("binding_status")
+      .default("pending")
+      .notNull(),
+    boundNearAccountId: text("bound_near_account_id"),
+    boundAt: timestamp("bound_at", { mode: "date", withTimezone: true }),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    retiredAt: timestamp("retired_at", { mode: "date", withTimezone: true }),
+  },
+  (table) => ({
+    activeSourceIdentityIdx: uniqueIndex("activity_signing_identities_active_source_idx")
+      .on(table.sourceRecordId)
+      .where(sql`${table.retiredAt} is null`),
+  }),
+);
+
+export const activitySourceApiKeys = pgTable(
+  "activity_source_api_keys",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sourceRecordId: uuid("source_record_id")
+      .notNull()
+      .references(() => activitySources.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    prefix: text("prefix").notNull(),
+    secretHash: text("secret_hash").notNull().unique(),
+    permission: text("permission").default("event:write").notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    lastUsedAt: timestamp("last_used_at", { mode: "date", withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { mode: "date", withTimezone: true }),
+  },
+  (table) => ({
+    sourceApiKeysIdx: index("activity_source_api_keys_source_idx").on(table.sourceRecordId),
   }),
 );

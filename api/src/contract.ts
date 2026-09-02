@@ -63,6 +63,37 @@ export const ActivitySourceSchema = z.object({
   updatedAt: z.string(),
 });
 
+export const ActivitySigningIdentitySchema = z.object({
+  publicKey: z.string().regex(/^[a-f0-9]{64}$/),
+  bindingStatus: z.enum(["pending", "bound"]),
+  boundNearAccountId: z.string().nullable(),
+  boundAt: z.string().nullable(),
+  keyVersion: z.string(),
+  createdAt: z.string(),
+  retiredAt: z.string().nullable(),
+});
+
+export const ActivityBindingWriteSchema = z.object({
+  contractId: z.string(),
+  methodName: z.literal("__fastdata_kv"),
+  key: z.string(),
+  value: z.string(),
+  args: z.record(z.string(), z.string()),
+  gas: z.string(),
+  attachedDeposit: z.string(),
+});
+
+export const ActivitySourceApiKeySchema = z.object({
+  id: z.string(),
+  sourceId: z.string(),
+  name: z.string(),
+  prefix: z.string(),
+  permissions: z.tuple([z.literal("event:write")]),
+  createdAt: z.string(),
+  lastUsedAt: z.string().nullable(),
+  revokedAt: z.string().nullable(),
+});
+
 const ActivityEventTypesInputSchema = z
   .array(ActivityEventTypeSchema)
   .min(1)
@@ -251,6 +282,68 @@ export const contract = oc.router({
       NOT_FOUND,
       CONFLICT: { status: 409 },
     }),
+
+  createActivitySigningIdentity: oc
+    .route({ method: "POST", path: "/activity/sources/{sourceId}/signing-identity" })
+    .input(z.object({ sourceId: z.string() }))
+    .output(ActivitySigningIdentitySchema)
+    .errors({
+      UNAUTHORIZED,
+      FORBIDDEN,
+      NOT_FOUND,
+      CONFLICT: { status: 409 },
+    }),
+
+  getActivitySigningIdentity: oc
+    .route({ method: "GET", path: "/activity/sources/{sourceId}/signing-identity" })
+    .input(z.object({ sourceId: z.string() }))
+    .output(ActivitySigningIdentitySchema.nullable())
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
+
+  listActivitySigningIdentities: oc
+    .route({ method: "GET", path: "/activity/sources/{sourceId}/signing-identities" })
+    .input(z.object({ sourceId: z.string() }))
+    .output(z.array(ActivitySigningIdentitySchema))
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
+
+  rotateActivitySigningIdentity: oc
+    .route({ method: "POST", path: "/activity/sources/{sourceId}/signing-identity/rotate" })
+    .input(z.object({ sourceId: z.string() }))
+    .output(ActivitySigningIdentitySchema)
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
+
+  prepareActivitySigningIdentityBinding: oc
+    .route({ method: "POST", path: "/activity/sources/{sourceId}/signing-identity/binding" })
+    .input(z.object({ sourceId: z.string() }))
+    .output(ActivityBindingWriteSchema)
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
+
+  confirmActivitySigningIdentityBinding: oc
+    .route({
+      method: "POST",
+      path: "/activity/sources/{sourceId}/signing-identity/binding/confirm",
+    })
+    .input(z.object({ sourceId: z.string() }))
+    .output(ActivitySigningIdentitySchema)
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST }),
+
+  createActivitySourceApiKey: oc
+    .route({ method: "POST", path: "/activity/sources/{sourceId}/api-keys" })
+    .input(z.object({ sourceId: z.string(), name: z.string().trim().min(1).max(120) }))
+    .output(z.object({ secret: z.string(), apiKey: ActivitySourceApiKeySchema }))
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
+
+  listActivitySourceApiKeys: oc
+    .route({ method: "GET", path: "/activity/sources/{sourceId}/api-keys" })
+    .input(z.object({ sourceId: z.string() }))
+    .output(z.array(ActivitySourceApiKeySchema))
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
+
+  revokeActivitySourceApiKey: oc
+    .route({ method: "POST", path: "/activity/sources/{sourceId}/api-keys/{apiKeyId}/revoke" })
+    .input(z.object({ sourceId: z.string(), apiKeyId: z.string() }))
+    .output(ActivitySourceApiKeySchema)
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
 
   createThing: oc
     .route({

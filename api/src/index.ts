@@ -2,11 +2,13 @@ import { createPlugin } from "every-plugin";
 import { Effect, Layer } from "every-plugin/effect";
 import { ORPCError } from "every-plugin/orpc";
 import { z } from "every-plugin/zod";
+import { parseActivityMasterKeys } from "./activity/activity-credentials-crypto";
 import { contract } from "./contract";
 import { DatabaseLive, DatabaseTag } from "./db/layer";
 import { createAuthMiddleware } from "./lib/auth";
 import { ContextSchema } from "./lib/context";
 import type { PluginsClient } from "./lib/plugins-types.gen";
+import { ActivityCredentialsLive, ActivityCredentialsTag } from "./services/activity-credentials";
 import { ActivitySourcesLive, ActivitySourcesTag } from "./services/activity-sources";
 import { TenantsLive, TenantsTag } from "./services/tenants";
 
@@ -55,10 +57,16 @@ function validateAccountId(accountId: string): void {
 }
 
 export default createPlugin.withPlugins<PluginsClient>()({
-  variables: z.object({}),
+  variables: z.object({
+    activityNostrBindingContract: z.string().default("contextual.near"),
+    activityNostrBindingRelay: z.string().default("wss://relay.nearbuilders.org"),
+    activityNostrKvApiUrl: z.string().default("https://kv.main.fastnear.com"),
+  }),
 
   secrets: z.object({
     API_DATABASE_URL: z.string().default("pglite:.bos/api/:memory:"),
+    ACTIVITY_SIGNING_MASTER_KEYS: z.string(),
+    ACTIVITY_SIGNING_ACTIVE_KEY_VERSION: z.string().default("v1"),
   }),
 
   context: ContextSchema,
@@ -80,12 +88,25 @@ export default createPlugin.withPlugins<PluginsClient>()({
         ActivitySourcesTag,
         ActivitySourcesLive.pipe(Layer.provide(databaseLayer)),
       );
+      const masterKeys = parseActivityMasterKeys(
+        config.secrets.ACTIVITY_SIGNING_MASTER_KEYS,
+        config.secrets.ACTIVITY_SIGNING_ACTIVE_KEY_VERSION,
+      );
+      const activityCredentialsService = yield* tools.buildService(
+        ActivityCredentialsTag,
+        ActivityCredentialsLive(masterKeys, {
+          contractId: config.variables.activityNostrBindingContract,
+          relay: config.variables.activityNostrBindingRelay,
+          kvApiUrl: config.variables.activityNostrKvApiUrl,
+        }).pipe(Layer.provide(databaseLayer)),
+      );
 
       console.log("[API] Services Initialized");
 
       return {
         tenants: tenantsService,
         activitySources: activitySourcesService,
+        activityCredentials: activityCredentialsService,
       };
     }),
 
@@ -103,7 +124,6 @@ export default createPlugin.withPlugins<PluginsClient>()({
       }
       return next({ context: { near: context.near } });
     });
-
     const authorizedTenant = async (
       input: { tenantId: string },
       context: { organization: { activeOrganizationId: string } },
@@ -318,6 +338,101 @@ export default createPlugin.withPlugins<PluginsClient>()({
             ...input,
             administratorId: context.userId,
           }),
+        ),
+
+      createActivitySigningIdentity: builder.createActivitySigningIdentity
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) =>
+          services.activityCredentials.createSigningIdentity(
+            context.organization.activeOrganizationId,
+            input.sourceId,
+          ),
+        ),
+
+      getActivitySigningIdentity: builder.getActivitySigningIdentity
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) =>
+          services.activityCredentials.getSigningIdentity(
+            context.organization.activeOrganizationId,
+            input.sourceId,
+          ),
+        ),
+
+      listActivitySigningIdentities: builder.listActivitySigningIdentities
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) =>
+          services.activityCredentials.listSigningIdentities(
+            context.organization.activeOrganizationId,
+            input.sourceId,
+          ),
+        ),
+
+      rotateActivitySigningIdentity: builder.rotateActivitySigningIdentity
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) =>
+          services.activityCredentials.rotateSigningIdentity(
+            context.organization.activeOrganizationId,
+            input.sourceId,
+          ),
+        ),
+
+      prepareActivitySigningIdentityBinding: builder.prepareActivitySigningIdentityBinding
+        .use(requireNearAuthentication)
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) => {
+          const nearAccountId = context.near.primaryAccountId;
+          if (!nearAccountId) {
+            throw new ORPCError("FORBIDDEN", { message: "NEAR authentication required" });
+          }
+          return services.activityCredentials.prepareSigningIdentityBinding(
+            context.organization.activeOrganizationId,
+            input.sourceId,
+            nearAccountId,
+          );
+        }),
+
+      confirmActivitySigningIdentityBinding: builder.confirmActivitySigningIdentityBinding
+        .use(requireNearAuthentication)
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) => {
+          const nearAccountId = context.near.primaryAccountId;
+          if (!nearAccountId) {
+            throw new ORPCError("FORBIDDEN", { message: "NEAR authentication required" });
+          }
+          return services.activityCredentials.confirmSigningIdentityBinding(
+            context.organization.activeOrganizationId,
+            input.sourceId,
+            nearAccountId,
+          );
+        }),
+
+      createActivitySourceApiKey: builder.createActivitySourceApiKey
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) =>
+          services.activityCredentials.createApiKey(
+            context.organization.activeOrganizationId,
+            input.sourceId,
+            input.name,
+          ),
+        ),
+
+      listActivitySourceApiKeys: builder.listActivitySourceApiKeys
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) =>
+          services.activityCredentials.listApiKeys(
+            context.organization.activeOrganizationId,
+            input.sourceId,
+          ),
+        ),
+
+      revokeActivitySourceApiKey: builder.revokeActivitySourceApiKey
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) =>
+          services.activityCredentials.revokeApiKey(
+            context.organization.activeOrganizationId,
+            input.sourceId,
+            input.apiKeyId,
+          ),
         ),
 
       createThing: builder.createThing.use(requireAuth).handler(async ({ input }) => {

@@ -38,3 +38,24 @@ export interface ReviewActivitySourceInput {
   decision: "approved" | "rejected";
   reason: string;
 }
+
+export interface ActivitySigningIdentityView {
+  publicKey: string;
+  bindingStatus: "pending" | "bound";
+  boundNearAccountId: string | null;
+  boundAt: string | null;
+  keyVersion: string;
+  createdAt: string;
+  retiredAt: string | null;
+}
+
+export interface ActivitySourceApiKeyView {
+  id: string;
+  sourceId: string;
+  name: string;
+  prefix: string;
+  permissions: ["event:write"];
+  createdAt: string;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+}

@@ -107,6 +107,13 @@ Leaderboard reads multiply counts by each event type's current point value and t
 5. The source creates an API key.
 6. It starts submitting events to `POST /api/v1/events`.
 
+Approved Source Owners manage credentials from the Activity Sources page. Creating a Signing
+Identity returns only its Nostr public key; its private key is encrypted by the gateway. The owner
+must connect the Activity Source's exact mainnet NEAR account and authorize the prepared FastNear
+KV binding before creating a Source API Key. This is a direct wallet
+transaction, so it does not require a configured relayer. A new API-key secret is shown once, while
+later views expose only its name, prefix, `event:write` permission, timestamps, and revocation state.
+
 ### Event delivery
 
 1. The gateway authenticates the API key and validates the event.
@@ -170,6 +177,23 @@ bun run dev
 The initializer creates a local `.env` from `.env.example`. Keep secrets out of version control.
 The Activity infrastructure command starts the pinned local Nostr relay on port `7447` and Redis
 on port `6380`; both use Docker named volumes. Run `bun run dev:activity-infra:down` to stop them.
+
+Local development uses a deterministic signing master key only when
+`ACTIVITY_SIGNING_MASTER_KEYS` is empty. Every deployed environment must provide a JSON keyring of
+base64-encoded 32-byte keys and select its current version:
+
+```dotenv
+ACTIVITY_SIGNING_MASTER_KEYS={"v1":"<base64-encoded-32-byte-key>"}
+ACTIVITY_SIGNING_ACTIVE_KEY_VERSION=v1
+```
+
+To rotate the encryption master key, retain previous entries for decryption and point the active
+version at the new entry. Signing Identity rotation is separate: it retires the old public identity,
+creates a new encrypted one, and requires a new NEAR binding without modifying historical events.
+
+Binding uses `contextual.near` with FastNear mainnet. The contract ID and FastNear endpoint are
+explicit API variables in `bos.config.json`; local API-only runs may override them with
+`ACTIVITY_NOSTR_BINDING_CONTRACT` and `ACTIVITY_NOSTR_KV_API_URL`.
 
 ### Useful commands
 

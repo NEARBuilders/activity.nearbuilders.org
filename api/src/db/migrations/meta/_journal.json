@@ -22,6 +22,20 @@
       "when": 1788376031584,
       "tag": "0002_known_warstar",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1788379593649,
+      "tag": "0003_fluffy_living_tribunal",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1788379871066,
+      "tag": "0004_luxuriant_clint_barton",
+      "breakpoints": true
     }
   ]
 }

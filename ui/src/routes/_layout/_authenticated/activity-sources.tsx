@@ -1,17 +1,32 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { toast } from "sonner";
-import { useApiClient } from "@/app";
+import { useApiClient, useAuthClient } from "@/app";
+import { ActivitySourceCredentials } from "@/components/activity-source-credentials";
 import {
   ActivitySourcesDashboard,
+  type ActivitySourceView,
   type CreateActivitySourceInput,
   type ReviewActivitySourceInput,
 } from "@/components/activity-sources-dashboard";
 import { PageContainer } from "@/components/layout/page-container";
+import {
+  createActivityBindingWallet,
+  submitActivityBindingTransaction,
+} from "@/lib/activity-binding-transaction";
 import { getActivitySourceRegistrationAccess } from "@/lib/activity-source-permissions";
 
 const activitySourcesQueryKey = ["activity-sources"] as const;
 const sourceReviewQueueQueryKey = ["activity-source-reviews", "pending"] as const;
+
+function credentialQueryKey(sourceId: string) {
+  return ["activity-source-credentials", sourceId] as const;
+}
+
+function apiKeysQueryKey(sourceId: string) {
+  return ["activity-source-api-keys", sourceId] as const;
+}
 
 export const Route = createFileRoute("/_layout/_authenticated/activity-sources")({
   head: () => ({
@@ -107,7 +122,151 @@ function ActivitySourcesPage() {
         onReview={async (input) => {
           await reviewSource.mutateAsync(input);
         }}
+        renderCredentials={(source) =>
+          source.approvalStatus === "approved" && auth.activeOrganizationRole === "owner" ? (
+            <ActivityCredentialsManager source={source} />
+          ) : null
+        }
       />
     </PageContainer>
+  );
+}
+
+function ActivityCredentialsManager({ source }: { source: ActivitySourceView }) {
+  const apiClient = useApiClient();
+  const authClient = useAuthClient();
+  const queryClient = useQueryClient();
+  const [revealedApiKey, setRevealedApiKey] = useState<{
+    secret: string;
+    apiKeyId: string;
+  } | null>(null);
+
+  const { data: identity = null } = useQuery({
+    queryKey: credentialQueryKey(source.sourceId),
+    queryFn: () => apiClient.getActivitySigningIdentity({ sourceId: source.sourceId }),
+  });
+  const { data: apiKeys = [] } = useQuery({
+    queryKey: apiKeysQueryKey(source.sourceId),
+    queryFn: () => apiClient.listActivitySourceApiKeys({ sourceId: source.sourceId }),
+  });
+
+  const refreshCredentials = async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: credentialQueryKey(source.sourceId) }),
+      queryClient.invalidateQueries({ queryKey: apiKeysQueryKey(source.sourceId) }),
+    ]);
+  };
+
+  const createIdentity = useMutation({
+    mutationFn: () => apiClient.createActivitySigningIdentity({ sourceId: source.sourceId }),
+    onSuccess: async () => {
+      toast.success("Signing Identity created");
+      await refreshCredentials();
+    },
+    onError: (error: Error) => toast.error(error.message || "Failed to create Signing Identity"),
+  });
+
+  const bindIdentity = useMutation({
+    mutationFn: async () => {
+      const prepared = await apiClient.prepareActivitySigningIdentityBinding({
+        sourceId: source.sourceId,
+      });
+      return submitActivityBindingTransaction({
+        wallet: createActivityBindingWallet(authClient.near),
+        nearAccountId: source.nearAccountId,
+        binding: prepared,
+      });
+    },
+    onSuccess: (result) => {
+      toast.success("Binding transaction submitted", {
+        description: result?.txHash
+          ? `Transaction ${result.txHash}. Check the binding after it is indexed.`
+          : "Check the binding after it is indexed.",
+      });
+    },
+    onError: (error: Error) => toast.error(error.message || "Failed to authorize binding"),
+  });
+
+  const confirmBinding = useMutation({
+    mutationFn: () =>
+      apiClient.confirmActivitySigningIdentityBinding({ sourceId: source.sourceId }),
+    onSuccess: async () => {
+      toast.success("NEAR-to-Nostr binding confirmed");
+      await refreshCredentials();
+    },
+    onError: (error: Error) =>
+      toast.error(error.message || "Binding is not indexed yet. Try again shortly."),
+  });
+
+  const rotateIdentity = useMutation({
+    mutationFn: () => apiClient.rotateActivitySigningIdentity({ sourceId: source.sourceId }),
+    onSuccess: async () => {
+      setRevealedApiKey(null);
+      toast.success("Signing Identity rotated", {
+        description: "Authorize the new public key with the Activity Source NEAR account.",
+      });
+      await refreshCredentials();
+    },
+    onError: (error: Error) => toast.error(error.message || "Failed to rotate Signing Identity"),
+  });
+
+  const createApiKey = useMutation({
+    mutationFn: (name: string) =>
+      apiClient.createActivitySourceApiKey({ sourceId: source.sourceId, name }),
+    onSuccess: async ({ secret, apiKey }) => {
+      setRevealedApiKey({ secret, apiKeyId: apiKey.id });
+      toast.success("Source API Key created");
+      await queryClient.invalidateQueries({ queryKey: apiKeysQueryKey(source.sourceId) });
+    },
+    onError: (error: Error) => toast.error(error.message || "Failed to create Source API Key"),
+  });
+
+  const revokeApiKey = useMutation({
+    mutationFn: (apiKeyId: string) =>
+      apiClient.revokeActivitySourceApiKey({ sourceId: source.sourceId, apiKeyId }),
+    onSuccess: async ({ id }) => {
+      if (revealedApiKey?.apiKeyId === id) setRevealedApiKey(null);
+      toast.success("Source API Key revoked");
+      await queryClient.invalidateQueries({ queryKey: apiKeysQueryKey(source.sourceId) });
+    },
+    onError: (error: Error) => toast.error(error.message || "Failed to revoke Source API Key"),
+  });
+
+  const isSubmitting =
+    createIdentity.isPending ||
+    bindIdentity.isPending ||
+    confirmBinding.isPending ||
+    rotateIdentity.isPending ||
+    createApiKey.isPending ||
+    revokeApiKey.isPending;
+
+  return (
+    <ActivitySourceCredentials
+      sourceId={source.sourceId}
+      nearAccountId={source.nearAccountId}
+      identity={identity}
+      apiKeys={apiKeys}
+      revealedApiKey={revealedApiKey}
+      isSubmitting={isSubmitting}
+      onCreateIdentity={async () => {
+        await createIdentity.mutateAsync();
+      }}
+      onBind={async () => {
+        await bindIdentity.mutateAsync();
+      }}
+      onConfirmBinding={async () => {
+        await confirmBinding.mutateAsync();
+      }}
+      onRotate={async () => {
+        await rotateIdentity.mutateAsync();
+      }}
+      onCreateApiKey={async (name) => {
+        await createApiKey.mutateAsync(name);
+      }}
+      onRevokeApiKey={async (apiKeyId) => {
+        await revokeApiKey.mutateAsync(apiKeyId);
+      }}
+      onDismissReveal={() => setRevealedApiKey(null)}
+    />
   );
 }

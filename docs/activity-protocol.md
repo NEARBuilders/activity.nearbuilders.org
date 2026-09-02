@@ -30,6 +30,32 @@ reconnection and resubscription, and explicit shutdown. No application plugin is
 the boundary is deliberately small enough to move behind the shared Nostr plugin when its public
 contract includes the required streaming lifecycle.
 
+## Source credentials and signing
+
+Each approved Activity Source has one active Signing Identity. Its 32-byte Nostr private key is
+encrypted with AES-256-GCM; the stored record contains ciphertext, a unique IV, an authentication
+tag, and the version of the master key that encrypted it. The plaintext key is produced only inside
+the signing operation and its buffer is cleared afterwards. API responses, errors, and safe history
+records contain only the Nostr public key and binding metadata.
+
+The deployment secret `ACTIVITY_SIGNING_MASTER_KEYS` is a JSON keyring whose values are base64
+encoded 32-byte keys. `ACTIVITY_SIGNING_ACTIVE_KEY_VERSION` selects the key used for new encryption.
+Old versions must remain available until every Signing Identity encrypted under them has been
+rotated.
+
+A Binding Proof follows the shared `near-nostr` convention. The gateway signs a kind-27235 challenge
+with the custodied identity and prepares a mainnet `contextual.near.__fastdata_kv` write under
+`nostr/<source-account>`. The connected wallet must use the Activity Source's exact mainnet NEAR
+account. The wallet submits the transaction directly; no relayer is required. The gateway marks the
+identity bound only after FastNear mainnet returns the same public key from that account's binding
+path.
+
+Source API keys contain 256 random bits and are persisted only as SHA-256 digests. They belong to
+exactly one Activity Source and always carry the single `event:write` permission. The full secret is
+returned by the creation response once; list and revoke responses contain safe metadata only. The
+ingestion authentication boundary rejects revoked keys, unapproved sources, and sources without a
+bound active Signing Identity.
+
 Queries order events by `(created_at DESC, id DESC)`. The opaque cursor contains both values. Relay
 queries include the cursor second, then discard IDs at or ahead of the cursor locally, preventing
 events with the same Nostr timestamp from being skipped or repeated. Each relay scan requests up to

@@ -1,5 +1,5 @@
 import { Check, X } from "lucide-react";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
 import type {
   ActivitySourceView,
   ReviewActivitySourceInput,
@@ -16,7 +16,13 @@ const statusLabel: Record<ActivitySourceView["approvalStatus"], string> = {
   rejected: "Rejected",
 };
 
-export function ActivitySourceCard({ source }: { source: ActivitySourceView }) {
+export function ActivitySourceCard({
+  source,
+  credentials,
+}: {
+  source: ActivitySourceView;
+  credentials?: ReactNode;
+}) {
   const statusVariant = source.approvalStatus === "rejected" ? "destructive" : "secondary";
 
   return (
@@ -54,6 +60,8 @@ export function ActivitySourceCard({ source }: { source: ActivitySourceView }) {
           Review: {source.reviewReason}
         </p>
       )}
+
+      {credentials}
     </Card>
   );
 }

@@ -6,6 +6,7 @@ import { RPCHandler } from "@orpc/server/node";
 import { createPluginRuntime } from "every-plugin";
 import type { contract } from "@/contract";
 import Plugin from "@/index";
+import type { ActivityCredentialsService } from "@/services/activity-credentials";
 import pluginDevConfig from "../plugin.dev";
 
 const TEST_PLUGIN_ID = pluginDevConfig.pluginId;
@@ -25,10 +26,12 @@ export const runtime = createPluginRuntime({
 
 let server: ReturnType<typeof createServer> | null = null;
 let baseUrl = "";
+let activityCredentialsService: ActivityCredentialsService | null = null;
 
 export async function getPluginClient(context?: Record<string, unknown>) {
   if (!server) {
-    const { router } = await runtime.usePlugin(TEST_PLUGIN_ID, TEST_CONFIG);
+    const { router, initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, TEST_CONFIG);
+    activityCredentialsService = initialized.context.activityCredentials;
     const rpcHandler = new RPCHandler(router);
 
     // Find an available port
@@ -83,6 +86,12 @@ export async function getPluginClient(context?: Record<string, unknown>) {
 export async function getActivitySourcesService() {
   const { initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, TEST_CONFIG);
   return initialized.context.activitySources;
+}
+
+export async function getActivityCredentialsService() {
+  if (!activityCredentialsService) await getPluginClient();
+  if (!activityCredentialsService) throw new Error("Activity credentials service is unavailable");
+  return activityCredentialsService;
 }
 
 export function authedContext(userId = "user-1"): Record<string, unknown> {

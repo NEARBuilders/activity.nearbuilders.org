@@ -307,6 +307,7 @@ fabric.properties
 .bos/*
 !.bos/generated/
 !.bos/generated/**
+/api/.bos/
 
 # AI tool config (local only, not committed)
 .opencode/

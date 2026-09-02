@@ -27,3 +27,17 @@ _Avoid_: Source status, trust status
 **Platform Administrator**:
 A service-level administrator who reviews Activity Sources independently of organization membership.
 _Avoid_: Source admin, organization admin
+
+**Signing Identity**:
+The cryptographic identity of one Activity Source whose public identity remains meaningful after it
+is rotated.
+_Avoid_: User key, organization key
+
+**Source API Key**:
+A revocable credential belonging to exactly one Activity Source and authorizing that source to
+submit Activity events.
+_Avoid_: User API key, organization API key
+
+**Binding Proof**:
+Evidence that an Activity Source's NEAR account authorized its association with a Signing Identity.
+_Avoid_: Login proof, source approval
