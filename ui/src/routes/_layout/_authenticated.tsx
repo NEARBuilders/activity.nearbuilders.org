@@ -1,5 +1,6 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { type SessionData, sessionQueryOptions } from "@/app";
+import { resolveActiveOrganizationMembership } from "@/lib/activity-source-permissions";
 
 interface AuthContext {
   isAuthenticated: boolean;
@@ -17,10 +18,9 @@ export const Route = createFileRoute("/_layout/_authenticated")({
   beforeLoad: async ({ context, location }) => {
     const { queryClient, authClient } = context;
 
-    const [session, requestAuth] = await Promise.all([
-      queryClient.ensureQueryData(sessionQueryOptions(authClient, context.session)),
-      context.apiClient.auth.getContext(),
-    ]);
+    const session = await queryClient.ensureQueryData(
+      sessionQueryOptions(authClient, context.session),
+    );
 
     if (!session?.user) {
       throw redirect({
@@ -38,16 +38,24 @@ export const Route = createFileRoute("/_layout/_authenticated")({
       });
     }
 
+    const activeOrganization = await resolveActiveOrganizationMembership({
+      activeOrganizationId: session.session?.activeOrganizationId ?? null,
+      getActiveMemberRole: async ({ organizationId }) => {
+        const { data, error } = await authClient.organization.getActiveMember({
+          query: { organizationId },
+        });
+        if (error) throw new Error(error.message || "Failed to read the active workspace role");
+        return { role: data?.role ?? null };
+      },
+    });
+
     const auth: AuthContext = {
       isAuthenticated: true,
       user: session.user,
       session: session.session,
-      activeOrganizationId:
-        requestAuth.organization.activeOrganizationId ||
-        session.session?.activeOrganizationId ||
-        null,
-      activeOrganizationRole: requestAuth.organization.member?.role ?? null,
-      hasNearAccount: requestAuth.near.hasNearAccount,
+      activeOrganizationId: activeOrganization.activeOrganizationId,
+      activeOrganizationRole: activeOrganization.activeOrganizationRole,
+      hasNearAccount: Boolean(authClient.near.getAccountId()),
       isAnonymous: session.user.isAnonymous || false,
       isAdmin: session.user.role === "admin",
       isBanned: session.user.banned || false,
