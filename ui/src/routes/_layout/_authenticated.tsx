@@ -6,6 +6,8 @@ interface AuthContext {
   user: SessionData["user"] | null;
   session: SessionData["session"] | null;
   activeOrganizationId: string | null;
+  activeOrganizationRole: string | null;
+  hasNearAccount: boolean;
   isAnonymous: boolean;
   isAdmin: boolean;
   isBanned: boolean;
@@ -15,9 +17,10 @@ export const Route = createFileRoute("/_layout/_authenticated")({
   beforeLoad: async ({ context, location }) => {
     const { queryClient, authClient } = context;
 
-    const session = await queryClient.ensureQueryData(
-      sessionQueryOptions(authClient, context.session),
-    );
+    const [session, requestAuth] = await Promise.all([
+      queryClient.ensureQueryData(sessionQueryOptions(authClient, context.session)),
+      context.apiClient.auth.getContext(),
+    ]);
 
     if (!session?.user) {
       throw redirect({
@@ -39,7 +42,12 @@ export const Route = createFileRoute("/_layout/_authenticated")({
       isAuthenticated: true,
       user: session.user,
       session: session.session,
-      activeOrganizationId: session.session?.activeOrganizationId || null,
+      activeOrganizationId:
+        requestAuth.organization.activeOrganizationId ||
+        session.session?.activeOrganizationId ||
+        null,
+      activeOrganizationRole: requestAuth.organization.member?.role ?? null,
+      hasNearAccount: requestAuth.near.hasNearAccount,
       isAnonymous: session.user.isAnonymous || false,
       isAdmin: session.user.role === "admin",
       isBanned: session.user.banned || false,

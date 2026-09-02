@@ -25,7 +25,6 @@ export const runtime = createPluginRuntime({
 
 let server: ReturnType<typeof createServer> | null = null;
 let baseUrl = "";
-let port = 0;
 
 export async function getPluginClient(context?: Record<string, unknown>) {
   if (!server) {
@@ -33,10 +32,6 @@ export async function getPluginClient(context?: Record<string, unknown>) {
     const rpcHandler = new RPCHandler(router);
 
     // Find an available port
-    const testPort = 3000 + Math.floor(Math.random() * 1000);
-    port = testPort;
-    baseUrl = `http://localhost:${port}`;
-
     server = createServer(async (req, res) => {
       const url = new URL(req.url!, baseUrl);
 
@@ -61,9 +56,14 @@ export async function getPluginClient(context?: Record<string, unknown>) {
     });
 
     await new Promise<void>((resolve, reject) => {
-      server?.listen(port, "127.0.0.1", () => resolve());
+      server?.listen(0, "127.0.0.1", () => resolve());
       server?.on("error", reject);
     });
+    const address = server.address();
+    if (!address || typeof address === "string") {
+      throw new Error("Test server did not bind to a TCP port");
+    }
+    baseUrl = `http://127.0.0.1:${address.port}`;
   }
 
   const link = new RPCLink({
@@ -78,6 +78,11 @@ export async function getPluginClient(context?: Record<string, unknown>) {
 
   const client: ContractRouterClient<typeof contract> = createORPCClient(link);
   return client;
+}
+
+export async function getActivitySourcesService() {
+  const { initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, TEST_CONFIG);
+  return initialized.context.activitySources;
 }
 
 export function authedContext(userId = "user-1"): Record<string, unknown> {
@@ -104,6 +109,81 @@ export function orgContext(
         slug: activeOrganizationId,
         metadata: null,
       },
+    },
+  };
+}
+
+export function orgOwnerContext(
+  userId = "owner-1",
+  activeOrganizationId = "org-owner-1",
+  nearAccountId: string | null = `${userId}.near`,
+): Record<string, unknown> {
+  return {
+    ...orgContext(userId, activeOrganizationId),
+    near: {
+      primaryAccountId: nearAccountId,
+      linkedAccounts: nearAccountId
+        ? [
+            {
+              accountId: nearAccountId,
+              network: "mainnet",
+              publicKey: `ed25519:${"1".repeat(64)}`,
+              isPrimary: true,
+            },
+          ]
+        : [],
+      hasNearAccount: nearAccountId !== null,
+    },
+    organization: {
+      activeOrganizationId,
+      member: { id: `member-${userId}`, role: "owner" },
+      organization: {
+        id: activeOrganizationId,
+        slug: activeOrganizationId,
+        metadata: null,
+      },
+    },
+  };
+}
+
+export function orgMemberContext(
+  userId = "member-1",
+  activeOrganizationId = "org-1",
+): Record<string, unknown> {
+  return {
+    ...authedContext(userId),
+    near: {
+      primaryAccountId: `${userId}.near`,
+      linkedAccounts: [
+        {
+          accountId: `${userId}.near`,
+          network: "mainnet",
+          publicKey: `ed25519:${"1".repeat(64)}`,
+          isPrimary: true,
+        },
+      ],
+      hasNearAccount: true,
+    },
+    organization: {
+      activeOrganizationId,
+      member: { id: `member-${userId}`, role: "member" },
+      organization: {
+        id: activeOrganizationId,
+        slug: activeOrganizationId,
+        metadata: null,
+      },
+    },
+  };
+}
+
+export function adminContext(userId = "platform-admin-1"): Record<string, unknown> {
+  return {
+    ...authedContext(userId),
+    user: {
+      id: userId,
+      email: `${userId}@example.com`,
+      name: "Platform Administrator",
+      role: "admin",
     },
   };
 }

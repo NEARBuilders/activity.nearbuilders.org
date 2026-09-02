@@ -1,20 +1,20 @@
 # Activity Service
 
-`activity.nearbuilders.org` is a shared activity and reputation layer for the NEAR ecosystem. Projects register with a NEAR account, receive an API key, and submit activity events through a common HTTP gateway. The service gives applications a portable event feed, live updates, and dynamically scored leaderboards without requiring every project to build the same infrastructure.
+`activity.nearbuilders.org` is a shared activity and reputation layer for the NEAR ecosystem. Activity Sources are registered through a NEAR-authenticated organization and, as the service grows, will receive API credentials for submitting events through a common HTTP gateway. The service is designed to give applications a portable event feed, live updates, and dynamically scored leaderboards without requiring every integrator to build the same infrastructure.
 
-This repository extends [`dev.everything`](https://everything.dev/) with local UI and API overrides. It is currently an initialized application scaffold; the activity features described below are the implementation scope, not a claim that they are already live.
+This repository extends [`dev.everything`](https://everything.dev/) with local UI and API overrides. It includes the local Nostr/Redis protocol proof and Activity Source registration and approval slices; later gateway, feed, and leaderboard features described below remain planned rather than live.
 
 The product scope comes from [NEAR Builders' Activity Service proposal](https://github.com/NEARBuilders/nearbuilders.org/blob/main/ACTIVITY.md), originally targeted for August 2026.
 
 ## Why this exists
 
-Activity data is fragmented across NEAR applications. Games, governance tools, community platforms, and developer tooling each track engagement independently, so contributors cannot carry a useful history between projects and every new application starts from zero.
+Activity data is fragmented across NEAR applications. Games, governance tools, community platforms, and developer tooling each track engagement independently, so contributors cannot carry a useful history between applications and every new integration starts from zero.
 
 The Activity Service provides one integration path for all of them:
 
-- Projects own their source identity through a NEAR account.
+- Organizations own stable Activity Source identities associated with NEAR accounts.
 - API keys authenticate event submissions.
-- Per-project Nostr keys provide cryptographic provenance.
+- Per-source Nostr keys provide cryptographic provenance.
 - Nostr relays store and distribute immutable events.
 - Redis stores raw counts and calculates scores using current point values.
 - HTTP queries and SSE expose historical and real-time activity to clients.
@@ -23,12 +23,12 @@ The service is intended to become shared plumbing for reputation, loyalty points
 
 ## Product principles
 
-- **Portable:** activity belongs to the actor and can be consumed across projects.
-- **Source-verifiable:** every event is attributable to an approved project identity.
+- **Portable:** activity belongs to the actor and can be consumed across applications.
+- **Source-verifiable:** every event is attributable to an approved Activity Source identity.
 - **Immutable:** accepted events are never edited; administrators may only hide them.
 - **Idempotent:** repeat submissions produce the same immutable event identity.
 - **Dynamically scored:** point-value changes affect historical leaderboard results immediately, without replaying events.
-- **Simple to adopt:** external projects integrate through an HTTP API and do not need to operate Nostr directly.
+- **Simple to adopt:** external integrators use an HTTP API and do not need to operate Nostr directly.
 
 ## Planned API
 
@@ -49,18 +49,18 @@ Each event contains:
 - `payload`: arbitrary JSON associated with the activity
 - an idempotency key scoped to the source, such as `github:pr:42`
 
-The gateway validates the source and event type, signs the event with the project's Nostr key, publishes it to configured relays, and returns its immutable event ID.
+The gateway validates the source and event type, signs the event with the Activity Source's Nostr key, publishes it to configured relays, and returns its immutable event ID.
 
 ## Proposed architecture
 
 ```text
-Project (NEAR account)
+Activity Source (NEAR account)
     |
     | POST /api/v1/events (API key)
     v
 HTTP gateway
     | validates the key and event type
-    | signs with the project's encrypted Nostr key
+    | signs with the source's encrypted Nostr key
     v
 Nostr relays
     | persist and distribute immutable events
@@ -75,9 +75,9 @@ Activity UI and external consumers
 
 ### Nostr
 
-Activity events will use a dedicated Nostr event kind. Each registered project receives or links its own Nostr keypair so its events can be verified independently. Private signing keys are encrypted at rest with AES-256, decrypted only while signing, and never returned by the API.
+Activity events use regular, immutable Nostr kind `1701`. Each registered Activity Source will receive or link its own Nostr keypair so its events can be verified independently. Private signing keys will be encrypted at rest with AES-256, decrypted only while signing, and never returned by the API.
 
-Rotating a project key affects only new signatures. Historical relay events remain valid, while actor-based Redis counts and leaderboard history continue without a rebuild.
+Rotating a source key affects only new signatures. Historical relay events remain valid, while actor-based Redis counts and leaderboard history continue without a rebuild.
 
 The service depends on the shared NEAR-to-Nostr work:
 
@@ -90,7 +90,7 @@ The service depends on the shared NEAR-to-Nostr work:
 Redis stores raw event counts rather than precomputed scores:
 
 ```text
-counts:{period}:{actor} -> Hash { "game.score": 42, "github.pr": 15 }
+counts:{period}:{actor} -> Hash { '["game.near","score"]': 42 }
 active:{period}         -> Sorted Set of actors by total event count
 ```
 
@@ -98,13 +98,13 @@ Leaderboard reads multiply counts by each event type's current point value and t
 
 ## User flows
 
-### Project onboarding
+### Activity Source onboarding
 
-1. A project signs in with its NEAR account.
-2. It registers an activity source and defines valid event types.
-3. An administrator approves or rejects the source.
-4. The project creates or links a Nostr signing identity.
-5. The project creates an API key.
+1. A Source Owner authenticates with NEAR and selects the owning organization.
+2. The owner registers an Activity Source and defines valid Event Types.
+3. A Platform Administrator approves or rejects the source with an auditable reason.
+4. The source creates or links a Nostr signing identity.
+5. The source creates an API key.
 6. It starts submitting events to `POST /api/v1/events`.
 
 ### Event delivery
@@ -120,8 +120,8 @@ Leaderboard reads multiply counts by each event type's current point value and t
 
 - Configure one reliable Nostr relay and define the activity event kind.
 - Provide relay-backed event ingestion and filtered event queries.
-- Register projects through NEAR authentication and approve sources through an admin dashboard.
-- Create and revoke API keys and securely manage per-project Nostr keys.
+- Register Activity Sources through NEAR-authenticated organizations and approve them through an admin dashboard.
+- Create and revoke API keys and securely manage per-source Nostr keys.
 - Stream new events to clients through filtered SSE subscriptions.
 - Build weekly, monthly, and all-time leaderboards from Redis counts and dynamic point values.
 - Show source badges and distinguish verified from unverified events.
@@ -145,11 +145,11 @@ These can later integrate through the same event gateway without changing the co
 
 ## Success measures
 
-- Three external projects are registered and submitting events.
+- Three external Activity Sources are registered and submitting events.
 - One polling integration appears in the live feed with a source badge.
 - Activity is visible on builder profiles and the projects board.
 - Weekly, monthly, and all-time leaderboards are live.
-- An external project can complete onboarding without direct assistance.
+- An external integrator can complete onboarding without direct assistance.
 - The Nostr infrastructure is reusable by both activity and chat scopes.
 
 ## Local development
@@ -159,24 +159,31 @@ These can later integrate through the same event gateway without changing the co
 - [Bun](https://bun.sh/)
 - Docker with Compose
 
-### Start the project
+### Start the service
 
 ```bash
 bun install
-docker compose up -d --wait
+bun run dev:activity-infra
 bun run dev
 ```
 
 The initializer creates a local `.env` from `.env.example`. Keep secrets out of version control.
+The Activity infrastructure command starts the pinned local Nostr relay on port `7447` and Redis
+on port `6380`; both use Docker named volumes. Run `bun run dev:activity-infra:down` to stop them.
 
 ### Useful commands
 
 ```bash
 bun run typecheck
 bun run test
+bun run test:activity
 bun run lint
 bun run build
 ```
+
+The Activity integration test uses only the local containers and includes a real relay restart.
+The event kind, indexed tags, cursor contract, and production requirements are documented in
+[`docs/activity-protocol.md`](./docs/activity-protocol.md).
 
 Runtime composition is configured in [`bos.config.json`](./bos.config.json). The project publishes from `nearbuilding.near`, serves `activity.nearbuilders.org`, and inherits the shared runtime from `dev.everything` while overriding the UI and API locally.
 
@@ -186,7 +193,7 @@ Runtime composition is configured in [`bos.config.json`](./bos.config.json). The
 api/               Activity API and service implementation
 ui/                Activity dashboard, feed, and leaderboard UI
 bos.config.json    everything.dev runtime composition
-docker-compose.yml Local infrastructure
+compose.activity.yml Local Nostr relay and Redis infrastructure
 ```
 
-See [`AGENTS.md`](./AGENTS.md) for project-specific development guidance and [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the contribution workflow.
+See [`AGENTS.md`](./AGENTS.md) for repository-specific development guidance and [`CONTRIBUTING.md`](./CONTRIBUTING.md) for the contribution workflow.

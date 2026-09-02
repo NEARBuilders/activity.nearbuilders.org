@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { ClipboardList, Compass, Globe, Home, Menu, Shield, X } from "lucide-react";
+import { ClipboardList, Compass, Globe, Home, Menu, RadioTower, Shield, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   getAccount,
@@ -83,6 +83,12 @@ function Layout() {
   const sidebarItems: SidebarItem[] = [
     { icon: Home, label: "home", to: "/home", roleRequired: "anon" },
     { icon: Globe, label: "apps", to: "/apps", roleRequired: "anon" },
+    {
+      icon: RadioTower,
+      label: "activity sources",
+      to: "/activity-sources",
+      roleRequired: "member",
+    },
     ...(liveIsTenantMember
       ? ([{ icon: Shield, label: "admin", to: "/admin", roleRequired: "member" }] as SidebarItem[])
       : []),

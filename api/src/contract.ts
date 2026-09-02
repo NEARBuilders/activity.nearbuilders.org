@@ -27,6 +27,50 @@ export const TenantSchema = z.object({
 
 export type Tenant = z.infer<typeof TenantSchema>;
 
+export const ActivitySourceApprovalStatusSchema = z.enum(["pending", "approved", "rejected"]);
+
+export const ActivityEventTypeSchema = z.object({
+  name: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/),
+  description: z.string().min(1).max(500),
+  enabled: z.boolean(),
+  pointValue: z.number().int().min(0).max(1_000_000),
+});
+
+export const ActivitySourceReviewSchema = z.object({
+  decision: z.enum(["approved", "rejected"]),
+  reason: z.string(),
+  administratorId: z.string(),
+  reviewedAt: z.string(),
+});
+
+export const ActivitySourceSchema = z.object({
+  sourceId: z.string(),
+  displayName: z.string(),
+  nearAccountId: z.string(),
+  organizationId: z.string(),
+  approvalStatus: ActivitySourceApprovalStatusSchema,
+  canIngest: z.boolean(),
+  eventTypes: z.array(ActivityEventTypeSchema),
+  reviewHistory: z.array(ActivitySourceReviewSchema),
+  reviewedBy: z.string().nullable(),
+  reviewReason: z.string().nullable(),
+  reviewedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
+const ActivityEventTypesInputSchema = z
+  .array(ActivityEventTypeSchema)
+  .min(1)
+  .max(50)
+  .refine((eventTypes) => new Set(eventTypes.map(({ name }) => name)).size === eventTypes.length, {
+    message: "Event type names must be unique",
+  });
+
 const ThingSchema = z.object({
   thingId: z.string().describe("Unique identifier for the thing"),
   type: z.string().describe("Plugin-derived thing type"),
@@ -149,6 +193,64 @@ export const contract = oc.router({
       }),
     )
     .errors({ UNAUTHORIZED, BAD_REQUEST }),
+
+  createActivitySource: oc
+    .route({ method: "POST", path: "/activity/sources" })
+    .input(
+      z.object({
+        sourceId: z
+          .string()
+          .min(2)
+          .max(100)
+          .regex(/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/),
+        displayName: z.string().trim().min(1).max(120),
+        nearAccountId: z.string().min(2).max(64),
+        eventTypes: ActivityEventTypesInputSchema,
+      }),
+    )
+    .output(ActivitySourceSchema)
+    .errors({ UNAUTHORIZED, FORBIDDEN, BAD_REQUEST, CONFLICT: { status: 409 } }),
+
+  listActivitySources: oc
+    .route({ method: "GET", path: "/activity/sources" })
+    .output(z.array(ActivitySourceSchema))
+    .errors({ UNAUTHORIZED, FORBIDDEN }),
+
+  updateActivitySource: oc
+    .route({ method: "PATCH", path: "/activity/sources/{sourceId}" })
+    .input(
+      z.object({
+        sourceId: z.string(),
+        displayName: z.string().trim().min(1).max(120).optional(),
+        nearAccountId: z.string().min(2).max(64).optional(),
+        eventTypes: ActivityEventTypesInputSchema.optional(),
+      }),
+    )
+    .output(ActivitySourceSchema)
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST, CONFLICT: { status: 409 } }),
+
+  listActivitySourcesForReview: oc
+    .route({ method: "GET", path: "/activity/source-reviews" })
+    .input(z.object({ approvalStatus: ActivitySourceApprovalStatusSchema.optional() }))
+    .output(z.array(ActivitySourceSchema))
+    .errors({ UNAUTHORIZED, FORBIDDEN }),
+
+  reviewActivitySource: oc
+    .route({ method: "POST", path: "/activity/sources/{sourceId}/review" })
+    .input(
+      z.object({
+        sourceId: z.string(),
+        decision: z.enum(["approved", "rejected"]),
+        reason: z.string().trim().min(1).max(1_000),
+      }),
+    )
+    .output(ActivitySourceSchema)
+    .errors({
+      UNAUTHORIZED,
+      FORBIDDEN,
+      NOT_FOUND,
+      CONFLICT: { status: 409 },
+    }),
 
   createThing: oc
     .route({

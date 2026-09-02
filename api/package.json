@@ -19,14 +19,17 @@
     "typescript": "catalog:"
   },
   "dependencies": {
+    "@electric-sql/pglite": "catalog:",
     "@orpc/contract": "catalog:",
     "@orpc/server": "catalog:",
     "drizzle-kit": "catalog:",
     "drizzle-orm": "catalog:",
     "effect": "catalog:",
     "every-plugin": "catalog:",
+    "nostr-tools": "2.24.1",
     "pg": "catalog:",
-    "@electric-sql/pglite": "catalog:",
+    "redis": "6.2.1",
+    "ws": "8.21.3",
     "zod": "catalog:"
   },
   "devDependencies": {
@@ -37,6 +40,7 @@
     "@rspack/core": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
+    "@types/ws": "8.18.1",
     "dotenv": "^17.2.3",
     "everything-dev": "catalog:",
     "vite-tsconfig-paths": "^5.1.4",

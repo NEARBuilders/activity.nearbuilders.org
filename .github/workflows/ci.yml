@@ -71,6 +71,18 @@ jobs:
       - name: Run tests
         run: bun run test
 
+      - name: Start Activity infrastructure
+        run: bun run dev:activity-infra
+
+      - name: Run Activity integration test
+        env:
+          ACTIVITY_INTEGRATION: "1"
+        run: bun run --cwd api test tests/integration/activity-boundary.test.ts
+
+      - name: Stop Activity infrastructure
+        if: always()
+        run: bun run dev:activity-infra:down
+
   notify:
     name: Notify downstream workflows
     needs: [lint-and-typecheck]

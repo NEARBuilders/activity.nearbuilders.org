@@ -1,0 +1,27 @@
+services:
+  activity-relay:
+    image: ghcr.io/mattn/nostr-relay:v0.0.250
+    platform: linux/amd64
+    environment:
+      DATABASE_URL: /data/nostr-relay.sqlite
+    ports:
+      - "7447:7447"
+    volumes:
+      - activity-relay-data:/data
+
+  activity-redis:
+    image: redis:8.2.1-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
+    volumes:
+      - activity-redis-data:/data
+
+volumes:
+  activity-relay-data:
+  activity-redis-data:

@@ -3,10 +3,11 @@ import { Effect, Layer } from "every-plugin/effect";
 import { ORPCError } from "every-plugin/orpc";
 import { z } from "every-plugin/zod";
 import { contract } from "./contract";
-import { DatabaseLive } from "./db/layer";
+import { DatabaseLive, DatabaseTag } from "./db/layer";
 import { createAuthMiddleware } from "./lib/auth";
 import { ContextSchema } from "./lib/context";
 import type { PluginsClient } from "./lib/plugins-types.gen";
+import { ActivitySourcesLive, ActivitySourcesTag } from "./services/activity-sources";
 import { TenantsLive, TenantsTag } from "./services/tenants";
 
 const SUBDOMAIN_SEGMENT_REGEX = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
@@ -66,22 +67,42 @@ export default createPlugin.withPlugins<PluginsClient>()({
 
   initialize: (config, _plugins, tools) =>
     Effect.gen(function* () {
-      const database = DatabaseLive(config.secrets.API_DATABASE_URL);
-      const tenantsLayer = TenantsLive.pipe(Layer.provide(database));
-
-      const tenantsService = yield* tools.buildService(TenantsTag, tenantsLayer);
+      const database = yield* tools.buildService(
+        DatabaseTag,
+        DatabaseLive(config.secrets.API_DATABASE_URL),
+      );
+      const databaseLayer = Layer.succeed(DatabaseTag, database);
+      const tenantsService = yield* tools.buildService(
+        TenantsTag,
+        TenantsLive.pipe(Layer.provide(databaseLayer)),
+      );
+      const activitySourcesService = yield* tools.buildService(
+        ActivitySourcesTag,
+        ActivitySourcesLive.pipe(Layer.provide(databaseLayer)),
+      );
 
       console.log("[API] Services Initialized");
 
       return {
         tenants: tenantsService,
+        activitySources: activitySourcesService,
       };
     }),
 
   shutdown: () => Effect.log("[API] Shutdown"),
 
   createRouter: (services, builder) => {
-    const { requireAuth, requireOrganization, requireOrgRole } = createAuthMiddleware(builder);
+    const { requireAdmin, requireAuth, requireOrganization, requireOrgRole } =
+      createAuthMiddleware(builder);
+    const requireNearAuthentication = builder.middleware(async ({ context, next }) => {
+      if (!context.near?.hasNearAccount || !context.near.primaryAccountId) {
+        throw new ORPCError("FORBIDDEN", {
+          message: "NEAR authentication required",
+          data: { hint: "Connect a NEAR account before registering an Activity Source" },
+        });
+      }
+      return next({ context: { near: context.near } });
+    });
 
     const authorizedTenant = async (
       input: { tenantId: string },
@@ -240,6 +261,64 @@ export default createPlugin.withPlugins<PluginsClient>()({
           accountId: { format: accountFormat, available: accountAvailable },
         };
       }),
+
+      createActivitySource: builder.createActivitySource
+        .use(requireNearAuthentication)
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) => {
+          validateAccountId(input.nearAccountId);
+          return await services.activitySources.createSource({
+            ...input,
+            organizationId: context.organization.activeOrganizationId,
+          });
+        }),
+
+      listActivitySources: builder.listActivitySources
+        .use(requireOrgRole("owner", "admin", "member"))
+        .handler(async ({ context }) =>
+          services.activitySources.listSourcesByOrganization(
+            context.organization.activeOrganizationId,
+          ),
+        ),
+
+      updateActivitySource: builder.updateActivitySource
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) => {
+          if (
+            input.displayName === undefined &&
+            input.nearAccountId === undefined &&
+            input.eventTypes === undefined
+          ) {
+            throw new ORPCError("BAD_REQUEST", {
+              message: "At least one source field must be updated",
+            });
+          }
+          if (input.nearAccountId !== undefined) validateAccountId(input.nearAccountId);
+          return await services.activitySources.updateSource(
+            context.organization.activeOrganizationId,
+            input.sourceId,
+            {
+              displayName: input.displayName,
+              nearAccountId: input.nearAccountId,
+              eventTypes: input.eventTypes,
+            },
+          );
+        }),
+
+      listActivitySourcesForReview: builder.listActivitySourcesForReview
+        .use(requireAdmin)
+        .handler(async ({ input }) =>
+          services.activitySources.listSourcesForReview(input.approvalStatus),
+        ),
+
+      reviewActivitySource: builder.reviewActivitySource
+        .use(requireAdmin)
+        .handler(async ({ input, context }) =>
+          services.activitySources.reviewSource({
+            ...input,
+            administratorId: context.userId,
+          }),
+        ),
 
       createThing: builder.createThing.use(requireAuth).handler(async ({ input }) => {
         throw new ORPCError("BAD_REQUEST", {

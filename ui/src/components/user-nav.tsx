@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { synchronizeActiveOrganization } from "@/lib/active-organization";
 
 export function UserNav() {
   const auth = useAuthClient();
@@ -66,10 +67,21 @@ export function UserNav() {
     );
   }
 
-  const handleOrgSwitch = async () => {
-    await queryClient.invalidateQueries({ queryKey: ["session"] });
-    await queryClient.invalidateQueries({ queryKey: ["organizations"] });
-  };
+  const handleOrgSwitch = async (organizationId: string) =>
+    synchronizeActiveOrganization({
+      organizationId,
+      queryClient,
+      confirmActiveOrganization: async () => {
+        const { data, error } = await auth.getSession({
+          query: { disableCookieCache: true },
+        });
+        if (error) {
+          throw new Error(error.message || "Failed to confirm the selected workspace");
+        }
+        return data?.session.activeOrganizationId ?? null;
+      },
+      invalidateRouter: () => router.invalidate(),
+    });
 
   return (
     <div className="flex items-center gap-2">

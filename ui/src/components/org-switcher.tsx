@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { Building2, Check, Plus } from "lucide-react";
+import { toast } from "sonner";
 import type { Organization } from "@/app";
 import { useAuthClient } from "@/app";
 import { Button } from "./ui/button";
@@ -15,7 +16,7 @@ import {
 interface OrgSwitcherProps {
   organizations: Organization[];
   activeOrgId?: string | null;
-  onSwitch?: (orgId: string) => void;
+  onSwitch?: (orgId: string) => void | Promise<void>;
 }
 
 export function OrgSwitcher({ organizations, activeOrgId, onSwitch }: OrgSwitcherProps) {
@@ -25,8 +26,18 @@ export function OrgSwitcher({ organizations, activeOrgId, onSwitch }: OrgSwitche
   const handleSwitch = async (orgId: string) => {
     if (orgId === activeOrgId) return;
     const { error } = await auth.organization.setActive({ organizationId: orgId });
-    if (!error) {
-      onSwitch?.(orgId);
+    if (error) {
+      toast.error(error.message || "Failed to switch organization");
+      return;
+    }
+    try {
+      await onSwitch?.(orgId);
+    } catch (switchError) {
+      toast.error(
+        switchError instanceof Error
+          ? switchError.message
+          : "Failed to confirm the selected workspace",
+      );
     }
   };
 
