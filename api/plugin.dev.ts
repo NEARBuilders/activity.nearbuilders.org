@@ -30,6 +30,7 @@ export default {
       ACTIVITY_SIGNING_MASTER_KEYS:
         process.env.ACTIVITY_SIGNING_MASTER_KEYS || DEVELOPMENT_MASTER_KEYS,
       ACTIVITY_SIGNING_ACTIVE_KEY_VERSION: process.env.ACTIVITY_SIGNING_ACTIVE_KEY_VERSION || "v1",
+      ACTIVITY_REDIS_URL: process.env.ACTIVITY_REDIS_URL || "memory:",
     },
   } satisfies PluginConfigInput<typeof Plugin>,
 };

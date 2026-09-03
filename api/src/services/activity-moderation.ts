@@ -13,6 +13,7 @@ import {
   activityEventModerationRequests as requestsTable,
 } from "../db/schema";
 import type { ActivitySuppressionStore } from "./activity-feed";
+import type { ActivityLeaderboard } from "./activity-leaderboard";
 
 type HiddenRow = typeof hiddenEventsTable.$inferSelect;
 type RequestRow = typeof requestsTable.$inferSelect;
@@ -180,10 +181,16 @@ export class DatabaseActivityModerationStore implements ActivitySuppressionStore
 export class ActivityModerationService {
   readonly #store: DatabaseActivityModerationStore;
   readonly #events: ActivityEventModerationLookup;
+  readonly #leaderboard: ActivityLeaderboard;
 
-  constructor(store: DatabaseActivityModerationStore, events: ActivityEventModerationLookup) {
+  constructor(
+    store: DatabaseActivityModerationStore,
+    events: ActivityEventModerationLookup,
+    leaderboard: ActivityLeaderboard,
+  ) {
     this.#store = store;
     this.#events = events;
+    this.#leaderboard = leaderboard;
   }
 
   async hide(input: {
@@ -203,7 +210,7 @@ export class ActivityModerationService {
           message: "Moderation idempotency key was already used for another request",
         });
       }
-      return this.#result(existingRequest, true);
+      return this.#resultWithProjection(existingRequest, true);
     }
 
     const alreadyHidden = await this.#store.getHidden(input.eventId);
@@ -214,7 +221,7 @@ export class ActivityModerationService {
     }
 
     const recorded = await this.#store.recordHide({ ...input, event, requestHash: hash });
-    return this.#result(recorded.request, recorded.requestReplayed);
+    return this.#resultWithProjection(recorded.request, recorded.requestReplayed);
   }
 
   listHidden(): Promise<HiddenActivityEvent[]> {
@@ -240,5 +247,20 @@ export class ActivityModerationService {
       },
       requestReplayed,
     };
+  }
+
+  async #resultWithProjection(
+    request: RequestRow,
+    requestReplayed: boolean,
+  ): Promise<HideActivityEventResult> {
+    const result = await this.#result(request, requestReplayed);
+    try {
+      await this.#leaderboard.apply({ operation: "exclude", event: result.hiddenEvent.event });
+    } catch {
+      throw new ORPCError("SERVICE_UNAVAILABLE", {
+        message: "Activity leaderboard projection is unavailable",
+      });
+    }
+    return result;
   }
 }

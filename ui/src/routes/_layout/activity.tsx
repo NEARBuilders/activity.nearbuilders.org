@@ -6,6 +6,10 @@ import {
   type ActivityFeedEventView,
   type ActivityFeedFilters,
 } from "@/components/activity-feed";
+import {
+  ActivityLeaderboard,
+  type ActivityLeaderboardPeriod,
+} from "@/components/activity-leaderboard";
 import { PageContainer } from "@/components/layout/page-container";
 import { mergeLiveActivityEvent } from "@/lib/activity-feed-live";
 import { useApiClient } from "@/lib/api";
@@ -14,6 +18,7 @@ type ActivityFeedSearch = {
   source?: string;
   type?: string;
   actor?: string;
+  period?: ActivityLeaderboardPeriod;
 };
 
 export const Route = createFileRoute("/_layout/activity")({
@@ -21,13 +26,14 @@ export const Route = createFileRoute("/_layout/activity")({
     source: stringSearchValue(search.source),
     type: stringSearchValue(search.type),
     actor: stringSearchValue(search.actor),
+    period: periodSearchValue(search.period),
   }),
   head: () => ({
     meta: [
-      { title: "Activity feed | NEAR Builders" },
+      { title: "Activity leaderboard and feed | NEAR Builders" },
       {
         name: "description",
-        content: "Browse trusted Activity events published by registered NEAR Builders sources.",
+        content: "Rank NEAR actors and browse trusted events from registered Activity Sources.",
       },
     ],
   }),
@@ -47,6 +53,18 @@ function ActivityFeedPageContent({ search }: { search: ActivityFeedSearch }) {
   const [liveEvents, setLiveEvents] = useState<ActivityFeedEventView[]>([]);
   const [liveStatus, setLiveStatus] = useState<"connecting" | "live" | "unavailable">("connecting");
   const cursor = cursors.at(-1);
+  const period = search.period ?? "weekly";
+  const leaderboardQuery = useQuery({
+    queryKey: ["activity-leaderboard", period, search.source, search.type],
+    queryFn: () =>
+      apiClient.getActivityLeaderboard({
+        period,
+        source: search.source,
+        type: search.type,
+        limit: 20,
+      }),
+    retry: 1,
+  });
   const query = useQuery({
     queryKey: ["activity-feed", search.source, search.type, search.actor, cursor],
     queryFn: () =>
@@ -91,7 +109,7 @@ function ActivityFeedPageContent({ search }: { search: ActivityFeedSearch }) {
 
   const applyFilters = (filters: ActivityFeedFilters) => {
     setCursors([undefined]);
-    void navigate({ search: filters });
+    void navigate({ search: { ...filters, period: search.period } });
   };
 
   const paginatedEvents: ActivityFeedEventView[] = query.data?.data ?? [];
@@ -104,29 +122,47 @@ function ActivityFeedPageContent({ search }: { search: ActivityFeedSearch }) {
 
   return (
     <PageContainer variant="wide">
-      <ActivityFeed
-        events={events}
-        filters={search}
-        liveStatus={liveStatus}
-        status={query.isError ? "error" : query.isPending ? "loading" : "success"}
-        errorMessage={query.error instanceof Error ? query.error.message : undefined}
-        skippedInvalid={query.data?.meta.skippedInvalid ?? 0}
-        hasMore={query.data?.meta.hasMore ?? false}
-        canGoBack={cursors.length > 1}
-        onApplyFilters={applyFilters}
-        onNextPage={() => {
-          const nextCursor = query.data?.meta.nextCursor;
-          if (nextCursor) setCursors((current) => [...current, nextCursor]);
-        }}
-        onPreviousPage={() => {
-          setCursors((current) => (current.length > 1 ? current.slice(0, -1) : current));
-        }}
-        onRetry={() => void query.refetch()}
-      />
+      <div className="space-y-12">
+        <ActivityLeaderboard
+          period={period}
+          result={leaderboardQuery.data}
+          status={
+            leaderboardQuery.isError ? "error" : leaderboardQuery.isPending ? "loading" : "success"
+          }
+          errorMessage={
+            leaderboardQuery.error instanceof Error ? leaderboardQuery.error.message : undefined
+          }
+          onPeriodChange={(period) => void navigate({ search: { ...search, period } })}
+          onRetry={() => void leaderboardQuery.refetch()}
+        />
+        <ActivityFeed
+          events={events}
+          filters={search}
+          liveStatus={liveStatus}
+          status={query.isError ? "error" : query.isPending ? "loading" : "success"}
+          errorMessage={query.error instanceof Error ? query.error.message : undefined}
+          skippedInvalid={query.data?.meta.skippedInvalid ?? 0}
+          hasMore={query.data?.meta.hasMore ?? false}
+          canGoBack={cursors.length > 1}
+          onApplyFilters={applyFilters}
+          onNextPage={() => {
+            const nextCursor = query.data?.meta.nextCursor;
+            if (nextCursor) setCursors((current) => [...current, nextCursor]);
+          }}
+          onPreviousPage={() => {
+            setCursors((current) => (current.length > 1 ? current.slice(0, -1) : current));
+          }}
+          onRetry={() => void query.refetch()}
+        />
+      </div>
     </PageContainer>
   );
 }
 
 function stringSearchValue(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function periodSearchValue(value: unknown): ActivityLeaderboardPeriod | undefined {
+  return value === "weekly" || value === "monthly" || value === "all-time" ? value : undefined;
 }

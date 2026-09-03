@@ -26,6 +26,11 @@ import {
 } from "./services/activity-feed";
 import { ActivityIngestionService } from "./services/activity-ingestion";
 import {
+  ActivityLeaderboardLive,
+  ActivityLeaderboardTag,
+  DatabaseActivityPointValueProvider,
+} from "./services/activity-leaderboard";
+import {
   ActivityModerationService,
   DatabaseActivityModerationStore,
 } from "./services/activity-moderation";
@@ -74,6 +79,15 @@ function validateAccountId(accountId: string): void {
   }
 }
 
+async function* listActivityHistory(feed: ActivityFeedService) {
+  let cursor: string | undefined;
+  do {
+    const page = await feed.list({ limit: 100, cursor });
+    yield* page.data;
+    cursor = page.meta.nextCursor ?? undefined;
+  } while (cursor);
+}
+
 export default createPlugin.withPlugins<PluginsClient>()({
   variables: z.object({
     activityNostrBindingContract: z.string().default("contextual.near"),
@@ -86,6 +100,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
     API_DATABASE_URL: z.string().default("pglite:.bos/api/:memory:"),
     ACTIVITY_SIGNING_MASTER_KEYS: z.string(),
     ACTIVITY_SIGNING_ACTIVE_KEY_VERSION: z.string().default("v1"),
+    ACTIVITY_REDIS_URL: z.string(),
   }),
 
   context: ContextSchema,
@@ -125,11 +140,20 @@ export default createPlugin.withPlugins<PluginsClient>()({
           scanLimit: 1_000,
         },
       );
+      const activityPointValues = new DatabaseActivityPointValueProvider(database);
+      const activityLeaderboard = yield* tools.buildService(
+        ActivityLeaderboardTag,
+        ActivityLeaderboardLive({
+          redisUrl: config.secrets.ACTIVITY_REDIS_URL,
+          listPointValues: () => activityPointValues.listPointValues(),
+        }),
+      );
       const activityIngestionService = new ActivityIngestionService(
         database,
         activityCredentialsService,
         activitySourcesService,
         activityRelay,
+        activityLeaderboard,
       );
       const activityModerationStore = new DatabaseActivityModerationStore(database);
       const activityFeedService = new ActivityFeedService(
@@ -140,7 +164,18 @@ export default createPlugin.withPlugins<PluginsClient>()({
       const activityModerationService = new ActivityModerationService(
         activityModerationStore,
         activityFeedService,
+        activityLeaderboard,
       );
+      const leaderboardStatus = yield* Effect.promise(() => activityLeaderboard.getStatus());
+      if (leaderboardStatus.state !== "ready" || config.secrets.ACTIVITY_REDIS_URL === "memory:") {
+        const hiddenEvents = yield* Effect.promise(() => activityModerationStore.listHidden());
+        yield* Effect.promise(() =>
+          activityLeaderboard.rebuild({
+            events: listActivityHistory(activityFeedService),
+            hiddenEvents: hiddenEvents.map(({ event }) => event),
+          }),
+        );
+      }
 
       console.log("[API] Services Initialized");
 
@@ -151,6 +186,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityIngestion: activityIngestionService,
         activityFeed: activityFeedService,
         activityModeration: activityModerationService,
+        activityLeaderboard,
         activityRelay,
       };
     }),
@@ -595,6 +631,16 @@ export default createPlugin.withPlugins<PluginsClient>()({
       listHiddenActivityEvents: builder.listHiddenActivityEvents
         .use(requireAdmin)
         .handler(async () => services.activityModeration.listHidden()),
+
+      getActivityLeaderboard: builder.getActivityLeaderboard.handler(async ({ input }) => {
+        try {
+          return await services.activityLeaderboard.getLeaderboard(input);
+        } catch {
+          throw new ORPCError("SERVICE_UNAVAILABLE", {
+            message: "Activity leaderboard projection is unavailable",
+          });
+        }
+      }),
 
       createThing: builder.createThing.use(requireAuth).handler(async ({ input }) => {
         throw new ORPCError("BAD_REQUEST", {

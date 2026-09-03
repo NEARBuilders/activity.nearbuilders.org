@@ -39,7 +39,7 @@ function readBosConfig() {
 const _bosConfig = readBosConfig();
 
 const baseConfig = {
-  externals: ["pg", "@electric-sql/pglite"],
+  externals: ["pg", "@electric-sql/pglite", "redis"],
   devtool: shouldDeploy ? false : "source-map",
   plugins: [
     new EmitPluginManifest(),
