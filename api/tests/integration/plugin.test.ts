@@ -1,3 +1,4 @@
+import { getEventMeta } from "every-plugin/orpc";
 import { verifyEvent } from "nostr-tools/pure";
 import { afterAll, describe, expect, it, vi } from "vitest";
 import {
@@ -7,6 +8,7 @@ import {
   getPluginBaseUrl,
   getPluginClient,
   getTestRelayEvents,
+  getTestRelaySubscriptionCount,
   loseNextTestRelayAcknowledgement,
   orgContext,
   orgMemberContext,
@@ -1143,6 +1145,161 @@ describe("API Plugin Integration Tests", () => {
         "Activity cursor is invalid",
       );
     });
+
+    it("streams newly submitted events that match all public feed filters", async () => {
+      const { secret } = await provisionIngestionSource({
+        sourceId: "stream-source",
+        ownerId: "stream-owner",
+        organizationId: "org-stream",
+        eventType: "feedback.submitted",
+      });
+      const gateway = await getPluginClient(undefined, {
+        authorization: `Bearer ${secret}`,
+      });
+      const publicClient = await getPluginClient();
+      const stream = await publicClient.streamActivityEvents({
+        source: "stream-source",
+        type: "feedback.submitted",
+        actor: "alice.near",
+      });
+
+      try {
+        const nextEvent = stream.next();
+        await gateway.submitActivityEvent({
+          eventType: "feedback.submitted",
+          actor: "bob.near",
+          idempotencyKey: "stream:bob",
+          payload: { rating: 3 },
+        });
+        const submitted = await gateway.submitActivityEvent({
+          eventType: "feedback.submitted",
+          actor: "alice.near",
+          idempotencyKey: "stream:alice",
+          payload: { rating: 5 },
+        });
+
+        await expect(withTestTimeout(nextEvent)).resolves.toEqual({
+          done: false,
+          value: expect.objectContaining({
+            id: submitted.eventId,
+            source: "stream-source",
+            type: "feedback.submitted",
+            actor: "alice.near",
+            payload: { rating: 5 },
+          }),
+        });
+      } finally {
+        await stream.return?.();
+      }
+
+      await expect.poll(() => getTestRelaySubscriptionCount()).toBe(0);
+    });
+
+    it("replays events after Last-Event-ID before continuing live with stable SSE IDs", async () => {
+      const { secret } = await provisionIngestionSource({
+        sourceId: "resume-source",
+        ownerId: "resume-owner",
+        organizationId: "org-resume",
+        eventType: "session.recorded",
+      });
+      const gateway = await getPluginClient(undefined, {
+        authorization: `Bearer ${secret}`,
+      });
+      const first = await gateway.submitActivityEvent({
+        eventType: "session.recorded",
+        actor: "speaker.near",
+        idempotencyKey: "resume:first",
+        payload: { sequence: 1 },
+      });
+      await new Promise((resolve) => setTimeout(resolve, 1_050));
+      const second = await gateway.submitActivityEvent({
+        eventType: "session.recorded",
+        actor: "speaker.near",
+        idempotencyKey: "resume:second",
+        payload: { sequence: 2 },
+      });
+      const resumedClient = await getPluginClient(undefined, {
+        "last-event-id": first.eventId,
+      });
+      const stream = await resumedClient.streamActivityEvents({ source: "resume-source" });
+
+      try {
+        const replayed = await withTestTimeout(stream.next());
+        expect(replayed).toEqual({
+          done: false,
+          value: expect.objectContaining({ id: second.eventId, payload: { sequence: 2 } }),
+        });
+        expect(replayed.done ? undefined : getEventMeta(replayed.value)?.id).toBe(second.eventId);
+      } finally {
+        await stream.return?.();
+      }
+
+      const response = await withTestTimeout(
+        fetch(`${await getPluginBaseUrl()}/v1/events/stream?source=resume-source`, {
+          headers: { "last-event-id": first.eventId },
+        }),
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-type")).toContain("text/event-stream");
+      const reader = response.body?.getReader();
+      expect(reader).toBeDefined();
+      try {
+        const frame = await readSseEventFrame(reader!);
+        expect(frame).toMatch(new RegExp(`^id:\\s*${second.eventId}$`, "m"));
+        expect(frame).toContain('"sequence":2');
+      } finally {
+        await reader?.cancel();
+      }
+    });
+
+    it("replays an event stored during a relay disconnect after reconnecting", async () => {
+      const { secret } = await provisionIngestionSource({
+        sourceId: "reconnect-source",
+        ownerId: "reconnect-owner",
+        organizationId: "org-reconnect",
+        eventType: "build.completed",
+      });
+      const gateway = await getPluginClient(undefined, {
+        authorization: `Bearer ${secret}`,
+      });
+      const publicClient = await getPluginClient();
+      const stream = await publicClient.streamActivityEvents({ source: "reconnect-source" });
+
+      try {
+        const replayedEvent = stream.next();
+        loseNextTestRelayAcknowledgement();
+        await expect(
+          gateway.submitActivityEvent({
+            eventType: "build.completed",
+            actor: "builder.near",
+            idempotencyKey: "reconnect:stored",
+            payload: { result: "success" },
+          }),
+        ).rejects.toThrow("Activity relay did not acknowledge the event");
+        const storedEvent = getTestRelayEvents().at(-1);
+
+        await expect(withTestTimeout(replayedEvent, 5_000)).resolves.toEqual({
+          done: false,
+          value: expect.objectContaining({
+            id: storedEvent?.id,
+            source: "reconnect-source",
+            payload: { result: "success" },
+          }),
+        });
+      } finally {
+        await stream.return?.();
+      }
+    });
+
+    it("rejects malformed and unavailable Last-Event-ID values", async () => {
+      for (const lastEventId of ["not-an-event-id", "f".repeat(64)]) {
+        const client = await getPluginClient(undefined, { "last-event-id": lastEventId });
+        const stream = await client.streamActivityEvents({ source: "resume-source" });
+        await expect(stream.next()).rejects.toThrow(
+          "Last-Event-ID is invalid or is not available in relay history",
+        );
+      }
+    });
   });
 
   describe("testError", () => {
@@ -1164,3 +1321,37 @@ describe("API Plugin Integration Tests", () => {
     });
   });
 });
+
+async function withTestTimeout<T>(promise: Promise<T>, timeoutMs = 2_000): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_resolve, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error("Timed out waiting for streamed Activity event")),
+          timeoutMs,
+        );
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
+}
+
+async function readSseEventFrame(reader: ReadableStreamDefaultReader<Uint8Array>): Promise<string> {
+  const decoder = new TextDecoder();
+  let body = "";
+  while (true) {
+    let boundary = body.indexOf("\n\n");
+    while (boundary >= 0) {
+      const frame = body.slice(0, boundary);
+      body = body.slice(boundary + 2);
+      if (/^id:/m.test(frame) && /^data:/m.test(frame)) return frame;
+      boundary = body.indexOf("\n\n");
+    }
+    const chunk = await withTestTimeout(reader.read());
+    if (chunk.done) throw new Error("Activity SSE stream ended before an event frame arrived");
+    body += decoder.decode(chunk.value, { stream: true });
+  }
+}
