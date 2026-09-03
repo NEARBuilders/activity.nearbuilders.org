@@ -19,12 +19,14 @@ const ErrorTestKindSchema = z.enum([
 
 export const NEAR_ACCOUNT_ID_REGEX =
   /^(?=.{2,64}$)([a-z0-9]+(?:[-_][a-z0-9]+)*)(\.([a-z0-9]+(?:[-_][a-z0-9]+)*))*$/;
+export const ACTIVITY_SOURCE_ID_REGEX = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
+export const ACTIVITY_EVENT_TYPE_NAME_REGEX = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
 
 const ActivityEventTypeNameSchema = z
   .string()
   .min(1)
   .max(100)
-  .regex(/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/);
+  .regex(ACTIVITY_EVENT_TYPE_NAME_REGEX);
 
 const NearAccountIdSchema = z.string().min(2).max(64).regex(NEAR_ACCOUNT_ID_REGEX);
 
@@ -112,6 +114,27 @@ export const ActivityEventSubmissionSchema = z.object({
   actor: NearAccountIdSchema,
   idempotencyKey: z.string().trim().min(1).max(200),
   payload: z.json(),
+});
+
+export const ActivityFeedEventSchema = z.object({
+  id: z.string().regex(/^[a-f0-9]{64}$/),
+  source: z.string(),
+  type: ActivityEventTypeNameSchema,
+  actor: NearAccountIdSchema,
+  idempotencyKey: z.string(),
+  timestamp: z.iso.datetime(),
+  payload: z.json(),
+});
+
+export type ActivityFeedEvent = z.infer<typeof ActivityFeedEventSchema>;
+
+export const ActivityFeedSchema = z.object({
+  data: z.array(ActivityFeedEventSchema),
+  meta: z.object({
+    hasMore: z.boolean(),
+    nextCursor: z.string().nullable(),
+    skippedInvalid: z.number().int().min(0),
+  }),
 });
 
 const ActivityEventTypesInputSchema = z
@@ -249,11 +272,7 @@ export const contract = oc.router({
     .route({ method: "POST", path: "/activity/sources" })
     .input(
       z.object({
-        sourceId: z
-          .string()
-          .min(2)
-          .max(100)
-          .regex(/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/),
+        sourceId: z.string().min(2).max(100).regex(ACTIVITY_SOURCE_ID_REGEX),
         displayName: z.string().trim().min(1).max(120),
         nearAccountId: z.string().min(2).max(64),
         eventTypes: ActivityEventTypesInputSchema,
@@ -383,6 +402,26 @@ export const contract = oc.router({
       SERVICE_UNAVAILABLE,
       CONFLICT: { status: 409 },
     }),
+
+  listActivityEvents: oc
+    .route({
+      method: "GET",
+      path: "/v1/events",
+      summary: "Browse Activity events",
+      description: "Returns trusted Activity events in deterministic reverse-chronological order.",
+      tags: ["Activity"],
+    })
+    .input(
+      z.object({
+        source: z.string().min(2).max(100).regex(ACTIVITY_SOURCE_ID_REGEX).optional(),
+        type: ActivityEventTypeNameSchema.optional(),
+        actor: NearAccountIdSchema.optional(),
+        limit: z.coerce.number().int().min(1).max(100).default(20),
+        cursor: z.string().optional(),
+      }),
+    )
+    .output(ActivityFeedSchema)
+    .errors({ BAD_REQUEST, SERVICE_UNAVAILABLE }),
 
   createThing: oc
     .route({

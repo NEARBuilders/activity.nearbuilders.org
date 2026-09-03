@@ -4,13 +4,21 @@ import { ORPCError } from "every-plugin/orpc";
 import { z } from "every-plugin/zod";
 import { resolveActivityRelayUrl } from "./activity/activity-config";
 import { parseActivityMasterKeys } from "./activity/activity-credentials-crypto";
-import { ActivityRelay, NostrRelayAdapter } from "./activity/activity-relay";
+import {
+  ActivityCursorError,
+  ActivityRelay,
+  ActivityRelayQueryTimeoutError,
+  ActivityRelayScanLimitError,
+  ActivityRelayUnavailableError,
+  NostrRelayAdapter,
+} from "./activity/activity-relay";
 import { contract, NEAR_ACCOUNT_ID_REGEX } from "./contract";
 import { DatabaseLive, DatabaseTag } from "./db/layer";
 import { createAuthMiddleware } from "./lib/auth";
 import { ContextSchema } from "./lib/context";
 import type { PluginsClient } from "./lib/plugins-types.gen";
 import { ActivityCredentialsLive, ActivityCredentialsTag } from "./services/activity-credentials";
+import { ActivityFeedService, DatabaseActivityIdentityStore } from "./services/activity-feed";
 import { ActivityIngestionService } from "./services/activity-ingestion";
 import { ActivitySourcesLive, ActivitySourcesTag } from "./services/activity-sources";
 import { TenantsLive, TenantsTag } from "./services/tenants";
@@ -102,16 +110,21 @@ export default createPlugin.withPlugins<PluginsClient>()({
           kvApiUrl: config.variables.activityNostrKvApiUrl,
         }).pipe(Layer.provide(databaseLayer)),
       );
+      const activityRelay = new ActivityRelay(
+        new NostrRelayAdapter(resolveActivityRelayUrl(config.variables.activityRelayUrl)),
+        {
+          scanLimit: 1_000,
+        },
+      );
       const activityIngestionService = new ActivityIngestionService(
         database,
         activityCredentialsService,
         activitySourcesService,
-        new ActivityRelay(
-          new NostrRelayAdapter(resolveActivityRelayUrl(config.variables.activityRelayUrl)),
-          {
-            scanLimit: 1_000,
-          },
-        ),
+        activityRelay,
+      );
+      const activityFeedService = new ActivityFeedService(
+        activityRelay,
+        new DatabaseActivityIdentityStore(database),
       );
 
       console.log("[API] Services Initialized");
@@ -121,12 +134,14 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activitySources: activitySourcesService,
         activityCredentials: activityCredentialsService,
         activityIngestion: activityIngestionService,
+        activityFeed: activityFeedService,
+        activityRelay,
       };
     }),
 
   shutdown: (services) =>
     Effect.sync(() => {
-      services.activityIngestion.close();
+      services.activityRelay.close();
     }),
 
   createRouter: (services, builder) => {
@@ -461,6 +476,30 @@ export default createPlugin.withPlugins<PluginsClient>()({
           });
         }
         return services.activityIngestion.submit(apiKey, input);
+      }),
+
+      listActivityEvents: builder.listActivityEvents.handler(async ({ input }) => {
+        try {
+          return await services.activityFeed.list({
+            source: input.source,
+            eventType: input.type,
+            actor: input.actor,
+            limit: input.limit,
+            cursor: input.cursor,
+          });
+        } catch (error) {
+          if (error instanceof ActivityCursorError) {
+            throw new ORPCError("BAD_REQUEST", { message: error.message });
+          }
+          if (
+            error instanceof ActivityRelayQueryTimeoutError ||
+            error instanceof ActivityRelayScanLimitError ||
+            error instanceof ActivityRelayUnavailableError
+          ) {
+            throw new ORPCError("SERVICE_UNAVAILABLE", { message: error.message });
+          }
+          throw error;
+        }
       }),
 
       createThing: builder.createThing.use(requireAuth).handler(async ({ input }) => {

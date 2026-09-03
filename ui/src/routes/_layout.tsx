@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
-import { ClipboardList, Compass, Globe, Home, Menu, RadioTower, Shield, X } from "lucide-react";
+import { Activity, Compass, Globe, Home, Menu, RadioTower, Shield, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   getAccount,
@@ -83,6 +83,7 @@ function Layout() {
   const sidebarItems: SidebarItem[] = [
     { icon: Home, label: "home", to: "/home", roleRequired: "anon" },
     { icon: Globe, label: "apps", to: "/apps", roleRequired: "anon" },
+    { icon: Activity, label: "activity feed", to: "/activity", roleRequired: "anon" },
     {
       icon: RadioTower,
       label: "activity sources",
@@ -181,21 +182,29 @@ function Layout() {
                 </div>
               </div>
             ) : (
-              <Link
-                to="/login"
-                aria-label={`${appName} home`}
-                className="flex items-center justify-center w-10 h-10 transition-opacity duration-200 hover:opacity-70"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  fill="currentColor"
-                  className="w-5 h-5 text-foreground"
-                  aria-label={`${appName} logo`}
+              <div className="flex items-center gap-4">
+                <Link
+                  to="/login"
+                  aria-label={`${appName} home`}
+                  className="flex items-center justify-center w-10 h-10 transition-opacity duration-200 hover:opacity-70"
                 >
-                  <title>{appName}</title>
-                  <circle cx="12" cy="12" r="10" />
-                </svg>
-              </Link>
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    className="w-5 h-5 text-foreground"
+                    aria-label={`${appName} logo`}
+                  >
+                    <title>{appName}</title>
+                    <circle cx="12" cy="12" r="10" />
+                  </svg>
+                </Link>
+                <Link
+                  to="/activity"
+                  className="text-sm font-medium text-muted-foreground hover:text-foreground"
+                >
+                  Activity feed
+                </Link>
+              </div>
             )}
 
             <div className="flex items-center gap-2">
@@ -354,7 +363,7 @@ function MobileTabBar({
         <TabItem to="/home" icon={Home} label="home" active={tabActive("/home")} />
         <TabItem to="/apps" icon={Globe} label="apps" active={tabActive("/apps")} />
         <TabItem to="/explore" icon={Compass} label="explore" active={tabActive("/explore")} />
-        <TabItem to="/recent" icon={ClipboardList} label="recent" active={tabActive("/recent")} />
+        <TabItem to="/activity" icon={Activity} label="activity" active={tabActive("/activity")} />
         <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
           <SheetTrigger asChild>
             <button

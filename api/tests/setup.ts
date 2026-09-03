@@ -2,8 +2,10 @@ import { createServer } from "node:http";
 import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import type { ContractRouterClient } from "@orpc/contract";
+import { OpenAPIHandler } from "@orpc/openapi/node";
 import { RPCHandler } from "@orpc/server/node";
 import { createPluginRuntime } from "every-plugin";
+import { type Filter, matchFilters } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/pure";
 import { WebSocketServer } from "ws";
 import type { contract } from "@/contract";
@@ -39,15 +41,26 @@ async function ensureTestRelay(): Promise<string> {
   relayServer = new WebSocketServer({ host: "127.0.0.1", port: 0 });
   relayServer.on("connection", (socket) => {
     socket.on("message", (data) => {
-      const message = JSON.parse(data.toString()) as [string, Event];
-      if (message[0] !== "EVENT") return;
-      relayEvents.push(message[1]);
-      if (dropNextRelayAcknowledgement) {
-        dropNextRelayAcknowledgement = false;
-        socket.close();
+      const message = JSON.parse(data.toString()) as unknown[];
+      if (message[0] === "REQ" && typeof message[1] === "string") {
+        const subscriptionId = message[1];
+        const filters = message.slice(2) as Filter[];
+        const uniqueEvents = [...new Map(relayEvents.map((event) => [event.id, event])).values()];
+        for (const event of uniqueEvents.filter((candidate) => matchFilters(filters, candidate))) {
+          socket.send(JSON.stringify(["EVENT", subscriptionId, event]));
+        }
+        socket.send(JSON.stringify(["EOSE", subscriptionId]));
         return;
       }
-      socket.send(JSON.stringify(["OK", message[1].id, true, "stored"]));
+      if (message[0] === "EVENT" && isEventMessage(message)) {
+        relayEvents.push(message[1]);
+        if (dropNextRelayAcknowledgement) {
+          dropNextRelayAcknowledgement = false;
+          socket.close();
+          return;
+        }
+        socket.send(JSON.stringify(["OK", message[1].id, true, "stored"]));
+      }
     });
   });
   await new Promise<void>((resolve, reject) => {
@@ -60,6 +73,10 @@ async function ensureTestRelay(): Promise<string> {
   }
   relayUrl = `ws://127.0.0.1:${address.port}`;
   return relayUrl;
+}
+
+function isEventMessage(message: unknown[]): message is ["EVENT", Event] {
+  return message.length >= 2 && typeof message[1] === "object" && message[1] !== null;
 }
 
 export function getTestRelayEvents(): readonly Event[] {
@@ -87,6 +104,7 @@ export async function getPluginClient(
     const { router, initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, config);
     activityCredentialsService = initialized.context.activityCredentials;
     const rpcHandler = new RPCHandler(router);
+    const openApiHandler = new OpenAPIHandler(router);
 
     // Find an available port
     server = createServer(async (req, res) => {
@@ -109,6 +127,15 @@ export async function getPluginClient(
         const result = await rpcHandler.handle(req, res, {
           prefix: "/rpc",
           context: requestContext,
+        });
+        if (result.matched) return;
+      }
+
+      if (url.pathname.startsWith("/v1")) {
+        const result = await openApiHandler.handle(req, res, {
+          context: {
+            reqHeaders: new Headers(req.headers as Record<string, string>),
+          },
         });
         if (result.matched) return;
       }
@@ -139,6 +166,11 @@ export async function getPluginClient(
 
   const client: ContractRouterClient<typeof contract> = createORPCClient(link);
   return client;
+}
+
+export async function getPluginBaseUrl(): Promise<string> {
+  await getPluginClient();
+  return baseUrl;
 }
 
 export async function getActivitySourcesService() {

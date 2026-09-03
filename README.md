@@ -2,7 +2,7 @@
 
 `activity.nearbuilders.org` is a shared activity and reputation layer for the NEAR ecosystem. Activity Sources are registered through a NEAR-authenticated organization and, as the service grows, will receive API credentials for submitting events through a common HTTP gateway. The service is designed to give applications a portable event feed, live updates, and dynamically scored leaderboards without requiring every integrator to build the same infrastructure.
 
-This repository extends [`dev.everything`](https://everything.dev/) with local UI and API overrides. It includes the local Nostr/Redis protocol proof, Activity Source registration and approval, source credentials, and exactly-once event ingestion; feed and leaderboard features described below remain planned rather than live.
+This repository extends [`dev.everything`](https://everything.dev/) with local UI and API overrides. It includes the local Nostr/Redis protocol proof, Activity Source registration and approval, source credentials, exactly-once event ingestion, and a public filtered Activity feed; live streaming and leaderboard features described below remain planned.
 
 The product scope comes from [NEAR Builders' Activity Service proposal](https://github.com/NEARBuilders/nearbuilders.org/blob/main/ACTIVITY.md), originally targeted for August 2026.
 
@@ -35,7 +35,7 @@ The service is intended to become shared plumbing for reputation, loyalty points
 | Method | Endpoint | Status | Purpose |
 | --- | --- | --- | --- |
 | `POST` | `/api/v1/events` | Available | Submit an event using a Source API Key. |
-| `GET` | `/api/v1/events` | Planned | Query events by source, type, actor, limit, and cursor. |
+| `GET` | `/api/v1/events` | Available | Query trusted events by source, type, actor, limit, and opaque cursor. |
 | `GET` | `/api/v1/events/stream` | Planned | Subscribe to new events over SSE, optionally filtered by source, type, or actor. |
 | `GET` | `/api/v1/leaderboard` | Planned | Read weekly, monthly, or all-time rankings. |
 
@@ -50,6 +50,10 @@ Each event contains:
 - an idempotency key scoped to the source, such as `github:pr:42`
 
 The gateway validates the source and event type, signs the event with the Activity Source's Nostr key, publishes it to configured relays, and returns its immutable event ID.
+
+Public consumers can browse trusted events at `/activity` or call `GET /api/v1/events`. Results are
+ordered newest-first by timestamp and event ID. Only events signed by a bound Signing Identity for
+their tagged Activity Source are returned.
 
 ## Proposed architecture
 
