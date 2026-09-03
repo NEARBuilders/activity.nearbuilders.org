@@ -164,3 +164,25 @@ export const activitySourceApiKeys = pgTable(
     sourceApiKeysIdx: index("activity_source_api_keys_source_idx").on(table.sourceRecordId),
   }),
 );
+
+export const activityEventSubmissions = pgTable(
+  "activity_event_submissions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sourceRecordId: uuid("source_record_id")
+      .notNull()
+      .references(() => activitySources.id, { onDelete: "cascade" }),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestHash: text("request_hash").notNull(),
+    eventId: text("event_id"),
+    eventJson: text("event_json"),
+    publishedAt: timestamp("published_at", { mode: "date", withTimezone: true }),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    sourceIdempotencyIdx: uniqueIndex("activity_event_submissions_source_idempotency_idx").on(
+      table.sourceRecordId,
+      table.idempotencyKey,
+    ),
+  }),
+);

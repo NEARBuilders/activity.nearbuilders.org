@@ -1,6 +1,10 @@
 import type { Event, Filter } from "nostr-tools";
 import { describe, expect, it } from "vitest";
-import { ActivityRelay, type ActivityRelayAdapter } from "@/activity/activity-relay";
+import {
+  ActivityRelay,
+  type ActivityRelayAdapter,
+  NostrRelayAdapter,
+} from "@/activity/activity-relay";
 
 function eventWithId(id: string, createdAt: number): Event {
   return {
@@ -15,6 +19,13 @@ function eventWithId(id: string, createdAt: number): Event {
 }
 
 describe("ActivityRelay", () => {
+  it("rejects when the relay connection cannot be established", async () => {
+    const adapter = new NostrRelayAdapter("ws://127.0.0.1:1");
+
+    await expect(adapter.publish(eventWithId("a".repeat(64), 1_788_307_200))).rejects.toThrow();
+    adapter.close();
+  });
+
   it("paginates more than 500 equal-timestamp events without omission", async () => {
     const createdAt = 1_788_307_200;
     const events = Array.from({ length: 501 }, (_, index) =>

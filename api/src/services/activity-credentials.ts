@@ -70,7 +70,10 @@ export interface ActivityCredentialsService {
     organizationId: string,
     sourceId: string,
   ): Promise<ActivitySigningIdentityRecord[]>;
-  signActivityEvent(sourceId: string, template: EventTemplate): Promise<Event>;
+  signActivityEvent(
+    credential: ActivityEventWriteCredential,
+    template: EventTemplate,
+  ): Promise<Event>;
 }
 
 export interface ActivitySourceApiKeyRecord {
@@ -615,7 +618,7 @@ export const ActivityCredentialsLive = (
           }
         },
 
-        signActivityEvent: async (sourceId, template) => {
+        signActivityEvent: async (credential, template) => {
           try {
             const [result] = await db
               .select({ source: sourcesTable, identity: identitiesTable })
@@ -627,7 +630,7 @@ export const ActivityCredentialsLive = (
                   isNull(identitiesTable.retiredAt),
                 ),
               )
-              .where(eq(sourcesTable.sourceId, sourceId))
+              .where(eq(sourcesTable.sourceId, credential.sourceId))
               .limit(1);
             if (!result || result.source.approvalStatus !== "approved") {
               throw new ORPCError("FORBIDDEN", {
@@ -637,6 +640,11 @@ export const ActivityCredentialsLive = (
             if (result.identity.bindingStatus !== "bound") {
               throw new ORPCError("FORBIDDEN", {
                 message: "Activity Source signing identity is not bound",
+              });
+            }
+            if (result.identity.publicKey !== credential.publicKey) {
+              throw new ORPCError("FORBIDDEN", {
+                message: "Source API Key is not valid for the active Signing Identity",
               });
             }
             const privateKey = decryptActivitySecret(

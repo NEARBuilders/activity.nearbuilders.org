@@ -23,6 +23,7 @@ export default {
         process.env.ACTIVITY_NOSTR_BINDING_RELAY || "wss://relay.nearbuilders.org",
       activityNostrKvApiUrl:
         process.env.ACTIVITY_NOSTR_KV_API_URL || "https://kv.main.fastnear.com",
+      activityRelayUrl: process.env.ACTIVITY_RELAY_URL || "ws://127.0.0.1:7447",
     },
     secrets: {
       API_DATABASE_URL: process.env.API_DATABASE_URL || "pglite:.bos/api/:memory:",

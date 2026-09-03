@@ -2,7 +2,7 @@
 
 `activity.nearbuilders.org` is a shared activity and reputation layer for the NEAR ecosystem. Activity Sources are registered through a NEAR-authenticated organization and, as the service grows, will receive API credentials for submitting events through a common HTTP gateway. The service is designed to give applications a portable event feed, live updates, and dynamically scored leaderboards without requiring every integrator to build the same infrastructure.
 
-This repository extends [`dev.everything`](https://everything.dev/) with local UI and API overrides. It includes the local Nostr/Redis protocol proof and Activity Source registration and approval slices; later gateway, feed, and leaderboard features described below remain planned rather than live.
+This repository extends [`dev.everything`](https://everything.dev/) with local UI and API overrides. It includes the local Nostr/Redis protocol proof, Activity Source registration and approval, source credentials, and exactly-once event ingestion; feed and leaderboard features described below remain planned rather than live.
 
 The product scope comes from [NEAR Builders' Activity Service proposal](https://github.com/NEARBuilders/nearbuilders.org/blob/main/ACTIVITY.md), originally targeted for August 2026.
 
@@ -30,14 +30,14 @@ The service is intended to become shared plumbing for reputation, loyalty points
 - **Dynamically scored:** point-value changes affect historical leaderboard results immediately, without replaying events.
 - **Simple to adopt:** external integrators use an HTTP API and do not need to operate Nostr directly.
 
-## Planned API
+## Current and planned API
 
-| Method | Endpoint | Purpose |
-| --- | --- | --- |
-| `POST` | `/api/v1/events` | Submit an event using an API key. |
-| `GET` | `/api/v1/events` | Query events by source, type, actor, limit, and cursor. |
-| `GET` | `/api/v1/events/stream` | Subscribe to new events over SSE, optionally filtered by source, type, or actor. |
-| `GET` | `/api/v1/leaderboard` | Read weekly, monthly, or all-time rankings. |
+| Method | Endpoint | Status | Purpose |
+| --- | --- | --- | --- |
+| `POST` | `/api/v1/events` | Available | Submit an event using a Source API Key. |
+| `GET` | `/api/v1/events` | Planned | Query events by source, type, actor, limit, and cursor. |
+| `GET` | `/api/v1/events/stream` | Planned | Subscribe to new events over SSE, optionally filtered by source, type, or actor. |
+| `GET` | `/api/v1/leaderboard` | Planned | Read weekly, monthly, or all-time rankings. |
 
 ### Event shape
 
