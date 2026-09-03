@@ -8,6 +8,7 @@ useWebSocketImplementation(WebSocket);
 export const ACTIVITY_EVENT_KIND = 1701;
 
 export type ActivityQuery = {
+  eventId?: string;
   source?: string;
   eventType?: string;
   actor?: string;
@@ -84,6 +85,7 @@ function compareEvents(left: Event, right: Event): number {
 
 function activityFilter(input: ActivityQuery): Filter {
   const filter: Filter = { kinds: [ACTIVITY_EVENT_KIND] };
+  if (input.eventId) filter.ids = [input.eventId];
   if (input.source) filter["#s"] = [input.source];
   if (input.eventType) filter["#t"] = [input.eventType];
   if (input.actor) filter["#n"] = [input.actor];
@@ -234,6 +236,7 @@ export class ActivityRelay {
   async query(
     input: ActivityQuery,
     isValid: (event: Event) => boolean = () => true,
+    selectVisible: (events: Event[]) => Promise<Event[]> = async (events) => events,
   ): Promise<ActivityQueryResult> {
     const limit = Math.min(Math.max(input.limit ?? 100, 1), 100);
     const cursor = input.cursor ? decodeCursor(input.cursor) : null;
@@ -246,7 +249,8 @@ export class ActivityRelay {
       throw new ActivityRelayScanLimitError();
     }
     const validEvents = events.filter(isValid);
-    const pageCandidates = validEvents.sort(compareEvents).filter((event) => {
+    const includedEvents = await selectVisible(validEvents);
+    const pageCandidates = includedEvents.sort(compareEvents).filter((event) => {
       if (!cursor) return true;
       return (
         event.created_at < cursor.createdAt ||

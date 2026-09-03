@@ -149,6 +149,43 @@ export const ActivityFeedSchema = z.object({
   }),
 });
 
+export const ActivityModerationHistorySchema = z.object({
+  id: z.string().uuid(),
+  administratorId: z.string(),
+  idempotencyKey: z.string(),
+  reason: z.string(),
+  applied: z.boolean(),
+  requestedAt: z.iso.datetime(),
+});
+export type ActivityModerationHistory = z.infer<typeof ActivityModerationHistorySchema>;
+
+export const HiddenActivityEventSchema = z.object({
+  event: ActivityFeedEventSchema,
+  hiddenBy: z.string(),
+  reason: z.string(),
+  hiddenAt: z.iso.datetime(),
+  moderationHistory: z.array(ActivityModerationHistorySchema),
+});
+export type HiddenActivityEvent = z.infer<typeof HiddenActivityEventSchema>;
+
+export const HideActivityEventResultSchema = z.object({
+  hiddenEvent: HiddenActivityEventSchema,
+  projection: z.object({
+    updateId: z.string(),
+    operation: z.literal("exclude"),
+    eventId: z.string().regex(/^[a-f0-9]{64}$/),
+    source: z.string(),
+    type: ActivityEventTypeNameSchema,
+    actor: NearAccountIdSchema,
+    idempotencyKey: z.string(),
+    eventTimestamp: z.iso.datetime(),
+    hiddenAt: z.iso.datetime(),
+    applied: z.boolean(),
+  }),
+  requestReplayed: z.boolean(),
+});
+export type HideActivityEventResult = z.infer<typeof HideActivityEventResultSchema>;
+
 const ActivityEventTypesInputSchema = z
   .array(ActivityEventTypeSchema)
   .min(1)
@@ -471,6 +508,42 @@ export const contract = oc.router({
     )
     .output(ActivitySseResponseSchema)
     .errors({ BAD_REQUEST, SERVICE_UNAVAILABLE }),
+
+  hideActivityEvent: oc
+    .route({
+      method: "POST",
+      path: "/activity/events/{eventId}/hide",
+      summary: "Hide an Activity event",
+      description:
+        "Records an administrator-only local suppression without editing the signed relay event.",
+      tags: ["Activity"],
+    })
+    .input(
+      z.object({
+        eventId: z.string().regex(/^[a-f0-9]{64}$/),
+        reason: z.string().trim().min(1).max(1_000),
+        idempotencyKey: z.string().trim().min(1).max(200),
+      }),
+    )
+    .output(HideActivityEventResultSchema)
+    .errors({
+      UNAUTHORIZED,
+      FORBIDDEN,
+      NOT_FOUND,
+      SERVICE_UNAVAILABLE,
+      CONFLICT: { status: 409 },
+    }),
+
+  listHiddenActivityEvents: oc
+    .route({
+      method: "GET",
+      path: "/activity/hidden-events",
+      summary: "Inspect hidden Activity events",
+      description: "Lists suppressed events and their append-only moderation history for admins.",
+      tags: ["Activity"],
+    })
+    .output(z.array(HiddenActivityEventSchema))
+    .errors({ UNAUTHORIZED, FORBIDDEN }),
 
   createThing: oc
     .route({

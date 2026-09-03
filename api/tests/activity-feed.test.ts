@@ -2,7 +2,11 @@ import type { Filter } from "nostr-tools";
 import { type Event, finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { describe, expect, it, vi } from "vitest";
 import { ActivityRelay, type ActivityRelayAdapter } from "@/activity/activity-relay";
-import { ActivityFeedService, type ActivityIdentityStore } from "@/services/activity-feed";
+import {
+  ActivityFeedService,
+  type ActivityIdentityStore,
+  type ActivitySuppressionStore,
+} from "@/services/activity-feed";
 
 function signedActivityEvent(
   secretKey: Uint8Array,
@@ -156,5 +160,92 @@ describe("ActivityFeedService", () => {
       since: expect.any(Number),
     });
     expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("rechecks suppression before yielding an event that was already queued", async () => {
+    const trustedKey = generateSecretKey();
+    const events = [1, 2, 3].map((sequence) =>
+      signedActivityEvent(trustedKey, {
+        source: "moderated-live-source",
+        eventType: "feedback.submitted",
+        actor: "alice.near",
+        idempotencyKey: `moderated-live:${sequence}`,
+        payload: { sequence },
+        createdAt: 1_788_400_000 + sequence,
+      }),
+    );
+    let emit: ((event: Event) => void) | undefined;
+    const adapter: ActivityRelayAdapter = {
+      publish: async () => "",
+      query: async () => [],
+      subscribe: (_filter, onEvent) => {
+        emit = onEvent;
+        return { close: () => {} };
+      },
+      close: () => {},
+    };
+    const identities: ActivityIdentityStore = {
+      listBound: async () => [
+        { sourceId: "moderated-live-source", publicKey: getPublicKey(trustedKey) },
+      ],
+    };
+    const hidden = new Set<string>();
+    const suppression: ActivitySuppressionStore = {
+      findHiddenEventIds: async (eventIds) =>
+        new Set(eventIds.filter((eventId) => hidden.has(eventId))),
+      isHidden: async (eventId) => hidden.has(eventId),
+    };
+    const service = new ActivityFeedService(
+      new ActivityRelay(adapter, { scanLimit: 100 }),
+      identities,
+      suppression,
+    );
+    const stream = service.stream({ source: "moderated-live-source" });
+
+    const firstResult = stream.next();
+    await vi.waitFor(() => expect(emit).toEqual(expect.any(Function)));
+    emit?.(events[0]!);
+    await expect(firstResult).resolves.toEqual({
+      done: false,
+      value: expect.objectContaining({ id: events[0]?.id }),
+    });
+
+    emit?.(events[1]!);
+    hidden.add(events[1]!.id);
+    emit?.(events[2]!);
+    await expect(stream.next()).resolves.toEqual({
+      done: false,
+      value: expect.objectContaining({ id: events[2]?.id }),
+    });
+    await stream.return(undefined);
+  });
+
+  it("does not trust a relay to honor an exact event ID moderation lookup", async () => {
+    const trustedKey = generateSecretKey();
+    const returned = signedActivityEvent(trustedKey, {
+      source: "moderation-lookup-source",
+      eventType: "feedback.submitted",
+      actor: "alice.near",
+      idempotencyKey: "moderation-lookup:returned",
+      payload: { sequence: 1 },
+      createdAt: 1_788_400_000,
+    });
+    const adapter: ActivityRelayAdapter = {
+      publish: async () => "",
+      query: async () => [returned],
+      subscribe: () => ({ close: () => {} }),
+      close: () => {},
+    };
+    const identities: ActivityIdentityStore = {
+      listBound: async () => [
+        { sourceId: "moderation-lookup-source", publicKey: getPublicKey(trustedKey) },
+      ],
+    };
+    const service = new ActivityFeedService(
+      new ActivityRelay(adapter, { scanLimit: 100 }),
+      identities,
+    );
+
+    await expect(service.findTrustedEventByIdForModeration("f".repeat(64))).resolves.toBeNull();
   });
 });

@@ -102,6 +102,18 @@ export function resetTestRelayEvents(): void {
   relayEvents.length = 0;
 }
 
+export function redeliverTestRelayEvent(eventId: string): void {
+  const event = relayEvents.find(({ id }) => id === eventId);
+  if (!event) throw new Error(`Test relay event not found: ${eventId}`);
+  for (const [subscriber, subscriptions] of relaySubscriptions) {
+    for (const [subscriptionId, filters] of subscriptions) {
+      if (matchFilters(filters, event)) {
+        subscriber.send(JSON.stringify(["EVENT", subscriptionId, event]));
+      }
+    }
+  }
+}
+
 export function getTestRelaySubscriptionCount(): number {
   return [...relaySubscriptions.values()].reduce(
     (count, subscriptions) => count + subscriptions.size,

@@ -43,6 +43,13 @@
       "when": 1788385834058,
       "tag": "0005_bright_jocasta",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1788466734303,
+      "tag": "0006_peaceful_red_skull",
+      "breakpoints": true
     }
   ]
 }

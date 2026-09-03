@@ -25,6 +25,10 @@ import {
   DatabaseActivityIdentityStore,
 } from "./services/activity-feed";
 import { ActivityIngestionService } from "./services/activity-ingestion";
+import {
+  ActivityModerationService,
+  DatabaseActivityModerationStore,
+} from "./services/activity-moderation";
 import { ActivitySourcesLive, ActivitySourcesTag } from "./services/activity-sources";
 import { TenantsLive, TenantsTag } from "./services/tenants";
 
@@ -127,9 +131,15 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activitySourcesService,
         activityRelay,
       );
+      const activityModerationStore = new DatabaseActivityModerationStore(database);
       const activityFeedService = new ActivityFeedService(
         activityRelay,
         new DatabaseActivityIdentityStore(database),
+        activityModerationStore,
+      );
+      const activityModerationService = new ActivityModerationService(
+        activityModerationStore,
+        activityFeedService,
       );
 
       console.log("[API] Services Initialized");
@@ -140,6 +150,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityCredentials: activityCredentialsService,
         activityIngestion: activityIngestionService,
         activityFeed: activityFeedService,
+        activityModeration: activityModerationService,
         activityRelay,
       };
     }),
@@ -560,6 +571,30 @@ export default createPlugin.withPlugins<PluginsClient>()({
           };
         },
       ),
+
+      hideActivityEvent: builder.hideActivityEvent
+        .use(requireAdmin)
+        .handler(async ({ input, context }) => {
+          try {
+            return await services.activityModeration.hide({
+              ...input,
+              administratorId: context.userId,
+            });
+          } catch (error) {
+            if (
+              error instanceof ActivityRelayQueryTimeoutError ||
+              error instanceof ActivityRelayScanLimitError ||
+              error instanceof ActivityRelayUnavailableError
+            ) {
+              throw new ORPCError("SERVICE_UNAVAILABLE", { message: error.message });
+            }
+            throw error;
+          }
+        }),
+
+      listHiddenActivityEvents: builder.listHiddenActivityEvents
+        .use(requireAdmin)
+        .handler(async () => services.activityModeration.listHidden()),
 
       createThing: builder.createThing.use(requireAuth).handler(async ({ input }) => {
         throw new ORPCError("BAD_REQUEST", {
