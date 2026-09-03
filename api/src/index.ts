@@ -30,6 +30,7 @@ import {
   ActivityLeaderboardTag,
   DatabaseActivityPointValueProvider,
 } from "./services/activity-leaderboard";
+import { DatabaseActivityLeaderboardHistory } from "./services/activity-leaderboard-history";
 import {
   ActivityModerationService,
   DatabaseActivityModerationStore,
@@ -77,15 +78,6 @@ function validateAccountId(accountId: string): void {
       data: { hint: "Must be a valid NEAR account ID" },
     });
   }
-}
-
-async function* listActivityHistory(feed: ActivityFeedService) {
-  let cursor: string | undefined;
-  do {
-    const page = await feed.list({ limit: 100, cursor });
-    yield* page.data;
-    cursor = page.meta.nextCursor ?? undefined;
-  } while (cursor);
 }
 
 export default createPlugin.withPlugins<PluginsClient>()({
@@ -166,15 +158,26 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityFeedService,
         activityLeaderboard,
       );
+      const activityLeaderboardHistory = new DatabaseActivityLeaderboardHistory(
+        database,
+        activityFeedService,
+      );
       const leaderboardStatus = yield* Effect.promise(() => activityLeaderboard.getStatus());
       if (leaderboardStatus.state !== "ready" || config.secrets.ACTIVITY_REDIS_URL === "memory:") {
         const hiddenEvents = yield* Effect.promise(() => activityModerationStore.listHidden());
-        yield* Effect.promise(() =>
-          activityLeaderboard.rebuild({
-            events: listActivityHistory(activityFeedService),
-            hiddenEvents: hiddenEvents.map(({ event }) => event),
-          }),
+        console.info("[ActivityLeaderboard] Projection rebuild started");
+        const rebuilt = yield* Effect.promise(() =>
+          activityLeaderboard
+            .rebuild({
+              events: activityLeaderboardHistory.list(),
+              hiddenEvents: hiddenEvents.map(({ event }) => event),
+            })
+            .catch((error) => {
+              console.error("[ActivityLeaderboard] Projection rebuild failed");
+              throw error;
+            }),
         );
+        console.info("[ActivityLeaderboard] Projection rebuild completed", rebuilt);
       }
 
       console.log("[API] Services Initialized");
@@ -638,6 +641,16 @@ export default createPlugin.withPlugins<PluginsClient>()({
         } catch {
           throw new ORPCError("SERVICE_UNAVAILABLE", {
             message: "Activity leaderboard projection is unavailable",
+          });
+        }
+      }),
+
+      getActivityLeaderboardStatus: builder.getActivityLeaderboardStatus.handler(async () => {
+        try {
+          return await services.activityLeaderboard.getStatus();
+        } catch {
+          throw new ORPCError("SERVICE_UNAVAILABLE", {
+            message: "Activity leaderboard projection status is unavailable",
           });
         }
       }),

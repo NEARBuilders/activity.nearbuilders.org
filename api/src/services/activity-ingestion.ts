@@ -178,7 +178,7 @@ export class ActivityIngestionService {
   }
 }
 
-function parseStoredActivityEvent(eventJson: string, eventId: string | null): Event {
+export function parseStoredActivityEvent(eventJson: string, eventId: string | null): Event {
   let event: unknown;
   try {
     event = JSON.parse(eventJson);

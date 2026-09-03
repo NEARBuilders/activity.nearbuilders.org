@@ -187,19 +187,22 @@ export const HideActivityEventResultSchema = z.object({
 export type HideActivityEventResult = z.infer<typeof HideActivityEventResultSchema>;
 
 export const ActivityLeaderboardPeriodSchema = z.enum(["weekly", "monthly", "all-time"]);
+export type ActivityLeaderboardPeriod = z.infer<typeof ActivityLeaderboardPeriodSchema>;
+
+export const ActivityLeaderboardProjectionStatusSchema = z.object({
+  state: z.enum(["uninitialized", "rebuilding", "ready", "failed"]),
+  rebuiltAt: z.iso.datetime().nullable(),
+  seen: z.number().int().nonnegative(),
+  applied: z.number().int().nonnegative(),
+  hidden: z.number().int().nonnegative(),
+});
 
 export const ActivityLeaderboardSchema = z.object({
   period: ActivityLeaderboardPeriodSchema,
   startsAt: z.iso.datetime().nullable(),
   endsAt: z.iso.datetime().nullable(),
   generatedAt: z.iso.datetime(),
-  projection: z.object({
-    state: z.enum(["uninitialized", "rebuilding", "ready", "failed"]),
-    rebuiltAt: z.iso.datetime().nullable(),
-    seen: z.number().int().nonnegative(),
-    applied: z.number().int().nonnegative(),
-    hidden: z.number().int().nonnegative(),
-  }),
+  projection: ActivityLeaderboardProjectionStatusSchema,
   data: z.array(
     z.object({
       rank: z.number().int().positive(),
@@ -597,6 +600,17 @@ export const contract = oc.router({
       }),
     )
     .output(ActivityLeaderboardSchema)
+    .errors({ SERVICE_UNAVAILABLE }),
+
+  getActivityLeaderboardStatus: oc
+    .route({
+      method: "GET",
+      path: "/v1/leaderboard/status",
+      summary: "Inspect Activity leaderboard projection",
+      description: "Returns projection readiness and rebuild counters without requiring readiness.",
+      tags: ["Activity"],
+    })
+    .output(ActivityLeaderboardProjectionStatusSchema)
     .errors({ SERVICE_UNAVAILABLE }),
 
   createThing: oc

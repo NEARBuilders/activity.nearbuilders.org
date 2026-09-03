@@ -1,35 +1,15 @@
 import { AlertTriangle, Trophy } from "lucide-react";
+import type { ApiClient } from "@/app";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-export type ActivityLeaderboardPeriod = "weekly" | "monthly" | "all-time";
+type GetActivityLeaderboard = ApiClient["getActivityLeaderboard"];
 
-export type ActivityLeaderboardView = {
-  period: ActivityLeaderboardPeriod;
-  startsAt: string | null;
-  endsAt: string | null;
-  generatedAt: string;
-  projection: {
-    state: "uninitialized" | "rebuilding" | "ready" | "failed";
-    rebuiltAt: string | null;
-    seen: number;
-    applied: number;
-    hidden: number;
-  };
-  data: Array<{
-    rank: number;
-    actor: string;
-    score: number;
-    eventCount: number;
-    breakdown: Array<{
-      source: string;
-      type: string;
-      pointValue: number;
-      eventCount: number;
-      score: number;
-    }>;
-  }>;
-};
+export type ActivityLeaderboardPeriod = NonNullable<
+  Parameters<GetActivityLeaderboard>[0]["period"]
+>;
+
+export type ActivityLeaderboardView = Awaited<ReturnType<GetActivityLeaderboard>>;
 
 type ActivityLeaderboardProps = {
   period: ActivityLeaderboardPeriod;
@@ -156,7 +136,9 @@ export function ActivityLeaderboard({
 
 function periodDescription(result?: ActivityLeaderboardView): string {
   if (!result?.startsAt || !result.endsAt) return "All trusted Activity events";
-  const startsAt = new Date(result.startsAt).toLocaleDateString();
-  const endsAt = new Date(new Date(result.endsAt).getTime() - 1).toLocaleDateString();
+  const startsAt = new Date(result.startsAt).toLocaleDateString(undefined, { timeZone: "UTC" });
+  const endsAt = new Date(new Date(result.endsAt).getTime() - 1).toLocaleDateString(undefined, {
+    timeZone: "UTC",
+  });
   return `${startsAt} – ${endsAt} · UTC`;
 }

@@ -1673,6 +1673,13 @@ describe("API Plugin Integration Tests", () => {
       });
       const publicClient = await getPluginClient();
 
+      await expect(publicClient.getActivityLeaderboardStatus()).resolves.toMatchObject({
+        state: "ready",
+      });
+      const statusResponse = await fetch(`${await getPluginBaseUrl()}/v1/leaderboard/status`);
+      expect(statusResponse.status).toBe(200);
+      await expect(statusResponse.json()).resolves.toMatchObject({ state: "ready" });
+
       const initial = await publicClient.getActivityLeaderboard({
         period: "all-time",
         source: "leaderboard-source",

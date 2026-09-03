@@ -152,7 +152,7 @@ bun run test:activity
 bun run dev:activity-infra:down
 ```
 
-Defaults are `ws://127.0.0.1:7447` for the relay and `redis://127.0.0.1:6380` for Redis. Override
+Defaults are `ws://127.0.0.1:7447` for the relay and `redis://127.0.0.1:6379` for Redis. Override
 them with `ACTIVITY_RELAY_URL` and `ACTIVITY_REDIS_URL`. Docker named volumes preserve local relay
 history and Redis projection state between restarts.
 

@@ -194,7 +194,7 @@ bun run dev
 
 The initializer creates a local `.env` from `.env.example`. Keep secrets out of version control.
 The Activity infrastructure command starts the pinned local Nostr relay on port `7447` and Redis
-on port `6380`; both use Docker named volumes. Run `bun run dev:activity-infra:down` to stop them.
+on port `6379`; both use Docker named volumes. Run `bun run dev:activity-infra:down` to stop them.
 
 Local development uses a deterministic signing master key only when
 `ACTIVITY_SIGNING_MASTER_KEYS` is empty. Every deployed environment must provide a JSON keyring of

@@ -94,7 +94,7 @@ export class ActivityFeedService {
     return { ...result, data: result.data.filter(({ id }) => !hidden.has(id)) };
   }
 
-  async findTrustedEventByIdForModeration(eventId: string): Promise<ActivityFeedEvent | null> {
+  async findTrustedEventById(eventId: string): Promise<ActivityFeedEvent | null> {
     const result = await this.#listRelayEvents({ eventId, limit: 1 });
     return result.data[0] ?? null;
   }

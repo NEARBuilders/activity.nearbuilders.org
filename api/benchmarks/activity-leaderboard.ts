@@ -13,7 +13,7 @@ const pointValues = Array.from({ length: EVENT_TYPE_COUNT }, (_, index) => ({
   pointValue: index + 1,
 }));
 const leaderboard = await createRedisActivityLeaderboard({
-  redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6380",
+  redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6379",
   namespace: "activity:leaderboard:benchmark",
   listPointValues: async () => pointValues,
   now: () => new Date(timestamp),

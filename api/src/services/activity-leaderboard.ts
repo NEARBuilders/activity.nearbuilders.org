@@ -2,13 +2,14 @@ import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
 import { Context, Effect, Layer } from "every-plugin/effect";
 import { createClient, type RedisClientType } from "redis";
+import type { ActivityLeaderboardPeriod, ActivityLeaderboardResult } from "../contract";
 import type { Database } from "../db";
 import {
   activityEventTypes as eventTypesTable,
   activitySources as sourcesTable,
 } from "../db/schema";
 
-export type ActivityLeaderboardPeriod = "weekly" | "monthly" | "all-time";
+export type { ActivityLeaderboardPeriod, ActivityLeaderboardResult } from "../contract";
 
 export type ActivityPointValue = {
   source: string;
@@ -29,42 +30,20 @@ export type ActivityLeaderboardUpdate = {
   event: ActivityLeaderboardEvent;
 };
 
-export type ActivityLeaderboardBreakdown = {
-  source: string;
-  type: string;
-  pointValue: number;
-  eventCount: number;
-  score: number;
-};
-
-export type ActivityLeaderboardEntry = {
-  rank: number;
-  actor: string;
-  score: number;
-  eventCount: number;
-  breakdown: ActivityLeaderboardBreakdown[];
-};
-
-export type ActivityLeaderboardResult = {
-  period: ActivityLeaderboardPeriod;
-  startsAt: string | null;
-  endsAt: string | null;
-  generatedAt: string;
-  projection: ActivityLeaderboardStatus;
-  data: ActivityLeaderboardEntry[];
-};
-
-export type ActivityLeaderboardStatus = {
-  state: "uninitialized" | "rebuilding" | "ready" | "failed";
-  rebuiltAt: string | null;
-  seen: number;
-  applied: number;
-  hidden: number;
-};
+export type ActivityLeaderboardBreakdown =
+  ActivityLeaderboardResult["data"][number]["breakdown"][number];
+export type ActivityLeaderboardEntry = ActivityLeaderboardResult["data"][number];
+export type ActivityLeaderboardStatus = ActivityLeaderboardResult["projection"];
 
 export interface ActivityPointValueProvider {
   listPointValues(): Promise<ActivityPointValue[]>;
 }
+
+export type ActivityLeaderboardOptions = ActivityPointValueProvider & {
+  redisUrl: string;
+  namespace?: string;
+  now?: () => Date;
+};
 
 export class DatabaseActivityPointValueProvider implements ActivityPointValueProvider {
   readonly #db: Database;
@@ -510,13 +489,15 @@ export function createInMemoryActivityLeaderboard(
 }
 
 export async function createRedisActivityLeaderboard(
-  input: ActivityPointValueProvider & {
-    redisUrl: string;
-    namespace?: string;
-    now?: () => Date;
-  },
+  input: ActivityLeaderboardOptions,
 ): Promise<ActivityLeaderboard> {
   const redis = createClient({ url: input.redisUrl });
+  redis.on("error", (error) => {
+    console.error("[ActivityLeaderboard] Redis connection error", error.message);
+  });
+  redis.on("reconnecting", () => {
+    console.warn("[ActivityLeaderboard] Redis reconnecting");
+  });
   await redis.connect();
   return new ActivityLeaderboard(
     new RedisActivityLeaderboardProjection(redis, input.namespace ?? "activity:leaderboard:v1"),
@@ -530,13 +511,7 @@ export class ActivityLeaderboardTag extends Context.Tag("api/ActivityLeaderboard
   ActivityLeaderboard
 >() {}
 
-export function ActivityLeaderboardLive(
-  input: ActivityPointValueProvider & {
-    redisUrl: string;
-    namespace?: string;
-    now?: () => Date;
-  },
-) {
+export function ActivityLeaderboardLive(input: ActivityLeaderboardOptions) {
   return Layer.scoped(
     ActivityLeaderboardTag,
     Effect.acquireRelease(
@@ -547,11 +522,7 @@ export function ActivityLeaderboardLive(
 }
 
 export function createActivityLeaderboard(
-  input: ActivityPointValueProvider & {
-    redisUrl: string;
-    namespace?: string;
-    now?: () => Date;
-  },
+  input: ActivityLeaderboardOptions,
 ): ActivityLeaderboard | Promise<ActivityLeaderboard> {
   return input.redisUrl === "memory:"
     ? createInMemoryActivityLeaderboard(input)

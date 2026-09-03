@@ -1,18 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { useApiClient } from "@/app";
+import { ActivityLeaderboard, type ActivityLeaderboardPeriod } from "@/components";
 import {
   ActivityFeed,
   type ActivityFeedEventView,
   type ActivityFeedFilters,
 } from "@/components/activity-feed";
-import {
-  ActivityLeaderboard,
-  type ActivityLeaderboardPeriod,
-} from "@/components/activity-leaderboard";
 import { PageContainer } from "@/components/layout/page-container";
 import { mergeLiveActivityEvent } from "@/lib/activity-feed-live";
-import { useApiClient } from "@/lib/api";
 
 type ActivityFeedSearch = {
   source?: string;

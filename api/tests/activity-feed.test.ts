@@ -246,6 +246,6 @@ describe("ActivityFeedService", () => {
       identities,
     );
 
-    await expect(service.findTrustedEventByIdForModeration("f".repeat(64))).resolves.toBeNull();
+    await expect(service.findTrustedEventById("f".repeat(64))).resolves.toBeNull();
   });
 });
