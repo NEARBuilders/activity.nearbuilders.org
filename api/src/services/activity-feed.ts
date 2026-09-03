@@ -27,6 +27,16 @@ export interface ActivityIdentityStore {
   listBound(source?: string): Promise<BoundActivityIdentity[]>;
 }
 
+export interface ActivitySuppressionStore {
+  findHiddenEventIds(eventIds: readonly string[]): Promise<Set<string>>;
+  isHidden(eventId: string): Promise<boolean>;
+}
+
+const NO_HIDDEN_EVENTS: ActivitySuppressionStore = {
+  findHiddenEventIds: async () => new Set(),
+  isHidden: async () => false,
+};
+
 export class DatabaseActivityIdentityStore implements ActivityIdentityStore {
   readonly #db: Database;
 
@@ -66,21 +76,47 @@ export class ActivityResumeError extends Error {
 export class ActivityFeedService {
   readonly #relay: ActivityRelay;
   readonly #identities: ActivityIdentityStore;
+  readonly #suppression: ActivitySuppressionStore;
 
-  constructor(relay: ActivityRelay, identities: ActivityIdentityStore) {
+  constructor(
+    relay: ActivityRelay,
+    identities: ActivityIdentityStore,
+    suppression: ActivitySuppressionStore = NO_HIDDEN_EVENTS,
+  ) {
     this.#relay = relay;
     this.#identities = identities;
+    this.#suppression = suppression;
   }
 
   async list(input: ActivityQuery): Promise<ActivityFeedResult> {
+    const result = await this.#listRelayEvents(input, true);
+    const hidden = await this.#suppression.findHiddenEventIds(result.data.map(({ id }) => id));
+    return { ...result, data: result.data.filter(({ id }) => !hidden.has(id)) };
+  }
+
+  async findTrustedEventByIdForModeration(eventId: string): Promise<ActivityFeedEvent | null> {
+    const result = await this.#listRelayEvents({ eventId, limit: 1 });
+    return result.data[0] ?? null;
+  }
+
+  async #listRelayEvents(input: ActivityQuery, excludeHidden = false): Promise<ActivityFeedResult> {
     const trustedIdentities = await this.#trustedIdentities(input.source);
     const parsedEvents = new Map<string, ActivityFeedEvent>();
-    const result = await this.#relay.query(input, (event) => {
-      const parsed = parseActivityFeedEvent(event, trustedIdentities, input);
-      if (!parsed) return false;
-      parsedEvents.set(event.id, parsed);
-      return true;
-    });
+    const result = await this.#relay.query(
+      input,
+      (event) => {
+        const parsed = parseActivityFeedEvent(event, trustedIdentities, input);
+        if (!parsed) return false;
+        parsedEvents.set(event.id, parsed);
+        return true;
+      },
+      excludeHidden
+        ? async (events) => {
+            const hidden = await this.#suppression.findHiddenEventIds(events.map(({ id }) => id));
+            return events.filter(({ id }) => !hidden.has(id));
+          }
+        : undefined,
+    );
 
     return {
       data: result.events.flatMap((event) => {
@@ -129,6 +165,7 @@ export class ActivityFeedService {
         : { events: [], baseline: undefined };
       for (const event of replay.events) {
         if (deliveredIds.has(event.id)) continue;
+        if (await this.#suppression.isHidden(event.id)) continue;
         deliveredIds.add(event.id);
         yield event;
       }
@@ -142,6 +179,7 @@ export class ActivityFeedService {
           ) {
             continue;
           }
+          if (await this.#suppression.isHidden(event.id)) continue;
           deliveredIds.add(event.id);
           yield event;
           continue;
@@ -164,12 +202,13 @@ export class ActivityFeedService {
     const newerEvents: ActivityFeedEvent[] = [];
     let cursor: string | undefined;
     do {
-      const page = await this.list({ ...input, limit: 100, cursor });
+      const page = await this.#listRelayEvents({ ...input, limit: 100, cursor });
+      const hidden = await this.#suppression.findHiddenEventIds(page.data.map(({ id }) => id));
       for (const event of page.data) {
         if (event.id === lastEventId) {
           return { events: newerEvents.reverse(), baseline: event };
         }
-        newerEvents.push(event);
+        if (!hidden.has(event.id)) newerEvents.push(event);
       }
       cursor = page.meta.nextCursor ?? undefined;
     } while (cursor);
@@ -231,6 +270,7 @@ function parseActivityFeedEvent(
     !idempotencyKey ||
     idempotencyKey.length > 200 ||
     !trustedIdentities.get(source)?.has(event.pubkey) ||
+    (query.eventId !== undefined && event.id !== query.eventId) ||
     (query.source !== undefined && source !== query.source) ||
     (query.eventType !== undefined && type !== query.eventType) ||
     (query.actor !== undefined && actor !== query.actor) ||

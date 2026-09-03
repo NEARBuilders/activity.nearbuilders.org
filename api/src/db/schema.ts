@@ -186,3 +186,51 @@ export const activityEventSubmissions = pgTable(
     ),
   }),
 );
+
+export const activityHiddenEvents = pgTable(
+  "activity_hidden_events",
+  {
+    eventId: text("event_id").primaryKey(),
+    source: text("source").notNull(),
+    eventType: text("event_type").notNull(),
+    actor: text("actor").notNull(),
+    eventIdempotencyKey: text("event_idempotency_key").notNull(),
+    eventCreatedAt: timestamp("event_created_at", { mode: "date", withTimezone: true }).notNull(),
+    eventJson: text("event_json").notNull(),
+    administratorId: text("administrator_id").notNull(),
+    reason: text("reason").notNull(),
+    hiddenAt: timestamp("hidden_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    hiddenAtIdx: index("activity_hidden_events_hidden_at_idx").on(table.hiddenAt, table.eventId),
+    actorIdx: index("activity_hidden_events_actor_idx").on(table.actor),
+    sourceIdx: index("activity_hidden_events_source_idx").on(table.source),
+  }),
+);
+
+export const activityEventModerationRequests = pgTable(
+  "activity_event_moderation_requests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    eventId: text("event_id")
+      .notNull()
+      .references(() => activityHiddenEvents.eventId),
+    administratorId: text("administrator_id").notNull(),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestHash: text("request_hash").notNull(),
+    reason: text("reason").notNull(),
+    applied: boolean("applied").default(false).notNull(),
+    requestedAt: timestamp("requested_at", { mode: "date", withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  (table) => ({
+    administratorIdempotencyIdx: uniqueIndex(
+      "activity_event_moderation_requests_administrator_idempotency_idx",
+    ).on(table.administratorId, table.idempotencyKey),
+    eventRequestedAtIdx: index("activity_event_moderation_requests_event_requested_at_idx").on(
+      table.eventId,
+      table.requestedAt,
+    ),
+  }),
+);

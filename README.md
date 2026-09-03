@@ -2,7 +2,7 @@
 
 `activity.nearbuilders.org` is a shared activity and reputation layer for the NEAR ecosystem. Activity Sources are registered through a NEAR-authenticated organization and, as the service grows, will receive API credentials for submitting events through a common HTTP gateway. The service is designed to give applications a portable event feed, live updates, and dynamically scored leaderboards without requiring every integrator to build the same infrastructure.
 
-This repository extends [`dev.everything`](https://everything.dev/) with local UI and API overrides. It includes the local Nostr/Redis protocol proof, Activity Source registration and approval, source credentials, exactly-once event ingestion, and a public filtered Activity feed; live streaming and leaderboard features described below remain planned.
+This repository extends [`dev.everything`](https://everything.dev/) with local UI and API overrides. It includes the local Nostr/Redis protocol proof, Activity Source registration and approval, source credentials, exactly-once event ingestion, a public filtered Activity feed with resumable live streaming, and administrator-controlled event suppression; leaderboard features described below remain planned.
 
 The product scope comes from [NEAR Builders' Activity Service proposal](https://github.com/NEARBuilders/nearbuilders.org/blob/main/ACTIVITY.md), originally targeted for August 2026.
 
@@ -36,7 +36,9 @@ The service is intended to become shared plumbing for reputation, loyalty points
 | --- | --- | --- | --- |
 | `POST` | `/api/v1/events` | Available | Submit an event using a Source API Key. |
 | `GET` | `/api/v1/events` | Available | Query trusted events by source, type, actor, limit, and opaque cursor. |
-| `GET` | `/api/v1/events/stream` | Planned | Subscribe to new events over SSE, optionally filtered by source, type, or actor. |
+| `GET` | `/api/v1/events/stream` | Available | Subscribe to new events over resumable SSE, optionally filtered by source, type, or actor. |
+| `POST` | `/api/activity/events/{eventId}/hide` | Available (admin) | Hide an immutable event from service-controlled public views. |
+| `GET` | `/api/activity/hidden-events` | Available (admin) | Inspect hidden events and their moderation history. |
 | `GET` | `/api/v1/leaderboard` | Planned | Read weekly, monthly, or all-time rankings. |
 
 ### Event shape
@@ -54,6 +56,11 @@ The gateway validates the source and event type, signs the event with the Activi
 Public consumers can browse trusted events at `/activity` or call `GET /api/v1/events`. Results are
 ordered newest-first by timestamp and event ID. Only events signed by a bound Signing Identity for
 their tagged Activity Source are returned.
+
+Platform administrators can hide a trusted event without changing or deleting its signed Nostr
+record. A local suppression projection removes the event from feed queries, live delivery, and SSE
+replay. The first hide and every distinct moderation request are retained for audit, while
+idempotency keys prevent request retries from applying the projection more than once.
 
 ## Proposed architecture
 
