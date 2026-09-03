@@ -154,6 +154,13 @@ function hashApiKey(secret: string): string {
   return createHash("sha256").update(secret, "utf8").digest("hex");
 }
 
+function hasCurrentBinding(
+  source: Pick<typeof sourcesTable.$inferSelect, "nearAccountId">,
+  identity: Pick<typeof identitiesTable.$inferSelect, "bindingStatus" | "boundNearAccountId">,
+): boolean {
+  return identity.bindingStatus === "bound" && identity.boundNearAccountId === source.nearAccountId;
+}
+
 function createEncryptedSigningIdentity(
   sourceRecordId: string,
   masterKeys: ActivityMasterKeys,
@@ -423,7 +430,7 @@ export const ActivityCredentialsLive = (
             if (result.source.approvalStatus !== "approved") {
               throw new ORPCError("FORBIDDEN", { message: "Activity Source is not approved" });
             }
-            if (result.identity.bindingStatus !== "bound") {
+            if (!hasCurrentBinding(result.source, result.identity)) {
               throw new ORPCError("FORBIDDEN", {
                 message: "Bind the Activity Source signing identity before creating an API key",
               });
@@ -526,7 +533,7 @@ export const ActivityCredentialsLive = (
                 message: "Activity Source is not approved for ingestion",
               });
             }
-            if (result.identity.bindingStatus !== "bound") {
+            if (!hasCurrentBinding(result.source, result.identity)) {
               throw new ORPCError("FORBIDDEN", {
                 message: "Activity Source signing identity is not bound",
               });
@@ -637,7 +644,7 @@ export const ActivityCredentialsLive = (
                 message: "Activity Source is not approved for signing",
               });
             }
-            if (result.identity.bindingStatus !== "bound") {
+            if (!hasCurrentBinding(result.source, result.identity)) {
               throw new ORPCError("FORBIDDEN", {
                 message: "Activity Source signing identity is not bound",
               });

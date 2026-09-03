@@ -684,6 +684,46 @@ describe("API Plugin Integration Tests", () => {
         "Activity Source is not approved for ingestion",
       );
     });
+
+    it("requires a new Binding Proof after the Activity Source NEAR account changes", async () => {
+      const { owner, secret } = await provisionIngestionSource({
+        sourceId: "rebound-source",
+        ownerId: "rebound-owner",
+        organizationId: "org-rebound",
+        eventType: "binding.changed",
+      });
+      await owner.updateActivitySource({
+        sourceId: "rebound-source",
+        nearAccountId: "replacement-owner.near",
+      });
+      await expect(
+        owner.getActivitySigningIdentity({ sourceId: "rebound-source" }),
+      ).resolves.toMatchObject({
+        bindingStatus: "pending",
+        boundNearAccountId: null,
+        boundAt: null,
+      });
+      const administrator = await getPluginClient(adminContext());
+      await administrator.reviewActivitySource({
+        sourceId: "rebound-source",
+        decision: "approved",
+        reason: "Replacement source account reviewed",
+      });
+      const gateway = await getPluginClient(undefined, {
+        authorization: `Bearer ${secret}`,
+      });
+      resetTestRelayEvents();
+
+      await expect(
+        gateway.submitActivityEvent({
+          eventType: "binding.changed",
+          actor: "replacement-owner.near",
+          idempotencyKey: "binding:changed",
+          payload: { rebound: false },
+        }),
+      ).rejects.toThrow("Activity Source signing identity is not bound");
+      expect(getTestRelayEvents()).toHaveLength(0);
+    });
   });
 
   describe("Activity event ingestion", () => {
