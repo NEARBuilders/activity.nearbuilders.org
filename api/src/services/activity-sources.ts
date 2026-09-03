@@ -1,10 +1,11 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { Context, Effect, Layer } from "every-plugin/effect";
 import { ORPCError } from "every-plugin/orpc";
 import { DatabaseTag } from "../db/layer";
 import {
   type activitySourceApprovalStatus,
   activityEventTypes as eventTypesTable,
+  activitySigningIdentities as identitiesTable,
   activitySourceReviews as reviewsTable,
   activitySources as sourcesTable,
 } from "../db/schema";
@@ -240,6 +241,8 @@ export const ActivitySourcesLive = Layer.effect(
             if (!existing) {
               throw new ORPCError("NOT_FOUND", { message: "Activity Source not found" });
             }
+            const nearAccountChanged =
+              input.nearAccountId !== undefined && input.nearAccountId !== existing.nearAccountId;
 
             const [updated] = await tx
               .update(sourcesTable)
@@ -256,6 +259,22 @@ export const ActivitySourcesLive = Layer.effect(
               .returning();
             if (!updated) {
               throw new ORPCError("NOT_FOUND", { message: "Activity Source not found" });
+            }
+
+            if (nearAccountChanged) {
+              await tx
+                .update(identitiesTable)
+                .set({
+                  bindingStatus: "pending",
+                  boundNearAccountId: null,
+                  boundAt: null,
+                })
+                .where(
+                  and(
+                    eq(identitiesTable.sourceRecordId, existing.id),
+                    isNull(identitiesTable.retiredAt),
+                  ),
+                );
             }
 
             if (input.eventTypes) {
