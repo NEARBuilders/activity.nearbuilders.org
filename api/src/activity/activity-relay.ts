@@ -152,6 +152,7 @@ export class NostrRelayAdapter implements ActivityRelayAdapter {
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let subscription: { close: (reason?: string) => void } | undefined;
     let lastEventTimestamp = filter.since;
+    const deliveredEventIds = new Set<string>();
     const reconnectBackoffMs = [250, 500, 1_000, 2_000, 5_000] as const;
 
     const scheduleReconnect = () => {
@@ -179,6 +180,8 @@ export class NostrRelayAdapter implements ActivityRelayAdapter {
             onevent: (event) => {
               lastEventTimestamp = Math.max(lastEventTimestamp ?? 0, event.created_at);
               reconnectAttempt = 0;
+              if (deliveredEventIds.has(event.id)) return;
+              deliveredEventIds.add(event.id);
               onEvent(event);
             },
             onclose: scheduleReconnect,
