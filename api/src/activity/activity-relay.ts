@@ -93,7 +93,9 @@ function activityFilter(input: ActivityQuery): Filter {
 
 export class NostrRelayAdapter implements ActivityRelayAdapter {
   readonly #relayUrl: string;
-  readonly #pool = new SimplePool({ enablePing: true, enableReconnect: true });
+  readonly #pool = new SimplePool({ enablePing: true, enableReconnect: false });
+  readonly #subscriptionClosers = new Set<() => void>();
+  #destroyed = false;
 
   constructor(relayUrl: string) {
     this.#relayUrl = relayUrl;
@@ -145,13 +147,65 @@ export class NostrRelayAdapter implements ActivityRelayAdapter {
   }
 
   subscribe(filter: Filter, onEvent: (event: Event) => void): { close: () => void } {
-    return this.#pool.subscribeMany([this.#relayUrl], filter, {
-      onevent: onEvent,
-      maxWait: 5_000,
-    });
+    let closed = false;
+    let reconnectAttempt = 0;
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
+    let subscription: { close: (reason?: string) => void } | undefined;
+    let lastEventTimestamp = filter.since;
+    const deliveredEventIds = new Set<string>();
+    const reconnectBackoffMs = [250, 500, 1_000, 2_000, 5_000] as const;
+
+    const scheduleReconnect = () => {
+      if (closed || this.#destroyed || reconnectTimer) return;
+      const delay = reconnectBackoffMs[Math.min(reconnectAttempt, reconnectBackoffMs.length - 1)];
+      reconnectAttempt += 1;
+      reconnectTimer = setTimeout(() => {
+        reconnectTimer = undefined;
+        void connect();
+      }, delay);
+    };
+    const connect = async () => {
+      if (closed || this.#destroyed) return;
+      try {
+        const relay = await this.#pool.ensureRelay(this.#relayUrl, { connectionTimeout: 5_000 });
+        if (closed || this.#destroyed) return;
+        subscription = relay.subscribe(
+          [
+            {
+              ...filter,
+              ...(lastEventTimestamp === undefined ? {} : { since: lastEventTimestamp }),
+            },
+          ],
+          {
+            onevent: (event) => {
+              lastEventTimestamp = Math.max(lastEventTimestamp ?? 0, event.created_at);
+              reconnectAttempt = 0;
+              if (deliveredEventIds.has(event.id)) return;
+              deliveredEventIds.add(event.id);
+              onEvent(event);
+            },
+            onclose: scheduleReconnect,
+          },
+        );
+      } catch {
+        scheduleReconnect();
+      }
+    };
+    const close = () => {
+      if (closed) return;
+      closed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      subscription?.close();
+      this.#subscriptionClosers.delete(close);
+    };
+    this.#subscriptionClosers.add(close);
+    void connect();
+    return { close };
   }
 
   close(): void {
+    this.#destroyed = true;
+    for (const close of [...this.#subscriptionClosers]) close();
     this.#pool.destroy();
   }
 }
@@ -208,8 +262,14 @@ export class ActivityRelay {
     };
   }
 
-  subscribe(input: ActivityQuery, onEvent: (event: Event) => void): { close: () => void } {
-    return this.#adapter.subscribe(activityFilter(input), onEvent);
+  subscribe(
+    input: ActivityQuery,
+    onEvent: (event: Event) => void,
+    options: { since?: number } = {},
+  ): { close: () => void } {
+    const filter = activityFilter(input);
+    if (options.since !== undefined) filter.since = options.since;
+    return this.#adapter.subscribe(filter, onEvent);
   }
 
   close(): void {

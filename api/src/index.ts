@@ -1,6 +1,6 @@
 import { createPlugin } from "every-plugin";
 import { Effect, Layer } from "every-plugin/effect";
-import { ORPCError } from "every-plugin/orpc";
+import { ORPCError, withEventMeta } from "every-plugin/orpc";
 import { z } from "every-plugin/zod";
 import { resolveActivityRelayUrl } from "./activity/activity-config";
 import { parseActivityMasterKeys } from "./activity/activity-credentials-crypto";
@@ -18,7 +18,11 @@ import { createAuthMiddleware } from "./lib/auth";
 import { ContextSchema } from "./lib/context";
 import type { PluginsClient } from "./lib/plugins-types.gen";
 import { ActivityCredentialsLive, ActivityCredentialsTag } from "./services/activity-credentials";
-import { ActivityFeedService, DatabaseActivityIdentityStore } from "./services/activity-feed";
+import {
+  ActivityFeedService,
+  ActivityResumeError,
+  DatabaseActivityIdentityStore,
+} from "./services/activity-feed";
 import { ActivityIngestionService } from "./services/activity-ingestion";
 import { ActivitySourcesLive, ActivitySourcesTag } from "./services/activity-sources";
 import { TenantsLive, TenantsTag } from "./services/tenants";
@@ -489,6 +493,37 @@ export default createPlugin.withPlugins<PluginsClient>()({
           });
         } catch (error) {
           if (error instanceof ActivityCursorError) {
+            throw new ORPCError("BAD_REQUEST", { message: error.message });
+          }
+          if (
+            error instanceof ActivityRelayQueryTimeoutError ||
+            error instanceof ActivityRelayScanLimitError ||
+            error instanceof ActivityRelayUnavailableError
+          ) {
+            throw new ORPCError("SERVICE_UNAVAILABLE", { message: error.message });
+          }
+          throw error;
+        }
+      }),
+
+      streamActivityEvents: builder.streamActivityEvents.handler(async function* ({
+        input,
+        signal,
+        lastEventId,
+      }) {
+        try {
+          for await (const event of services.activityFeed.stream(
+            {
+              source: input.source,
+              eventType: input.type,
+              actor: input.actor,
+            },
+            { lastEventId, signal },
+          )) {
+            yield withEventMeta(event, { id: event.id, retry: 1_000 });
+          }
+        } catch (error) {
+          if (error instanceof ActivityResumeError) {
             throw new ORPCError("BAD_REQUEST", { message: error.message });
           }
           if (

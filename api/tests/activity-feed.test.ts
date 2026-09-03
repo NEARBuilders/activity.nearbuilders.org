@@ -1,6 +1,6 @@
 import type { Filter } from "nostr-tools";
 import { type Event, finalizeEvent, generateSecretKey, getPublicKey } from "nostr-tools/pure";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { ActivityRelay, type ActivityRelayAdapter } from "@/activity/activity-relay";
 import { ActivityFeedService, type ActivityIdentityStore } from "@/services/activity-feed";
 
@@ -84,5 +84,77 @@ describe("ActivityFeedService", () => {
       ],
       meta: { hasMore: false, nextCursor: null, skippedInvalid: 4 },
     });
+  });
+
+  it("deduplicates live relay delivery, ignores malformed events, and closes on cancellation", async () => {
+    const trustedKey = generateSecretKey();
+    const first = signedActivityEvent(trustedKey, {
+      source: "live-source",
+      eventType: "feedback.submitted",
+      actor: "alice.near",
+      idempotencyKey: "live:first",
+      payload: { sequence: 1 },
+      createdAt: 1_788_400_000,
+    });
+    const second = signedActivityEvent(trustedKey, {
+      source: "live-source",
+      eventType: "feedback.submitted",
+      actor: "alice.near",
+      idempotencyKey: "live:second",
+      payload: { sequence: 2 },
+      createdAt: 1_788_400_001,
+    });
+    let emit: ((event: Event) => void) | undefined;
+    let subscribedFilter: Filter | undefined;
+    const close = vi.fn();
+    const adapter: ActivityRelayAdapter = {
+      publish: async () => "",
+      query: async () => [],
+      subscribe: (filter, onEvent) => {
+        subscribedFilter = filter;
+        emit = onEvent;
+        return { close };
+      },
+      close: () => {},
+    };
+    const identities: ActivityIdentityStore = {
+      listBound: async () => [{ sourceId: "live-source", publicKey: getPublicKey(trustedKey) }],
+    };
+    const service = new ActivityFeedService(
+      new ActivityRelay(adapter, { scanLimit: 100 }),
+      identities,
+    );
+    const stream = service.stream({
+      source: "live-source",
+      eventType: "feedback.submitted",
+      actor: "alice.near",
+    });
+
+    const firstResult = stream.next();
+    await vi.waitFor(() => expect(emit).toEqual(expect.any(Function)));
+    emit?.({ ...first, content: "not-json" });
+    emit?.(first);
+    await expect(firstResult).resolves.toEqual({
+      done: false,
+      value: expect.objectContaining({ id: first.id, payload: { sequence: 1 } }),
+    });
+
+    const secondResult = stream.next();
+    emit?.(first);
+    emit?.(second);
+    await expect(secondResult).resolves.toEqual({
+      done: false,
+      value: expect.objectContaining({ id: second.id, payload: { sequence: 2 } }),
+    });
+    await stream.return(undefined);
+
+    expect(subscribedFilter).toMatchObject({
+      kinds: [1701],
+      "#s": ["live-source"],
+      "#t": ["feedback.submitted"],
+      "#n": ["alice.near"],
+      since: expect.any(Number),
+    });
+    expect(close).toHaveBeenCalledOnce();
   });
 });

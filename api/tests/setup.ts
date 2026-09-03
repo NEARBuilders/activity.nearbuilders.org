@@ -7,7 +7,7 @@ import { RPCHandler } from "@orpc/server/node";
 import { createPluginRuntime } from "every-plugin";
 import { type Filter, matchFilters } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/pure";
-import { WebSocketServer } from "ws";
+import { type WebSocket, WebSocketServer } from "ws";
 import type { contract } from "@/contract";
 import Plugin from "@/index";
 import type { ActivityCredentialsService } from "@/services/activity-credentials";
@@ -34,17 +34,21 @@ let activityCredentialsService: ActivityCredentialsService | null = null;
 let relayServer: WebSocketServer | null = null;
 let relayUrl = "";
 const relayEvents: Event[] = [];
+const relaySubscriptions = new Map<WebSocket, Map<string, Filter[]>>();
 let dropNextRelayAcknowledgement = false;
 
 async function ensureTestRelay(): Promise<string> {
   if (relayServer) return relayUrl;
   relayServer = new WebSocketServer({ host: "127.0.0.1", port: 0 });
   relayServer.on("connection", (socket) => {
+    relaySubscriptions.set(socket, new Map());
+    socket.on("close", () => relaySubscriptions.delete(socket));
     socket.on("message", (data) => {
       const message = JSON.parse(data.toString()) as unknown[];
       if (message[0] === "REQ" && typeof message[1] === "string") {
         const subscriptionId = message[1];
         const filters = message.slice(2) as Filter[];
+        relaySubscriptions.get(socket)?.set(subscriptionId, filters);
         const uniqueEvents = [...new Map(relayEvents.map((event) => [event.id, event])).values()];
         for (const event of uniqueEvents.filter((candidate) => matchFilters(filters, candidate))) {
           socket.send(JSON.stringify(["EVENT", subscriptionId, event]));
@@ -60,6 +64,17 @@ async function ensureTestRelay(): Promise<string> {
           return;
         }
         socket.send(JSON.stringify(["OK", message[1].id, true, "stored"]));
+        for (const [subscriber, subscriptions] of relaySubscriptions) {
+          for (const [subscriptionId, filters] of subscriptions) {
+            if (matchFilters(filters, message[1])) {
+              subscriber.send(JSON.stringify(["EVENT", subscriptionId, message[1]]));
+            }
+          }
+        }
+        return;
+      }
+      if (message[0] === "CLOSE" && typeof message[1] === "string") {
+        relaySubscriptions.get(socket)?.delete(message[1]);
       }
     });
   });
@@ -85,6 +100,13 @@ export function getTestRelayEvents(): readonly Event[] {
 
 export function resetTestRelayEvents(): void {
   relayEvents.length = 0;
+}
+
+export function getTestRelaySubscriptionCount(): number {
+  return [...relaySubscriptions.values()].reduce(
+    (count, subscriptions) => count + subscriptions.size,
+    0,
+  );
 }
 
 export function loseNextTestRelayAcknowledgement(): void {

@@ -19,6 +19,20 @@ function eventData({ id, pubkey, created_at, kind, tags, content, sig }: NostrEv
 
 const activityDescribe = process.env.ACTIVITY_INTEGRATION === "1" ? describe : describe.skip;
 
+async function retryWhileRelayStarts<T>(operation: () => Promise<T>): Promise<T> {
+  const deadline = Date.now() + 10_000;
+  let lastError: unknown;
+  while (Date.now() < deadline) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      await new Promise((resolveWait) => setTimeout(resolveWait, 200));
+    }
+  }
+  throw lastError;
+}
+
 activityDescribe("Activity Nostr boundary", () => {
   let boundary: ActivityBoundary | undefined;
 
@@ -133,7 +147,6 @@ activityDescribe("Activity Nostr boundary", () => {
       "restart",
       "activity-relay",
     ]);
-    await new Promise((resolveWait) => setTimeout(resolveWait, 1_000));
     const second = signActivityEvent(
       {
         source,
@@ -152,7 +165,7 @@ activityDescribe("Activity Nostr boundary", () => {
     const secondReceived = new Promise<void>((resolveEvent) => {
       receiveNext = resolveEvent;
     });
-    await publisher.publish(second);
+    await retryWhileRelayStarts(() => publisher.publish(second));
     await publisher.close();
 
     await Promise.race([

@@ -24,6 +24,7 @@ export type ActivityFeedFilters = {
 type ActivityFeedProps = {
   events: ActivityFeedEventView[];
   filters?: ActivityFeedFilters;
+  liveStatus?: "connecting" | "live" | "unavailable";
   status: "loading" | "success" | "error";
   errorMessage?: string;
   skippedInvalid: number;
@@ -38,6 +39,7 @@ type ActivityFeedProps = {
 export function ActivityFeed({
   events,
   filters = {},
+  liveStatus,
   status,
   errorMessage,
   skippedInvalid,
@@ -65,6 +67,15 @@ export function ActivityFeed({
         <p className="max-w-2xl text-sm text-muted-foreground">
           Browse signed Activity events from registered Activity Sources.
         </p>
+        {liveStatus && (
+          <p className="text-xs text-muted-foreground" role="status" aria-live="polite">
+            {liveStatus === "live"
+              ? "Live updates connected"
+              : liveStatus === "connecting"
+                ? "Connecting live updates…"
+                : "Live updates unavailable; paginated events are still available"}
+          </p>
+        )}
       </header>
 
       <Card>

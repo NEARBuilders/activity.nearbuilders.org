@@ -1,8 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
-import { ActivityFeed, type ActivityFeedFilters } from "@/components/activity-feed";
+import { useEffect, useState } from "react";
+import {
+  ActivityFeed,
+  type ActivityFeedEventView,
+  type ActivityFeedFilters,
+} from "@/components/activity-feed";
 import { PageContainer } from "@/components/layout/page-container";
+import { mergeLiveActivityEvent } from "@/lib/activity-feed-live";
 import { useApiClient } from "@/lib/api";
 
 type ActivityFeedSearch = {
@@ -39,6 +44,8 @@ function ActivityFeedPageContent({ search }: { search: ActivityFeedSearch }) {
   const apiClient = useApiClient();
   const navigate = useNavigate({ from: Route.fullPath });
   const [cursors, setCursors] = useState<Array<string | undefined>>([undefined]);
+  const [liveEvents, setLiveEvents] = useState<ActivityFeedEventView[]>([]);
+  const [liveStatus, setLiveStatus] = useState<"connecting" | "live" | "unavailable">("connecting");
   const cursor = cursors.at(-1);
   const query = useQuery({
     queryKey: ["activity-feed", search.source, search.type, search.actor, cursor],
@@ -53,16 +60,54 @@ function ActivityFeedPageContent({ search }: { search: ActivityFeedSearch }) {
     retry: 1,
   });
 
+  useEffect(() => {
+    const controller = new AbortController();
+    let active = true;
+    const consume = async () => {
+      try {
+        const stream = await apiClient.streamActivityEvents(
+          {
+            source: search.source,
+            type: search.type,
+            actor: search.actor,
+          },
+          { signal: controller.signal },
+        );
+        if (active) setLiveStatus("live");
+        for await (const event of stream) {
+          if (!active) break;
+          setLiveEvents((current) => mergeLiveActivityEvent(current, event));
+        }
+      } catch {
+        if (active && !controller.signal.aborted) setLiveStatus("unavailable");
+      }
+    };
+    void consume();
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [apiClient, search.actor, search.source, search.type]);
+
   const applyFilters = (filters: ActivityFeedFilters) => {
     setCursors([undefined]);
     void navigate({ search: filters });
   };
 
+  const paginatedEvents: ActivityFeedEventView[] = query.data?.data ?? [];
+  const events = cursor
+    ? paginatedEvents
+    : liveEvents.reduceRight(
+        (current, event) => mergeLiveActivityEvent(current, event),
+        paginatedEvents,
+      );
+
   return (
     <PageContainer variant="wide">
       <ActivityFeed
-        events={query.data?.data ?? []}
+        events={events}
         filters={search}
+        liveStatus={liveStatus}
         status={query.isError ? "error" : query.isPending ? "loading" : "success"}
         errorMessage={query.error instanceof Error ? query.error.message : undefined}
         skippedInvalid={query.data?.meta.skippedInvalid ?? 0}

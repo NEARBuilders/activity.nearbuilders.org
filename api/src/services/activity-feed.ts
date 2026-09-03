@@ -56,6 +56,13 @@ export type ActivityFeedResult = {
   };
 };
 
+export class ActivityResumeError extends Error {
+  constructor(message = "Last-Event-ID is invalid or is not available in relay history") {
+    super(message);
+    this.name = "ActivityResumeError";
+  }
+}
+
 export class ActivityFeedService {
   readonly #relay: ActivityRelay;
   readonly #identities: ActivityIdentityStore;
@@ -66,13 +73,7 @@ export class ActivityFeedService {
   }
 
   async list(input: ActivityQuery): Promise<ActivityFeedResult> {
-    const identities = await this.#identities.listBound(input.source);
-    const trustedIdentities = new Map<string, Set<string>>();
-    for (const { sourceId, publicKey } of identities) {
-      const sourceKeys = trustedIdentities.get(sourceId) ?? new Set<string>();
-      sourceKeys.add(publicKey);
-      trustedIdentities.set(sourceId, sourceKeys);
-    }
+    const trustedIdentities = await this.#trustedIdentities(input.source);
     const parsedEvents = new Map<string, ActivityFeedEvent>();
     const result = await this.#relay.query(input, (event) => {
       const parsed = parseActivityFeedEvent(event, trustedIdentities, input);
@@ -93,6 +94,105 @@ export class ActivityFeedService {
       },
     };
   }
+
+  async *stream(
+    input: ActivityQuery,
+    options: { lastEventId?: string; signal?: AbortSignal } = {},
+  ): AsyncGenerator<ActivityFeedEvent> {
+    if (options.lastEventId !== undefined && !/^[a-f0-9]{64}$/.test(options.lastEventId)) {
+      throw new ActivityResumeError();
+    }
+    const trustedIdentities = await this.#trustedIdentities(input.source);
+    const queued: ActivityFeedEvent[] = [];
+    const deliveredIds = new Set(options.lastEventId ? [options.lastEventId] : []);
+    let wake: (() => void) | undefined;
+    const wakeStream = () => {
+      wake?.();
+      wake = undefined;
+    };
+    const subscription = this.#relay.subscribe(
+      input,
+      (event) => {
+        const parsed = parseActivityFeedEvent(event, trustedIdentities, input);
+        if (!parsed) return;
+        if (deliveredIds.has(parsed.id)) return;
+        queued.push(parsed);
+        wakeStream();
+      },
+      { since: Math.floor(Date.now() / 1_000) },
+    );
+    options.signal?.addEventListener("abort", wakeStream, { once: true });
+
+    try {
+      const replay = options.lastEventId
+        ? await this.#eventsAfter(input, options.lastEventId)
+        : { events: [], baseline: undefined };
+      for (const event of replay.events) {
+        if (deliveredIds.has(event.id)) continue;
+        deliveredIds.add(event.id);
+        yield event;
+      }
+
+      while (!options.signal?.aborted) {
+        const event = queued.shift();
+        if (event) {
+          if (
+            deliveredIds.has(event.id) ||
+            (replay.baseline !== undefined && !isAfter(event, replay.baseline))
+          ) {
+            continue;
+          }
+          deliveredIds.add(event.id);
+          yield event;
+          continue;
+        }
+        await new Promise<void>((resolve) => {
+          wake = resolve;
+          if (options.signal?.aborted || queued.length > 0) wakeStream();
+        });
+      }
+    } finally {
+      options.signal?.removeEventListener("abort", wakeStream);
+      subscription.close();
+    }
+  }
+
+  async #eventsAfter(
+    input: ActivityQuery,
+    lastEventId: string,
+  ): Promise<{ events: ActivityFeedEvent[]; baseline: ActivityFeedEvent }> {
+    const newerEvents: ActivityFeedEvent[] = [];
+    let cursor: string | undefined;
+    do {
+      const page = await this.list({ ...input, limit: 100, cursor });
+      for (const event of page.data) {
+        if (event.id === lastEventId) {
+          return { events: newerEvents.reverse(), baseline: event };
+        }
+        newerEvents.push(event);
+      }
+      cursor = page.meta.nextCursor ?? undefined;
+    } while (cursor);
+    throw new ActivityResumeError();
+  }
+
+  async #trustedIdentities(source?: string): Promise<Map<string, Set<string>>> {
+    const identities = await this.#identities.listBound(source);
+    const trustedIdentities = new Map<string, Set<string>>();
+    for (const { sourceId, publicKey } of identities) {
+      const sourceKeys = trustedIdentities.get(sourceId) ?? new Set<string>();
+      sourceKeys.add(publicKey);
+      trustedIdentities.set(sourceId, sourceKeys);
+    }
+    return trustedIdentities;
+  }
+}
+
+function isAfter(event: ActivityFeedEvent, baseline: ActivityFeedEvent): boolean {
+  return (
+    event.timestamp > baseline.timestamp ||
+    (event.timestamp === baseline.timestamp && event.id.localeCompare(baseline.id) > 0)
+  );
 }
 
 function parseActivityFeedEvent(

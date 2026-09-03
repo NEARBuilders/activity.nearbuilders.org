@@ -5,7 +5,7 @@ import {
   SERVICE_UNAVAILABLE,
   UNAUTHORIZED,
 } from "every-plugin/errors";
-import { oc } from "every-plugin/orpc";
+import { eventIterator, oc } from "every-plugin/orpc";
 import { z } from "every-plugin/zod";
 
 const ErrorTestKindSchema = z.enum([
@@ -421,6 +421,24 @@ export const contract = oc.router({
       }),
     )
     .output(ActivityFeedSchema)
+    .errors({ BAD_REQUEST, SERVICE_UNAVAILABLE }),
+
+  streamActivityEvents: oc
+    .route({
+      method: "GET",
+      path: "/v1/events/stream",
+      summary: "Stream Activity events",
+      description: "Streams trusted Activity events and supports resuming with Last-Event-ID.",
+      tags: ["Activity"],
+    })
+    .input(
+      z.object({
+        source: z.string().min(2).max(100).regex(ACTIVITY_SOURCE_ID_REGEX).optional(),
+        type: ActivityEventTypeNameSchema.optional(),
+        actor: NearAccountIdSchema.optional(),
+      }),
+    )
+    .output(eventIterator(ActivityFeedEventSchema))
     .errors({ BAD_REQUEST, SERVICE_UNAVAILABLE }),
 
   createThing: oc
