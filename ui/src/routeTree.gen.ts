@@ -13,6 +13,7 @@ import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutSkillRouteImport } from './routes/_layout/skill'
 import { Route as LayoutLoginRouteImport } from './routes/_layout/login'
+import { Route as LayoutActivityRouteImport } from './routes/_layout/activity'
 import { Route as LayoutAboutRouteImport } from './routes/_layout/about'
 import { Route as LayoutAuthenticatedRouteImport } from './routes/_layout/_authenticated'
 import { Route as LayoutThingsIndexRouteImport } from './routes/_layout/things/index'
@@ -51,6 +52,11 @@ const LayoutSkillRoute = LayoutSkillRouteImport.update({
 const LayoutLoginRoute = LayoutLoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutActivityRoute = LayoutActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutAboutRoute = LayoutAboutRouteImport.update({
@@ -170,6 +176,7 @@ const LayoutAuthenticatedAcceptInvitationIdRoute =
 export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
   '/about': typeof LayoutAboutRoute
+  '/activity': typeof LayoutActivityRoute
   '/login': typeof LayoutLoginRoute
   '/skill': typeof LayoutSkillRoute
   '/activity-sources': typeof LayoutAuthenticatedActivitySourcesRoute
@@ -194,6 +201,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof LayoutIndexRoute
   '/about': typeof LayoutAboutRoute
+  '/activity': typeof LayoutActivityRoute
   '/login': typeof LayoutLoginRoute
   '/skill': typeof LayoutSkillRoute
   '/activity-sources': typeof LayoutAuthenticatedActivitySourcesRoute
@@ -219,6 +227,7 @@ export interface FileRoutesById {
   '/_layout': typeof LayoutRouteWithChildren
   '/_layout/_authenticated': typeof LayoutAuthenticatedRouteWithChildren
   '/_layout/about': typeof LayoutAboutRoute
+  '/_layout/activity': typeof LayoutActivityRoute
   '/_layout/login': typeof LayoutLoginRoute
   '/_layout/skill': typeof LayoutSkillRoute
   '/_layout/': typeof LayoutIndexRoute
@@ -246,6 +255,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
+    | '/activity'
     | '/login'
     | '/skill'
     | '/activity-sources'
@@ -270,6 +280,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
+    | '/activity'
     | '/login'
     | '/skill'
     | '/activity-sources'
@@ -294,6 +305,7 @@ export interface FileRouteTypes {
     | '/_layout'
     | '/_layout/_authenticated'
     | '/_layout/about'
+    | '/_layout/activity'
     | '/_layout/login'
     | '/_layout/skill'
     | '/_layout/'
@@ -349,6 +361,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LayoutLoginRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/activity': {
+      id: '/_layout/activity'
+      path: '/activity'
+      fullPath: '/activity'
+      preLoaderRoute: typeof LayoutActivityRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/about': {
@@ -559,6 +578,7 @@ const LayoutAuthenticatedRouteWithChildren =
 interface LayoutRouteChildren {
   LayoutAuthenticatedRoute: typeof LayoutAuthenticatedRouteWithChildren
   LayoutAboutRoute: typeof LayoutAboutRoute
+  LayoutActivityRoute: typeof LayoutActivityRoute
   LayoutLoginRoute: typeof LayoutLoginRoute
   LayoutSkillRoute: typeof LayoutSkillRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
@@ -570,6 +590,7 @@ interface LayoutRouteChildren {
 const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAuthenticatedRoute: LayoutAuthenticatedRouteWithChildren,
   LayoutAboutRoute: LayoutAboutRoute,
+  LayoutActivityRoute: LayoutActivityRoute,
   LayoutLoginRoute: LayoutLoginRoute,
   LayoutSkillRoute: LayoutSkillRoute,
   LayoutIndexRoute: LayoutIndexRoute,

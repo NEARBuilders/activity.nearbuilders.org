@@ -19,6 +19,7 @@ export type ActivityQuery = {
 export type ActivityQueryResult = {
   events: Event[];
   nextCursor: string | null;
+  skippedInvalid: number;
 };
 
 export interface ActivityRelayAdapter {
@@ -33,6 +34,34 @@ type ActivityCursor = {
   id: string;
 };
 
+export class ActivityCursorError extends Error {
+  constructor() {
+    super("Activity cursor is invalid");
+    this.name = "ActivityCursorError";
+  }
+}
+
+export class ActivityRelayQueryTimeoutError extends Error {
+  constructor() {
+    super("Activity relay query timed out");
+    this.name = "ActivityRelayQueryTimeoutError";
+  }
+}
+
+export class ActivityRelayUnavailableError extends Error {
+  constructor() {
+    super("Activity relay is unavailable");
+    this.name = "ActivityRelayUnavailableError";
+  }
+}
+
+export class ActivityRelayScanLimitError extends Error {
+  constructor() {
+    super("Activity relay query reached its scan limit");
+    this.name = "ActivityRelayScanLimitError";
+  }
+}
+
 function encodeCursor(event: Event): string {
   return Buffer.from(JSON.stringify({ createdAt: event.created_at, id: event.id })).toString(
     "base64url",
@@ -45,7 +74,7 @@ function decodeCursor(cursor: string): ActivityCursor {
     if (!Number.isInteger(value.createdAt) || !/^[0-9a-f]{64}$/.test(value.id)) throw new Error();
     return value;
   } catch {
-    throw new Error("Activity cursor is invalid");
+    throw new ActivityCursorError();
   }
 }
 
@@ -75,8 +104,44 @@ export class NostrRelayAdapter implements ActivityRelayAdapter {
     return relay.publish(event);
   }
 
-  query(filter: Filter): Promise<Event[]> {
-    return this.#pool.querySync([this.#relayUrl], filter, { maxWait: 5_000 });
+  async query(filter: Filter): Promise<Event[]> {
+    const relay = await this.#pool
+      .ensureRelay(this.#relayUrl, { connectionTimeout: 5_000 })
+      .catch(() => {
+        throw new ActivityRelayUnavailableError();
+      });
+
+    return new Promise<Event[]>((resolve, reject) => {
+      const events: Event[] = [];
+      let settled = false;
+      let subscription: ReturnType<typeof relay.subscribe> | undefined;
+      const timeout = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        subscription?.close("Activity relay query timed out");
+        reject(new ActivityRelayQueryTimeoutError());
+      }, 5_000);
+      const settle = (result: () => void) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timeout);
+        subscription?.close();
+        result();
+      };
+
+      try {
+        subscription = relay.subscribe([filter], {
+          onevent: (event) => events.push(event),
+          oneose: () => settle(() => resolve(events)),
+          onclose: () => settle(() => reject(new ActivityRelayUnavailableError())),
+          // The adapter timer above must report a missing EOSE instead of letting
+          // nostr-tools turn its own EOSE timeout into a successful empty result.
+          eoseTimeout: 6_000,
+        });
+      } catch {
+        settle(() => reject(new ActivityRelayUnavailableError()));
+      }
+    });
   }
 
   subscribe(filter: Filter, onEvent: (event: Event) => void): { close: () => void } {
@@ -94,10 +159,15 @@ export class NostrRelayAdapter implements ActivityRelayAdapter {
 export class ActivityRelay {
   readonly #adapter: ActivityRelayAdapter;
   readonly #scanLimit: number;
+  readonly #queryTimeoutMs: number;
 
-  constructor(adapter: ActivityRelayAdapter, options: { scanLimit: number }) {
+  constructor(
+    adapter: ActivityRelayAdapter,
+    options: { scanLimit: number; queryTimeoutMs?: number },
+  ) {
     this.#adapter = adapter;
     this.#scanLimit = options.scanLimit;
+    this.#queryTimeoutMs = options.queryTimeoutMs ?? 6_000;
   }
 
   async publish(event: Event): Promise<{ accepted: true; message: string }> {
@@ -107,18 +177,22 @@ export class ActivityRelay {
     return { accepted: true, message: await this.#adapter.publish(event) };
   }
 
-  async query(input: ActivityQuery): Promise<ActivityQueryResult> {
+  async query(
+    input: ActivityQuery,
+    isValid: (event: Event) => boolean = () => true,
+  ): Promise<ActivityQueryResult> {
     const limit = Math.min(Math.max(input.limit ?? 100, 1), 100);
     const cursor = input.cursor ? decodeCursor(input.cursor) : null;
     const filter = activityFilter(input);
     filter.limit = this.#scanLimit;
     if (cursor) filter.until = cursor.createdAt;
 
-    const events = await this.#adapter.query(filter);
+    const events = await withTimeout(this.#adapter.query(filter), this.#queryTimeoutMs);
     if (events.length >= this.#scanLimit) {
-      throw new Error("Activity relay query reached its scan limit");
+      throw new ActivityRelayScanLimitError();
     }
-    const pageCandidates = events.sort(compareEvents).filter((event) => {
+    const validEvents = events.filter(isValid);
+    const pageCandidates = validEvents.sort(compareEvents).filter((event) => {
       if (!cursor) return true;
       return (
         event.created_at < cursor.createdAt ||
@@ -130,6 +204,7 @@ export class ActivityRelay {
     return {
       events: page,
       nextCursor: pageCandidates.length > limit && lastEvent ? encodeCursor(lastEvent) : null,
+      skippedInvalid: events.length - validEvents.length,
     };
   }
 
@@ -139,5 +214,19 @@ export class ActivityRelay {
 
   close(): void {
     this.#adapter.close();
+  }
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_resolve, reject) => {
+        timeout = setTimeout(() => reject(new ActivityRelayQueryTimeoutError()), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
   }
 }

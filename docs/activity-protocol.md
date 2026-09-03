@@ -58,6 +58,47 @@ Identity cannot ingest; `409 Conflict` when an idempotency key is reused with di
 `503 Service Unavailable` when the relay does not positively acknowledge the signed event. A client
 may safely retry the same request after a `503`.
 
+## Public feed
+
+`GET /api/v1/events` is public and accepts optional `source`, `type`, and `actor` filters. `limit`
+defaults to 20 and may be between 1 and 100. Pass the returned opaque `nextCursor` unchanged to read
+the following page:
+
+```http
+GET /api/v1/events?source=feedback-rounds&type=feedback.submitted&actor=alice.near&limit=20
+```
+
+The response contains `data` and pagination metadata:
+
+```json
+{
+  "data": [
+    {
+      "id": "<64-character Nostr event ID>",
+      "source": "feedback-rounds",
+      "type": "feedback.submitted",
+      "actor": "alice.near",
+      "idempotencyKey": "feedback:round-42:alice.near",
+      "timestamp": "2026-09-03T01:46:40.000Z",
+      "payload": { "rating": 5 }
+    }
+  ],
+  "meta": {
+    "hasMore": false,
+    "nextCursor": null,
+    "skippedInvalid": 0
+  }
+}
+```
+
+The gateway verifies each event envelope, content hash, signature, required tags, and source-to-key
+association against every bound Signing Identity retained for that source. Retired identities remain
+trusted for historical events. Malformed, forged, mismatched, and filter-inconsistent relay records
+are omitted before page boundaries are calculated. `skippedInvalid` makes those omissions observable
+to clients. A malformed cursor returns `400 Bad Request`; a relay timeout or unsafe scan-limit result
+returns `503 Service Unavailable` rather than leaving the request open or returning an incomplete
+page.
+
 ## Transport boundary
 
 The local boundary pins `nostr-tools@2.24.1`, `ws@8.21.3`, and `redis@6.2.1`, matching the transport
@@ -99,6 +140,7 @@ queries include the cursor second, then discard IDs at or ahead of the cursor lo
 events with the same Nostr timestamp from being skipped or repeated. Each relay scan requests up to
 1,000 matching records and exposes pages of at most 100 records. A response that reaches the scan
 limit fails loudly instead of returning a cursor that could silently omit same-second events.
+Relay reads have a six-second gateway deadline around the relay client's five-second wait.
 
 ## Local workflow
 

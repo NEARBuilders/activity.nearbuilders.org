@@ -4,6 +4,7 @@ import {
   adminContext,
   authedContext,
   getActivityCredentialsService,
+  getPluginBaseUrl,
   getPluginClient,
   getTestRelayEvents,
   loseNextTestRelayAcknowledgement,
@@ -1063,6 +1064,84 @@ describe("API Plugin Integration Tests", () => {
         unacknowledgedEvent?.id,
         unacknowledgedEvent?.id,
       ]);
+    });
+  });
+
+  describe("Activity event feed", () => {
+    it("publicly filters and cursor-paginates trusted Activity events without overlap", async () => {
+      const { secret } = await provisionIngestionSource({
+        sourceId: "feed-source",
+        ownerId: "feed-owner",
+        organizationId: "org-feed",
+        eventType: "feedback.submitted",
+      });
+      const gateway = await getPluginClient(undefined, {
+        authorization: `Bearer ${secret}`,
+      });
+      resetTestRelayEvents();
+      const firstSubmitted = await gateway.submitActivityEvent({
+        eventType: "feedback.submitted",
+        actor: "alice.near",
+        idempotencyKey: "feed:alice",
+        payload: { rating: 5 },
+      });
+      const secondSubmitted = await gateway.submitActivityEvent({
+        eventType: "feedback.submitted",
+        actor: "bob.near",
+        idempotencyKey: "feed:bob",
+        payload: { rating: 4 },
+      });
+      const publicClient = await getPluginClient();
+
+      const firstPage = await publicClient.listActivityEvents({
+        source: "feed-source",
+        type: "feedback.submitted",
+        limit: 1,
+      });
+      const secondPage = await publicClient.listActivityEvents({
+        source: "feed-source",
+        type: "feedback.submitted",
+        limit: 1,
+        cursor: firstPage.meta.nextCursor ?? undefined,
+      });
+
+      expect(firstPage.meta.hasMore).toBe(true);
+      expect(firstPage.meta.nextCursor).toEqual(expect.any(String));
+      expect(secondPage.meta).toEqual({
+        hasMore: false,
+        nextCursor: null,
+        skippedInvalid: 0,
+      });
+      expect([...firstPage.data, ...secondPage.data].map(({ id }) => id).sort()).toEqual(
+        [firstSubmitted.eventId, secondSubmitted.eventId].sort(),
+      );
+      expect(new Set([...firstPage.data, ...secondPage.data].map(({ id }) => id)).size).toBe(2);
+
+      const actorFiltered = await publicClient.listActivityEvents({ actor: "alice.near" });
+      expect(actorFiltered.data).toEqual([
+        expect.objectContaining({
+          id: firstSubmitted.eventId,
+          source: "feed-source",
+          type: "feedback.submitted",
+          actor: "alice.near",
+          payload: { rating: 5 },
+        }),
+      ]);
+
+      const rawResponse = await fetch(
+        `${await getPluginBaseUrl()}/v1/events?source=feed-source&limit=1`,
+      );
+      const rawFeed = (await rawResponse.json()) as { data: unknown[] };
+      expect(rawResponse.status).toBe(200);
+      expect(rawFeed.data).toHaveLength(1);
+    });
+
+    it("rejects a malformed public feed cursor", async () => {
+      const publicClient = await getPluginClient();
+
+      await expect(publicClient.listActivityEvents({ cursor: "invalid" })).rejects.toThrow(
+        "Activity cursor is invalid",
+      );
     });
   });
 
