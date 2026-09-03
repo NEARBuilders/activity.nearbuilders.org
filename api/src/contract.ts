@@ -128,6 +128,18 @@ export const ActivityFeedEventSchema = z.object({
 
 export type ActivityFeedEvent = z.infer<typeof ActivityFeedEventSchema>;
 
+const ActivitySseResponseSchema = z.object({
+  status: z.literal(200),
+  headers: z.record(z.string(), z.string()),
+  body: z.custom<ReadableStream<Uint8Array>>(
+    (value) =>
+      value !== null &&
+      typeof value === "object" &&
+      "getReader" in value &&
+      typeof value.getReader === "function",
+  ),
+});
+
 export const ActivityFeedSchema = z.object({
   data: z.array(ActivityFeedEventSchema),
   meta: z.object({
@@ -425,8 +437,27 @@ export const contract = oc.router({
 
   streamActivityEvents: oc
     .route({
+      method: "POST",
+      path: "/internal/activity/events/stream",
+      summary: "Stream Activity events over typed RPC",
+      description: "Internal typed stream used by the Activity feed UI.",
+      tags: ["Activity"],
+    })
+    .input(
+      z.object({
+        source: z.string().min(2).max(100).regex(ACTIVITY_SOURCE_ID_REGEX).optional(),
+        type: ActivityEventTypeNameSchema.optional(),
+        actor: NearAccountIdSchema.optional(),
+      }),
+    )
+    .output(eventIterator(ActivityFeedEventSchema))
+    .errors({ BAD_REQUEST, SERVICE_UNAVAILABLE }),
+
+  streamActivityEventsSse: oc
+    .route({
       method: "GET",
       path: "/v1/events/stream",
+      outputStructure: "detailed",
       summary: "Stream Activity events",
       description: "Streams trusted Activity events and supports resuming with Last-Event-ID.",
       tags: ["Activity"],
@@ -438,7 +469,7 @@ export const contract = oc.router({
         actor: NearAccountIdSchema.optional(),
       }),
     )
-    .output(eventIterator(ActivityFeedEventSchema))
+    .output(ActivitySseResponseSchema)
     .errors({ BAD_REQUEST, SERVICE_UNAVAILABLE }),
 
   createThing: oc

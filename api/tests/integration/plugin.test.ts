@@ -1195,6 +1195,50 @@ describe("API Plugin Integration Tests", () => {
       await expect.poll(() => getTestRelaySubscriptionCount()).toBe(0);
     });
 
+    it("applies all filters and cancellation on the public SSE route", async () => {
+      const { secret } = await provisionIngestionSource({
+        sourceId: "public-stream-source",
+        ownerId: "public-stream-owner",
+        organizationId: "org-public-stream",
+        eventType: "feedback.submitted",
+      });
+      const gateway = await getPluginClient(undefined, {
+        authorization: `Bearer ${secret}`,
+      });
+      const response = await withTestTimeout(
+        fetch(
+          `${await getPluginBaseUrl()}/v1/events/stream?source=public-stream-source&type=feedback.submitted&actor=alice.near`,
+        ),
+      );
+      const reader = response.body?.getReader();
+      expect(response.status).toBe(200);
+      expect(reader).toBeDefined();
+
+      try {
+        await gateway.submitActivityEvent({
+          eventType: "feedback.submitted",
+          actor: "bob.near",
+          idempotencyKey: "public-stream:bob",
+          payload: { rating: 3 },
+        });
+        const submitted = await gateway.submitActivityEvent({
+          eventType: "feedback.submitted",
+          actor: "alice.near",
+          idempotencyKey: "public-stream:alice",
+          payload: { rating: 5 },
+        });
+
+        const frame = await readSseEventFrame(reader!);
+        expect(frame).toMatch(new RegExp(`^id:\\s*${submitted.eventId}$`, "m"));
+        expect(frame).toContain('"actor":"alice.near"');
+        expect(frame).not.toContain('"actor":"bob.near"');
+      } finally {
+        await reader?.cancel();
+      }
+
+      await expect.poll(() => getTestRelaySubscriptionCount()).toBe(0);
+    });
+
     it("replays events after Last-Event-ID before continuing live with stable SSE IDs", async () => {
       const { secret } = await provisionIngestionSource({
         sourceId: "resume-source",

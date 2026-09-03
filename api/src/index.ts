@@ -12,8 +12,9 @@ import {
   ActivityRelayUnavailableError,
   NostrRelayAdapter,
 } from "./activity/activity-relay";
-import { contract, NEAR_ACCOUNT_ID_REGEX } from "./contract";
+import { type ActivityFeedEvent, contract, NEAR_ACCOUNT_ID_REGEX } from "./contract";
 import { DatabaseLive, DatabaseTag } from "./db/layer";
+import { createActivitySseStream } from "./lib/activity-sse";
 import { createAuthMiddleware } from "./lib/auth";
 import { ContextSchema } from "./lib/context";
 import type { PluginsClient } from "./lib/plugins-types.gen";
@@ -536,6 +537,29 @@ export default createPlugin.withPlugins<PluginsClient>()({
           throw error;
         }
       }),
+
+      streamActivityEventsSse: builder.streamActivityEventsSse.handler(
+        ({ input, context, signal }) => {
+          const lastEventId = context.reqHeaders?.get("last-event-id") ?? undefined;
+          const events = services.activityFeed.stream(
+            {
+              source: input.source,
+              eventType: input.type,
+              actor: input.actor,
+            },
+            { lastEventId, signal },
+          ) as AsyncGenerator<ActivityFeedEvent>;
+
+          return {
+            status: 200 as const,
+            headers: {
+              "cache-control": "no-cache",
+              "content-type": "text/event-stream; charset=utf-8",
+            },
+            body: createActivitySseStream(events),
+          };
+        },
+      ),
 
       createThing: builder.createThing.use(requireAuth).handler(async ({ input }) => {
         throw new ORPCError("BAD_REQUEST", {
