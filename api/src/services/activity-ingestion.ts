@@ -9,6 +9,7 @@ import {
   activityEventSubmissions as submissionsTable,
 } from "../db/schema";
 import type { ActivityCredentialsService } from "./activity-credentials";
+import type { ActivityLeaderboard } from "./activity-leaderboard";
 import type { ActivitySourcesService } from "./activity-sources";
 
 export interface ActivityEventSubmission {
@@ -25,17 +26,20 @@ export class ActivityIngestionService {
   readonly #credentials: ActivityCredentialsService;
   readonly #sources: ActivitySourcesService;
   readonly #relay: ActivityRelay;
+  readonly #leaderboard: ActivityLeaderboard;
 
   constructor(
     db: Database,
     credentials: ActivityCredentialsService,
     sources: ActivitySourcesService,
     relay: ActivityRelay,
+    leaderboard: ActivityLeaderboard,
   ) {
     this.#db = db;
     this.#credentials = credentials;
     this.#sources = sources;
     this.#relay = relay;
+    this.#leaderboard = leaderboard;
   }
 
   async submit(apiKey: string, input: ActivityEventSubmission): Promise<{ eventId: string }> {
@@ -145,6 +149,22 @@ export class ActivityIngestionService {
           message: "Activity relay did not acknowledge the event",
         });
       }
+      try {
+        await this.#leaderboard.apply({
+          operation: "include",
+          event: {
+            id: eventToPublish.id,
+            source: credential.sourceId,
+            type: input.eventType,
+            actor: input.actor,
+            timestamp: new Date(eventToPublish.created_at * 1_000).toISOString(),
+          },
+        });
+      } catch {
+        throw new ORPCError("SERVICE_UNAVAILABLE", {
+          message: "Activity leaderboard projection is unavailable",
+        });
+      }
       await tx
         .update(submissionsTable)
         .set({ publishedAt: new Date() })
@@ -158,7 +178,7 @@ export class ActivityIngestionService {
   }
 }
 
-function parseStoredActivityEvent(eventJson: string, eventId: string | null): Event {
+export function parseStoredActivityEvent(eventJson: string, eventId: string | null): Event {
   let event: unknown;
   try {
     event = JSON.parse(eventJson);

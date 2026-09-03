@@ -26,6 +26,12 @@ import {
 } from "./services/activity-feed";
 import { ActivityIngestionService } from "./services/activity-ingestion";
 import {
+  ActivityLeaderboardLive,
+  ActivityLeaderboardTag,
+  DatabaseActivityPointValueProvider,
+} from "./services/activity-leaderboard";
+import { DatabaseActivityLeaderboardHistory } from "./services/activity-leaderboard-history";
+import {
   ActivityModerationService,
   DatabaseActivityModerationStore,
 } from "./services/activity-moderation";
@@ -86,6 +92,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
     API_DATABASE_URL: z.string().default("pglite:.bos/api/:memory:"),
     ACTIVITY_SIGNING_MASTER_KEYS: z.string(),
     ACTIVITY_SIGNING_ACTIVE_KEY_VERSION: z.string().default("v1"),
+    ACTIVITY_REDIS_URL: z.string(),
   }),
 
   context: ContextSchema,
@@ -125,11 +132,20 @@ export default createPlugin.withPlugins<PluginsClient>()({
           scanLimit: 1_000,
         },
       );
+      const activityPointValues = new DatabaseActivityPointValueProvider(database);
+      const activityLeaderboard = yield* tools.buildService(
+        ActivityLeaderboardTag,
+        ActivityLeaderboardLive({
+          redisUrl: config.secrets.ACTIVITY_REDIS_URL,
+          listPointValues: () => activityPointValues.listPointValues(),
+        }),
+      );
       const activityIngestionService = new ActivityIngestionService(
         database,
         activityCredentialsService,
         activitySourcesService,
         activityRelay,
+        activityLeaderboard,
       );
       const activityModerationStore = new DatabaseActivityModerationStore(database);
       const activityFeedService = new ActivityFeedService(
@@ -140,7 +156,29 @@ export default createPlugin.withPlugins<PluginsClient>()({
       const activityModerationService = new ActivityModerationService(
         activityModerationStore,
         activityFeedService,
+        activityLeaderboard,
       );
+      const activityLeaderboardHistory = new DatabaseActivityLeaderboardHistory(
+        database,
+        activityFeedService,
+      );
+      const leaderboardStatus = yield* Effect.promise(() => activityLeaderboard.getStatus());
+      if (leaderboardStatus.state !== "ready" || config.secrets.ACTIVITY_REDIS_URL === "memory:") {
+        const hiddenEvents = yield* Effect.promise(() => activityModerationStore.listHidden());
+        console.info("[ActivityLeaderboard] Projection rebuild started");
+        const rebuilt = yield* Effect.promise(() =>
+          activityLeaderboard
+            .rebuild({
+              events: activityLeaderboardHistory.list(),
+              hiddenEvents: hiddenEvents.map(({ event }) => event),
+            })
+            .catch((error) => {
+              console.error("[ActivityLeaderboard] Projection rebuild failed");
+              throw error;
+            }),
+        );
+        console.info("[ActivityLeaderboard] Projection rebuild completed", rebuilt);
+      }
 
       console.log("[API] Services Initialized");
 
@@ -151,6 +189,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityIngestion: activityIngestionService,
         activityFeed: activityFeedService,
         activityModeration: activityModerationService,
+        activityLeaderboard,
         activityRelay,
       };
     }),
@@ -595,6 +634,26 @@ export default createPlugin.withPlugins<PluginsClient>()({
       listHiddenActivityEvents: builder.listHiddenActivityEvents
         .use(requireAdmin)
         .handler(async () => services.activityModeration.listHidden()),
+
+      getActivityLeaderboard: builder.getActivityLeaderboard.handler(async ({ input }) => {
+        try {
+          return await services.activityLeaderboard.getLeaderboard(input);
+        } catch {
+          throw new ORPCError("SERVICE_UNAVAILABLE", {
+            message: "Activity leaderboard projection is unavailable",
+          });
+        }
+      }),
+
+      getActivityLeaderboardStatus: builder.getActivityLeaderboardStatus.handler(async () => {
+        try {
+          return await services.activityLeaderboard.getStatus();
+        } catch {
+          throw new ORPCError("SERVICE_UNAVAILABLE", {
+            message: "Activity leaderboard projection status is unavailable",
+          });
+        }
+      }),
 
       createThing: builder.createThing.use(requireAuth).handler(async ({ input }) => {
         throw new ORPCError("BAD_REQUEST", {

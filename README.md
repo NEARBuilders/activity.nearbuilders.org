@@ -2,7 +2,7 @@
 
 `activity.nearbuilders.org` is a shared activity and reputation layer for the NEAR ecosystem. Activity Sources are registered through a NEAR-authenticated organization and, as the service grows, will receive API credentials for submitting events through a common HTTP gateway. The service is designed to give applications a portable event feed, live updates, and dynamically scored leaderboards without requiring every integrator to build the same infrastructure.
 
-This repository extends [`dev.everything`](https://everything.dev/) with local UI and API overrides. It includes the local Nostr/Redis protocol proof, Activity Source registration and approval, source credentials, exactly-once event ingestion, a public filtered Activity feed with resumable live streaming, and administrator-controlled event suppression; leaderboard features described below remain planned.
+This repository extends [`dev.everything`](https://everything.dev/) with local UI and API overrides. It includes the local Nostr/Redis protocol proof, Activity Source registration and approval, source credentials, exactly-once event ingestion, a public filtered Activity feed with resumable live streaming, administrator-controlled event suppression, and dynamically weighted leaderboards.
 
 The product scope comes from [NEAR Builders' Activity Service proposal](https://github.com/NEARBuilders/nearbuilders.org/blob/main/ACTIVITY.md), originally targeted for August 2026.
 
@@ -39,7 +39,7 @@ The service is intended to become shared plumbing for reputation, loyalty points
 | `GET` | `/api/v1/events/stream` | Available | Subscribe to new events over resumable SSE, optionally filtered by source, type, or actor. |
 | `POST` | `/api/activity/events/{eventId}/hide` | Available (admin) | Hide an immutable event from service-controlled public views. |
 | `GET` | `/api/activity/hidden-events` | Available (admin) | Inspect hidden events and their moderation history. |
-| `GET` | `/api/v1/leaderboard` | Planned | Read weekly, monthly, or all-time rankings. |
+| `GET` | `/api/v1/leaderboard` | Available | Read exact weekly, monthly, or all-time rankings with optional source and Event Type filters. |
 
 ### Event shape
 
@@ -61,6 +61,13 @@ Platform administrators can hide a trusted event without changing or deleting it
 record. A local suppression projection removes the event from feed queries, live delivery, and SSE
 replay. The first hide and every distinct moderation request are retained for audit, while
 idempotency keys prevent request retries from applying the projection more than once.
+
+Leaderboard queries rank actors from raw per-source and per-Event-Type Redis counts, then apply the
+current point values stored with Activity Source configuration. Changing a point value therefore
+changes the next response without replaying relay history. Weeks begin Monday at 00:00 UTC, months
+begin on the first day at 00:00 UTC, and all-time counts have no expiry boundary. See
+[`docs/activity-leaderboard.md`](docs/activity-leaderboard.md) for storage, rebuild, and benchmark
+details.
 
 ## Proposed architecture
 
@@ -141,7 +148,7 @@ later views expose only its name, prefix, `event:write` permission, timestamps, 
 - Register Activity Sources through NEAR-authenticated organizations and approve them through an admin dashboard.
 - Create and revoke API keys and securely manage per-source Nostr keys.
 - Stream new events to clients through filtered SSE subscriptions.
-- Build weekly, monthly, and all-time leaderboards from Redis counts and dynamic point values.
+- Add provenance and verification signals to leaderboard entries.
 - Show source badges and distinguish verified from unverified events.
 - Connect public event upvotes and downvotes through the existing votes service.
 - Support hiding immutable events through moderation controls.
@@ -187,7 +194,7 @@ bun run dev
 
 The initializer creates a local `.env` from `.env.example`. Keep secrets out of version control.
 The Activity infrastructure command starts the pinned local Nostr relay on port `7447` and Redis
-on port `6380`; both use Docker named volumes. Run `bun run dev:activity-infra:down` to stop them.
+on port `6379`; both use Docker named volumes. Run `bun run dev:activity-infra:down` to stop them.
 
 Local development uses a deterministic signing master key only when
 `ACTIVITY_SIGNING_MASTER_KEYS` is empty. Every deployed environment must provide a JSON keyring of

@@ -186,6 +186,44 @@ export const HideActivityEventResultSchema = z.object({
 });
 export type HideActivityEventResult = z.infer<typeof HideActivityEventResultSchema>;
 
+export const ActivityLeaderboardPeriodSchema = z.enum(["weekly", "monthly", "all-time"]);
+export type ActivityLeaderboardPeriod = z.infer<typeof ActivityLeaderboardPeriodSchema>;
+
+export const ActivityLeaderboardProjectionStatusSchema = z.object({
+  state: z.enum(["uninitialized", "rebuilding", "ready", "failed"]),
+  rebuiltAt: z.iso.datetime().nullable(),
+  seen: z.number().int().nonnegative(),
+  applied: z.number().int().nonnegative(),
+  hidden: z.number().int().nonnegative(),
+});
+
+export const ActivityLeaderboardSchema = z.object({
+  period: ActivityLeaderboardPeriodSchema,
+  startsAt: z.iso.datetime().nullable(),
+  endsAt: z.iso.datetime().nullable(),
+  generatedAt: z.iso.datetime(),
+  projection: ActivityLeaderboardProjectionStatusSchema,
+  data: z.array(
+    z.object({
+      rank: z.number().int().positive(),
+      actor: NearAccountIdSchema,
+      score: z.number().int().nonnegative(),
+      eventCount: z.number().int().nonnegative(),
+      breakdown: z.array(
+        z.object({
+          source: z.string(),
+          type: ActivityEventTypeNameSchema,
+          pointValue: z.number().int().min(0).max(1_000_000),
+          eventCount: z.number().int().positive(),
+          score: z.number().int().nonnegative(),
+        }),
+      ),
+    }),
+  ),
+});
+
+export type ActivityLeaderboardResult = z.infer<typeof ActivityLeaderboardSchema>;
+
 const ActivityEventTypesInputSchema = z
   .array(ActivityEventTypeSchema)
   .min(1)
@@ -544,6 +582,36 @@ export const contract = oc.router({
     })
     .output(z.array(HiddenActivityEventSchema))
     .errors({ UNAUTHORIZED, FORBIDDEN }),
+
+  getActivityLeaderboard: oc
+    .route({
+      method: "GET",
+      path: "/v1/leaderboard",
+      summary: "Rank Activity actors",
+      description: "Returns exact dynamically weighted rankings for the current UTC period.",
+      tags: ["Activity"],
+    })
+    .input(
+      z.object({
+        period: ActivityLeaderboardPeriodSchema.default("weekly"),
+        source: z.string().min(2).max(100).regex(ACTIVITY_SOURCE_ID_REGEX).optional(),
+        type: ActivityEventTypeNameSchema.optional(),
+        limit: z.coerce.number().int().min(1).max(100).default(20),
+      }),
+    )
+    .output(ActivityLeaderboardSchema)
+    .errors({ SERVICE_UNAVAILABLE }),
+
+  getActivityLeaderboardStatus: oc
+    .route({
+      method: "GET",
+      path: "/v1/leaderboard/status",
+      summary: "Inspect Activity leaderboard projection",
+      description: "Returns projection readiness and rebuild counters without requiring readiness.",
+      tags: ["Activity"],
+    })
+    .output(ActivityLeaderboardProjectionStatusSchema)
+    .errors({ SERVICE_UNAVAILABLE }),
 
   createThing: oc
     .route({

@@ -28,7 +28,8 @@
       "secrets": [
         "API_DATABASE_URL",
         "ACTIVITY_SIGNING_MASTER_KEYS",
-        "ACTIVITY_SIGNING_ACTIVE_KEY_VERSION"
+        "ACTIVITY_SIGNING_ACTIVE_KEY_VERSION",
+        "ACTIVITY_REDIS_URL"
       ]
     }
   },

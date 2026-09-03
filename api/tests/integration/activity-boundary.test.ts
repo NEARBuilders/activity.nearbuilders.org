@@ -9,6 +9,10 @@ import {
   ActivityBoundary,
   signActivityEvent,
 } from "@/activity/activity-boundary";
+import {
+  type ActivityLeaderboard,
+  createRedisActivityLeaderboard,
+} from "@/services/activity-leaderboard";
 
 const SECRET_KEY = "0000000000000000000000000000000000000000000000000000000000000001";
 const execFileAsync = promisify(execFile);
@@ -35,15 +39,17 @@ async function retryWhileRelayStarts<T>(operation: () => Promise<T>): Promise<T>
 
 activityDescribe("Activity Nostr boundary", () => {
   let boundary: ActivityBoundary | undefined;
+  let leaderboard: ActivityLeaderboard | undefined;
 
   afterEach(async () => {
     await boundary?.close();
+    await leaderboard?.close();
   });
 
   it("publishes and queries a signed Activity event by relay-indexed fields", async () => {
     boundary = await ActivityBoundary.connect({
       relayUrl: process.env.ACTIVITY_RELAY_URL ?? "ws://127.0.0.1:7447",
-      redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6380",
+      redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6379",
     });
     const idempotencyKey = `github:pr:${randomUUID()}`;
     const event = signActivityEvent(
@@ -79,7 +85,7 @@ activityDescribe("Activity Nostr boundary", () => {
   it("paginates equal-timestamp events deterministically by descending event id", async () => {
     boundary = await ActivityBoundary.connect({
       relayUrl: process.env.ACTIVITY_RELAY_URL ?? "ws://127.0.0.1:7447",
-      redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6380",
+      redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6379",
     });
     const source = `cursor-test:${randomUUID()}`;
     const createdAt = Math.floor(Date.now() / 1_000);
@@ -113,7 +119,7 @@ activityDescribe("Activity Nostr boundary", () => {
   it("resubscribes after the local relay restarts", async () => {
     boundary = await ActivityBoundary.connect({
       relayUrl: process.env.ACTIVITY_RELAY_URL ?? "ws://127.0.0.1:7447",
-      redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6380",
+      redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6379",
     });
     const source = `subscription-test:${randomUUID()}`;
     const received: NostrEvent[] = [];
@@ -160,7 +166,7 @@ activityDescribe("Activity Nostr boundary", () => {
     );
     const publisher = await ActivityBoundary.connect({
       relayUrl: process.env.ACTIVITY_RELAY_URL ?? "ws://127.0.0.1:7447",
-      redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6380",
+      redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6379",
     });
     const secondReceived = new Promise<void>((resolveEvent) => {
       receiveNext = resolveEvent;
@@ -182,7 +188,7 @@ activityDescribe("Activity Nostr boundary", () => {
   it("replays relay history into Redis without double counting", async () => {
     boundary = await ActivityBoundary.connect({
       relayUrl: process.env.ACTIVITY_RELAY_URL ?? "ws://127.0.0.1:7447",
-      redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6380",
+      redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6379",
     });
     const source = `replay-test:${randomUUID()}`;
     const actor = `${randomUUID()}.near`;
@@ -236,5 +242,41 @@ activityDescribe("Activity Nostr boundary", () => {
     expect(otherSourceReplay).toEqual({ seen: 1, applied: 1 });
     expect(projectedCount).toBe(2);
     expect(otherSourceProjectedCount).toBe(1);
+  });
+
+  it("stores exact dynamic leaderboard counts and exclusions in Redis", async () => {
+    let pointValue = 5;
+    leaderboard = await createRedisActivityLeaderboard({
+      redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6379",
+      namespace: `activity:test:${randomUUID()}`,
+      listPointValues: async () => [{ source: "feedback", type: "feedback.written", pointValue }],
+      now: () => new Date("2026-09-03T12:00:00.000Z"),
+    });
+    await leaderboard.rebuild({ events: [], hiddenEvents: [] });
+    const projectedEvent = {
+      id: "1".repeat(64),
+      source: "feedback",
+      type: "feedback.written",
+      actor: "alice.near",
+      timestamp: "2026-09-02T12:00:00.000Z",
+    };
+
+    expect(await leaderboard.apply({ operation: "include", event: projectedEvent })).toBe(true);
+    expect(await leaderboard.apply({ operation: "include", event: projectedEvent })).toBe(false);
+    expect(await leaderboard.getLeaderboard({ period: "weekly", limit: 10 })).toMatchObject({
+      data: [{ actor: "alice.near", eventCount: 1, score: 5 }],
+    });
+
+    pointValue = 12;
+    expect(await leaderboard.getLeaderboard({ period: "weekly", limit: 10 })).toMatchObject({
+      data: [{ actor: "alice.near", eventCount: 1, score: 12 }],
+    });
+
+    expect(await leaderboard.apply({ operation: "exclude", event: projectedEvent })).toBe(true);
+    expect(await leaderboard.apply({ operation: "exclude", event: projectedEvent })).toBe(false);
+    expect(await leaderboard.apply({ operation: "include", event: projectedEvent })).toBe(false);
+    expect(await leaderboard.getLeaderboard({ period: "weekly", limit: 10 })).toMatchObject({
+      data: [],
+    });
   });
 });

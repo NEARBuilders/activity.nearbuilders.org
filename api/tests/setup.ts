@@ -11,6 +11,7 @@ import { type WebSocket, WebSocketServer } from "ws";
 import type { contract } from "@/contract";
 import Plugin from "@/index";
 import type { ActivityCredentialsService } from "@/services/activity-credentials";
+import type { ActivityLeaderboard } from "@/services/activity-leaderboard";
 import pluginDevConfig from "../plugin.dev";
 
 const TEST_PLUGIN_ID = pluginDevConfig.pluginId;
@@ -31,6 +32,7 @@ export const runtime = createPluginRuntime({
 let server: ReturnType<typeof createServer> | null = null;
 let baseUrl = "";
 let activityCredentialsService: ActivityCredentialsService | null = null;
+let activityLeaderboardService: ActivityLeaderboard | null = null;
 let relayServer: WebSocketServer | null = null;
 let relayUrl = "";
 const relayEvents: Event[] = [];
@@ -137,6 +139,7 @@ export async function getPluginClient(
     } as typeof TEST_CONFIG;
     const { router, initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, config);
     activityCredentialsService = initialized.context.activityCredentials;
+    activityLeaderboardService = initialized.context.activityLeaderboard;
     const rpcHandler = new RPCHandler(router);
     const openApiHandler = new OpenAPIHandler(router);
 
@@ -216,6 +219,12 @@ export async function getActivityCredentialsService() {
   if (!activityCredentialsService) await getPluginClient();
   if (!activityCredentialsService) throw new Error("Activity credentials service is unavailable");
   return activityCredentialsService;
+}
+
+export async function getActivityLeaderboardService() {
+  if (!activityLeaderboardService) await getPluginClient();
+  if (!activityLeaderboardService) throw new Error("Activity leaderboard is unavailable");
+  return activityLeaderboardService;
 }
 
 export function authedContext(userId = "user-1"): Record<string, unknown> {
