@@ -71,10 +71,8 @@ export class NostrRelayAdapter implements ActivityRelayAdapter {
   }
 
   async publish(event: Event): Promise<string> {
-    const acknowledgements = this.#pool.publish([this.#relayUrl], event, { maxWait: 5_000 });
-    const message = await acknowledgements[0];
-    if (message === undefined) throw new Error("Activity relay did not acknowledge the event");
-    return message;
+    const relay = await this.#pool.ensureRelay(this.#relayUrl, { connectionTimeout: 5_000 });
+    return relay.publish(event);
   }
 
   query(filter: Filter): Promise<Event[]> {

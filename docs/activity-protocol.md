@@ -20,6 +20,44 @@ uses the `[source, idempotency key]` pair as its atomic deduplication identity, 
 events carrying the same source-scoped idempotency key count once. Projected counters are also
 source-scoped and cannot merge event types declared by different Activity Sources.
 
+`POST /api/v1/events` accepts JSON payloads up to 16 KiB after serialization. The gateway rejects
+larger payloads before reserving an idempotency key, signing an event, or contacting the relay.
+
+## Ingestion gateway
+
+Send the Source API Key as a bearer credential and omit the source from the body; the gateway
+derives the source from the credential:
+
+```http
+POST /api/v1/events
+Authorization: Bearer act_<source-api-key>
+Content-Type: application/json
+
+{
+  "eventType": "feedback.submitted",
+  "actor": "alice.near",
+  "idempotencyKey": "feedback:round-42:alice.near",
+  "payload": { "rating": 5 }
+}
+```
+
+A successful request returns `{ "eventId": "<64-character Nostr event ID>" }`. The Event Type must
+be enabled for the authenticated Activity Source, the actor must be a valid NEAR account, and the
+payload must be JSON within the 16 KiB limit.
+
+Before signing, the gateway commits a durable reservation keyed by Activity Source and idempotency
+key. It stores the signed event before relay publication and marks the reservation published only
+after a positive relay acknowledgement. An identical completed retry returns the original event ID
+without republishing. Different content under the same key returns `409 Conflict`. If relay
+acknowledgement is lost, a retry republishes the same signed event ID, which relays and downstream
+projections deduplicate.
+
+The gateway returns `401 Unauthorized` for a missing, invalid, or revoked Source API Key; `400 Bad
+Request` for an invalid actor, Event Type, or payload; `403 Forbidden` when the source or Signing
+Identity cannot ingest; `409 Conflict` when an idempotency key is reused with different content; and
+`503 Service Unavailable` when the relay does not positively acknowledge the signed event. A client
+may safely retry the same request after a `503`.
+
 ## Transport boundary
 
 The local boundary pins `nostr-tools@2.24.1`, `ws@8.21.3`, and `redis@6.2.1`, matching the transport

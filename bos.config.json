@@ -22,7 +22,8 @@
       "variables": {
         "activityNostrBindingContract": "contextual.near",
         "activityNostrBindingRelay": "wss://relay.nearbuilders.org",
-        "activityNostrKvApiUrl": "https://kv.main.fastnear.com"
+        "activityNostrKvApiUrl": "https://kv.main.fastnear.com",
+        "activityRelayUrl": "wss://relay.nearbuilders.org"
       },
       "secrets": [
         "API_DATABASE_URL",

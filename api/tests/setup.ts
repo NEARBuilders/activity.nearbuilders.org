@@ -4,6 +4,8 @@ import { RPCLink } from "@orpc/client/fetch";
 import type { ContractRouterClient } from "@orpc/contract";
 import { RPCHandler } from "@orpc/server/node";
 import { createPluginRuntime } from "every-plugin";
+import type { Event } from "nostr-tools/pure";
+import { WebSocketServer } from "ws";
 import type { contract } from "@/contract";
 import Plugin from "@/index";
 import type { ActivityCredentialsService } from "@/services/activity-credentials";
@@ -27,10 +29,62 @@ export const runtime = createPluginRuntime({
 let server: ReturnType<typeof createServer> | null = null;
 let baseUrl = "";
 let activityCredentialsService: ActivityCredentialsService | null = null;
+let relayServer: WebSocketServer | null = null;
+let relayUrl = "";
+const relayEvents: Event[] = [];
+let dropNextRelayAcknowledgement = false;
 
-export async function getPluginClient(context?: Record<string, unknown>) {
+async function ensureTestRelay(): Promise<string> {
+  if (relayServer) return relayUrl;
+  relayServer = new WebSocketServer({ host: "127.0.0.1", port: 0 });
+  relayServer.on("connection", (socket) => {
+    socket.on("message", (data) => {
+      const message = JSON.parse(data.toString()) as [string, Event];
+      if (message[0] !== "EVENT") return;
+      relayEvents.push(message[1]);
+      if (dropNextRelayAcknowledgement) {
+        dropNextRelayAcknowledgement = false;
+        socket.close();
+        return;
+      }
+      socket.send(JSON.stringify(["OK", message[1].id, true, "stored"]));
+    });
+  });
+  await new Promise<void>((resolve, reject) => {
+    relayServer?.once("listening", resolve);
+    relayServer?.once("error", reject);
+  });
+  const address = relayServer.address();
+  if (!address || typeof address === "string") {
+    throw new Error("Test relay did not bind to a TCP port");
+  }
+  relayUrl = `ws://127.0.0.1:${address.port}`;
+  return relayUrl;
+}
+
+export function getTestRelayEvents(): readonly Event[] {
+  return relayEvents;
+}
+
+export function resetTestRelayEvents(): void {
+  relayEvents.length = 0;
+}
+
+export function loseNextTestRelayAcknowledgement(): void {
+  dropNextRelayAcknowledgement = true;
+}
+
+export async function getPluginClient(
+  context?: Record<string, unknown>,
+  headers: Record<string, string> = {},
+) {
   if (!server) {
-    const { router, initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, TEST_CONFIG);
+    const activityRelayUrl = await ensureTestRelay();
+    const config = {
+      ...TEST_CONFIG,
+      variables: { ...TEST_CONFIG.variables, activityRelayUrl },
+    } as typeof TEST_CONFIG;
+    const { router, initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, config);
     activityCredentialsService = initialized.context.activityCredentials;
     const rpcHandler = new RPCHandler(router);
 
@@ -40,11 +94,16 @@ export async function getPluginClient(context?: Record<string, unknown>) {
 
       if (url.pathname.startsWith("/rpc")) {
         // Initialize empty context for each request to prevent closure capture
-        let requestContext = {};
+        let requestContext: Record<string, unknown> = {
+          reqHeaders: new Headers(req.headers as Record<string, string>),
+        };
 
         // Allow overriding context via headers for flexibility
         if (req.headers["x-test-context"]) {
-          requestContext = JSON.parse(req.headers["x-test-context"] as string);
+          requestContext = {
+            ...requestContext,
+            ...JSON.parse(req.headers["x-test-context"] as string),
+          };
         }
 
         const result = await rpcHandler.handle(req, res, {
@@ -72,11 +131,10 @@ export async function getPluginClient(context?: Record<string, unknown>) {
   const link = new RPCLink({
     url: `${baseUrl}/rpc`,
     fetch: globalThis.fetch,
-    headers: context
-      ? {
-          "x-test-context": JSON.stringify(context),
-        }
-      : {},
+    headers: {
+      ...headers,
+      ...(context ? { "x-test-context": JSON.stringify(context) } : {}),
+    },
   });
 
   const client: ContractRouterClient<typeof contract> = createORPCClient(link);
@@ -205,4 +263,8 @@ export async function teardown() {
     server = null;
   }
   await runtime.shutdown();
+  if (relayServer) {
+    await new Promise<void>((resolve) => relayServer?.close(() => resolve()));
+    relayServer = null;
+  }
 }

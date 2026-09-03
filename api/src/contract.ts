@@ -1,4 +1,10 @@
-import { BAD_REQUEST, FORBIDDEN, NOT_FOUND, UNAUTHORIZED } from "every-plugin/errors";
+import {
+  BAD_REQUEST,
+  FORBIDDEN,
+  NOT_FOUND,
+  SERVICE_UNAVAILABLE,
+  UNAUTHORIZED,
+} from "every-plugin/errors";
 import { oc } from "every-plugin/orpc";
 import { z } from "every-plugin/zod";
 
@@ -10,6 +16,17 @@ const ErrorTestKindSchema = z.enum([
   "bad_request",
   "internal",
 ]);
+
+export const NEAR_ACCOUNT_ID_REGEX =
+  /^(?=.{2,64}$)([a-z0-9]+(?:[-_][a-z0-9]+)*)(\.([a-z0-9]+(?:[-_][a-z0-9]+)*))*$/;
+
+const ActivityEventTypeNameSchema = z
+  .string()
+  .min(1)
+  .max(100)
+  .regex(/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/);
+
+const NearAccountIdSchema = z.string().min(2).max(64).regex(NEAR_ACCOUNT_ID_REGEX);
 
 export const TenantStatusSchema = z.enum(["active", "pending", "suspended", "pending_deletion"]);
 
@@ -30,11 +47,7 @@ export type Tenant = z.infer<typeof TenantSchema>;
 export const ActivitySourceApprovalStatusSchema = z.enum(["pending", "approved", "rejected"]);
 
 export const ActivityEventTypeSchema = z.object({
-  name: z
-    .string()
-    .min(1)
-    .max(100)
-    .regex(/^[a-z0-9]+(?:[._-][a-z0-9]+)*$/),
+  name: ActivityEventTypeNameSchema,
   description: z.string().min(1).max(500),
   enabled: z.boolean(),
   pointValue: z.number().int().min(0).max(1_000_000),
@@ -92,6 +105,13 @@ export const ActivitySourceApiKeySchema = z.object({
   createdAt: z.string(),
   lastUsedAt: z.string().nullable(),
   revokedAt: z.string().nullable(),
+});
+
+export const ActivityEventSubmissionSchema = z.object({
+  eventType: ActivityEventTypeNameSchema,
+  actor: NearAccountIdSchema,
+  idempotencyKey: z.string().trim().min(1).max(200),
+  payload: z.json(),
 });
 
 const ActivityEventTypesInputSchema = z
@@ -344,6 +364,25 @@ export const contract = oc.router({
     .input(z.object({ sourceId: z.string(), apiKeyId: z.string() }))
     .output(ActivitySourceApiKeySchema)
     .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
+
+  submitActivityEvent: oc
+    .route({
+      method: "POST",
+      path: "/v1/events",
+      summary: "Submit an Activity event",
+      description:
+        "Authenticates a Source API Key and publishes one exactly-once, source-signed Nostr event.",
+      tags: ["Activity"],
+    })
+    .input(ActivityEventSubmissionSchema)
+    .output(z.object({ eventId: z.string().regex(/^[a-f0-9]{64}$/) }))
+    .errors({
+      UNAUTHORIZED,
+      FORBIDDEN,
+      BAD_REQUEST,
+      SERVICE_UNAVAILABLE,
+      CONFLICT: { status: 409 },
+    }),
 
   createThing: oc
     .route({

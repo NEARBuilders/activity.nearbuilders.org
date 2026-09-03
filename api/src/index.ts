@@ -2,19 +2,20 @@ import { createPlugin } from "every-plugin";
 import { Effect, Layer } from "every-plugin/effect";
 import { ORPCError } from "every-plugin/orpc";
 import { z } from "every-plugin/zod";
+import { resolveActivityRelayUrl } from "./activity/activity-config";
 import { parseActivityMasterKeys } from "./activity/activity-credentials-crypto";
-import { contract } from "./contract";
+import { ActivityRelay, NostrRelayAdapter } from "./activity/activity-relay";
+import { contract, NEAR_ACCOUNT_ID_REGEX } from "./contract";
 import { DatabaseLive, DatabaseTag } from "./db/layer";
 import { createAuthMiddleware } from "./lib/auth";
 import { ContextSchema } from "./lib/context";
 import type { PluginsClient } from "./lib/plugins-types.gen";
 import { ActivityCredentialsLive, ActivityCredentialsTag } from "./services/activity-credentials";
+import { ActivityIngestionService } from "./services/activity-ingestion";
 import { ActivitySourcesLive, ActivitySourcesTag } from "./services/activity-sources";
 import { TenantsLive, TenantsTag } from "./services/tenants";
 
 const SUBDOMAIN_SEGMENT_REGEX = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
-const ACCOUNT_ID_REGEX =
-  /^(?=.{2,64}$)([a-z0-9]+(?:[-_][a-z0-9]+)*)(\.([a-z0-9]+(?:[-_][a-z0-9]+)*))*$/;
 const RESERVED_SUBDOMAINS = new Set([
   "root",
   "www",
@@ -48,7 +49,7 @@ function validateSubdomain(subdomain: string): void {
 }
 
 function validateAccountId(accountId: string): void {
-  if (!ACCOUNT_ID_REGEX.test(accountId)) {
+  if (!NEAR_ACCOUNT_ID_REGEX.test(accountId)) {
     throw new ORPCError("BAD_REQUEST", {
       message: "Invalid accountId format",
       data: { hint: "Must be a valid NEAR account ID" },
@@ -61,6 +62,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
     activityNostrBindingContract: z.string().default("contextual.near"),
     activityNostrBindingRelay: z.string().default("wss://relay.nearbuilders.org"),
     activityNostrKvApiUrl: z.string().default("https://kv.main.fastnear.com"),
+    activityRelayUrl: z.string().default("wss://relay.nearbuilders.org"),
   }),
 
   secrets: z.object({
@@ -100,6 +102,17 @@ export default createPlugin.withPlugins<PluginsClient>()({
           kvApiUrl: config.variables.activityNostrKvApiUrl,
         }).pipe(Layer.provide(databaseLayer)),
       );
+      const activityIngestionService = new ActivityIngestionService(
+        database,
+        activityCredentialsService,
+        activitySourcesService,
+        new ActivityRelay(
+          new NostrRelayAdapter(resolveActivityRelayUrl(config.variables.activityRelayUrl)),
+          {
+            scanLimit: 1_000,
+          },
+        ),
+      );
 
       console.log("[API] Services Initialized");
 
@@ -107,10 +120,14 @@ export default createPlugin.withPlugins<PluginsClient>()({
         tenants: tenantsService,
         activitySources: activitySourcesService,
         activityCredentials: activityCredentialsService,
+        activityIngestion: activityIngestionService,
       };
     }),
 
-  shutdown: () => Effect.log("[API] Shutdown"),
+  shutdown: (services) =>
+    Effect.sync(() => {
+      services.activityIngestion.close();
+    }),
 
   createRouter: (services, builder) => {
     const { requireAdmin, requireAuth, requireOrganization, requireOrgRole } =
@@ -263,7 +280,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       tenantPreflight: builder.tenantPreflight.use(requireAuth).handler(async ({ input }) => {
         const subdomainValid = SUBDOMAIN_SEGMENT_REGEX.test(input.subdomain);
         const accountId = `${input.subdomain}.${input.parentAccount}`;
-        const accountFormat = ACCOUNT_ID_REGEX.test(accountId)
+        const accountFormat = NEAR_ACCOUNT_ID_REGEX.test(accountId)
           ? ("valid" as const)
           : ("invalid" as const);
 
@@ -434,6 +451,17 @@ export default createPlugin.withPlugins<PluginsClient>()({
             input.apiKeyId,
           ),
         ),
+
+      submitActivityEvent: builder.submitActivityEvent.handler(async ({ input, context }) => {
+        const authorization = context.reqHeaders?.get("authorization");
+        const apiKey = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+        if (!apiKey) {
+          throw new ORPCError("UNAUTHORIZED", {
+            message: "Source API Key required",
+          });
+        }
+        return services.activityIngestion.submit(apiKey, input);
+      }),
 
       createThing: builder.createThing.use(requireAuth).handler(async ({ input }) => {
         throw new ORPCError("BAD_REQUEST", {
