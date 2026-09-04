@@ -25,6 +25,7 @@ import {
   ActivityResumeError,
   DatabaseActivityIdentityStore,
 } from "./services/activity-feed";
+import { ActivityGithubService } from "./services/activity-github";
 import { ActivityIngestionService } from "./services/activity-ingestion";
 import {
   ActivityLeaderboardLive,
@@ -94,6 +95,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
     ACTIVITY_SIGNING_MASTER_KEYS: z.string(),
     ACTIVITY_SIGNING_ACTIVE_KEY_VERSION: z.string().default("v1"),
     ACTIVITY_REDIS_URL: z.string(),
+    ACTIVITY_GITHUB_TOKEN: z.string().optional(),
   }),
 
   context: ContextSchema,
@@ -148,6 +150,11 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityRelay,
         activityLeaderboard,
       );
+      const activityGithubService = new ActivityGithubService({
+        db: database,
+        ingestion: activityIngestionService,
+        token: config.secrets.ACTIVITY_GITHUB_TOKEN,
+      });
       const activityModerationStore = new DatabaseActivityModerationStore(database);
       const activityFeedService = new ActivityFeedService(
         activityRelay,
@@ -181,14 +188,17 @@ export default createPlugin.withPlugins<PluginsClient>()({
         );
         console.info("[ActivityLeaderboard] Projection rebuild completed", rebuilt);
       }
+      activityGithubService.start();
 
       console.log("[API] Services Initialized");
 
       return {
+        database,
         tenants: tenantsService,
         activitySources: activitySourcesService,
         activityCredentials: activityCredentialsService,
         activityIngestion: activityIngestionService,
+        activityGithub: activityGithubService,
         activityFeed: activityFeedService,
         activityEndorsements: activityEndorsementsService,
         activityModeration: activityModerationService,
@@ -199,6 +209,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
 
   shutdown: (services) =>
     Effect.sync(() => {
+      services.activityGithub.stop();
       services.activityRelay.close();
     }),
 
@@ -551,6 +562,43 @@ export default createPlugin.withPlugins<PluginsClient>()({
             context.organization.activeOrganizationId,
             input.sourceId,
             input.apiKeyId,
+          ),
+        ),
+
+      getActivityGithubIntegration: builder.getActivityGithubIntegration
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) =>
+          services.activityGithub.getConfiguration(
+            context.organization.activeOrganizationId,
+            input.sourceId,
+          ),
+        ),
+
+      configureActivityGithubIntegration: builder.configureActivityGithubIntegration
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) =>
+          services.activityGithub.configure(
+            context.organization.activeOrganizationId,
+            input.sourceId,
+            input,
+          ),
+        ),
+
+      pollActivityGithubIntegration: builder.pollActivityGithubIntegration
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) =>
+          services.activityGithub.pollSource(
+            context.organization.activeOrganizationId,
+            input.sourceId,
+          ),
+        ),
+
+      listActivityGithubQuarantine: builder.listActivityGithubQuarantine
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) =>
+          services.activityGithub.listQuarantine(
+            context.organization.activeOrganizationId,
+            input.sourceId,
           ),
         ),
 

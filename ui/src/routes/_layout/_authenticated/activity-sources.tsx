@@ -3,6 +3,10 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useApiClient, useAuthClient } from "@/app";
+import {
+  type ActivityGithubConfigurationInput,
+  ActivityGithubIntegration,
+} from "@/components/activity-github-integration";
 import { ActivitySourceCredentials } from "@/components/activity-source-credentials";
 import {
   ActivitySourcesDashboard,
@@ -27,6 +31,10 @@ function credentialQueryKey(sourceId: string) {
 
 function apiKeysQueryKey(sourceId: string) {
   return ["activity-source-api-keys", sourceId] as const;
+}
+
+function githubQueryKey(sourceId: string) {
+  return ["activity-source-github", sourceId] as const;
 }
 
 export const Route = createFileRoute("/_layout/_authenticated/activity-sources")({
@@ -143,11 +151,60 @@ function ActivitySourcesPage() {
         }}
         renderCredentials={(source) =>
           source.approvalStatus === "approved" && auth.activeOrganizationRole === "owner" ? (
-            <ActivityCredentialsManager source={source} />
+            <>
+              <ActivityCredentialsManager source={source} />
+              <ActivityGithubManager sourceId={source.sourceId} />
+            </>
           ) : null
         }
       />
     </PageContainer>
+  );
+}
+
+function ActivityGithubManager({ sourceId }: { sourceId: string }) {
+  const apiClient = useApiClient();
+  const queryClient = useQueryClient();
+  const { data: configuration = null, isLoading } = useQuery({
+    queryKey: githubQueryKey(sourceId),
+    queryFn: () => apiClient.getActivityGithubIntegration({ sourceId }),
+  });
+
+  const saveConfiguration = useMutation({
+    mutationFn: (input: ActivityGithubConfigurationInput) =>
+      apiClient.configureActivityGithubIntegration({ sourceId, ...input }),
+    onSuccess: async () => {
+      toast.success("GitHub polling settings saved");
+      await queryClient.invalidateQueries({ queryKey: githubQueryKey(sourceId) });
+    },
+    onError: (error: Error) =>
+      toast.error(error.message || "Failed to save GitHub polling settings"),
+  });
+
+  const poll = useMutation({
+    mutationFn: () => apiClient.pollActivityGithubIntegration({ sourceId }),
+    onSuccess: async (result) => {
+      toast.success("GitHub poll completed", {
+        description: `${result.published} published, ${result.quarantined} quarantined, ${result.failed} failed`,
+      });
+      await queryClient.invalidateQueries({ queryKey: githubQueryKey(sourceId) });
+    },
+    onError: (error: Error) => toast.error(error.message || "GitHub poll failed"),
+  });
+
+  return (
+    <ActivityGithubIntegration
+      sourceId={sourceId}
+      configuration={configuration}
+      isLoading={isLoading}
+      isSubmitting={saveConfiguration.isPending || poll.isPending}
+      onSave={async (input) => {
+        await saveConfiguration.mutateAsync(input);
+      }}
+      onPoll={async () => {
+        await poll.mutateAsync();
+      }}
+    />
   );
 }
 

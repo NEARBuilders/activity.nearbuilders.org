@@ -8,7 +8,10 @@ import {
   activitySources as sourcesTable,
   activityEventSubmissions as submissionsTable,
 } from "../db/schema";
-import type { ActivityCredentialsService } from "./activity-credentials";
+import type {
+  ActivityCredentialsService,
+  ActivityEventWriteCredential,
+} from "./activity-credentials";
 import type { ActivityLeaderboard } from "./activity-leaderboard";
 import type { ActivitySourcesService } from "./activity-sources";
 
@@ -43,13 +46,28 @@ export class ActivityIngestionService {
   }
 
   async submit(apiKey: string, input: ActivityEventSubmission): Promise<{ eventId: string }> {
+    const credential = await this.#credentials.authenticateEventWriteKey(apiKey);
+    return this.#submitWithCredential(credential, input);
+  }
+
+  async submitForSource(
+    sourceId: string,
+    input: ActivityEventSubmission,
+  ): Promise<{ eventId: string }> {
+    const credential = await this.#credentials.getInternalEventWriteCredential(sourceId);
+    return this.#submitWithCredential(credential, input);
+  }
+
+  async #submitWithCredential(
+    credential: ActivityEventWriteCredential,
+    input: ActivityEventSubmission,
+  ): Promise<{ eventId: string }> {
     const payloadJson = JSON.stringify(input.payload);
     if (!payloadJson || Buffer.byteLength(payloadJson, "utf8") > ACTIVITY_EVENT_PAYLOAD_MAX_BYTES) {
       throw new ORPCError("BAD_REQUEST", {
         message: "Activity event payload exceeds 16 KiB",
       });
     }
-    const credential = await this.#credentials.authenticateEventWriteKey(apiKey);
     const source = await this.#sources.getApprovedSourceForIngestion(credential.sourceId);
     const eventType = source.eventTypes.find(({ name }) => name === input.eventType);
     if (!eventType?.enabled) {

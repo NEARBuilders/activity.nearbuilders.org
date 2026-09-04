@@ -13,6 +13,7 @@ import {
 } from "../contract";
 import type { Database } from "../db";
 import {
+  activityGithubIntegrations as githubIntegrationsTable,
   activitySigningIdentities as identitiesTable,
   activitySources as sourcesTable,
 } from "../db/schema";
@@ -21,6 +22,7 @@ import { ACTIVITY_EVENT_PAYLOAD_MAX_BYTES, parseStoredActivityEvent } from "./ac
 export type BoundActivityIdentity = {
   sourceId: string;
   sourceDisplayName?: string;
+  integration?: "github" | null;
   trustStatus?: "standard" | "trusted";
   scoreMultiplier?: number;
   publicKey: string;
@@ -54,6 +56,7 @@ export class DatabaseActivityIdentityStore implements ActivityIdentityStore {
       .select({
         sourceId: sourcesTable.sourceId,
         sourceDisplayName: sourcesTable.displayName,
+        githubIntegrationId: githubIntegrationsTable.id,
         trustStatus: sourcesTable.trustStatus,
         scoreMultiplierBps: sourcesTable.scoreMultiplierBps,
         publicKey: identitiesTable.publicKey,
@@ -62,6 +65,10 @@ export class DatabaseActivityIdentityStore implements ActivityIdentityStore {
       })
       .from(identitiesTable)
       .innerJoin(sourcesTable, eq(identitiesTable.sourceRecordId, sourcesTable.id))
+      .leftJoin(
+        githubIntegrationsTable,
+        eq(githubIntegrationsTable.sourceRecordId, sourcesTable.id),
+      )
       .where(
         source
           ? and(
@@ -72,17 +79,19 @@ export class DatabaseActivityIdentityStore implements ActivityIdentityStore {
           : and(eq(identitiesTable.bindingStatus, "bound"), isNotNull(identitiesTable.boundAt)),
       )
       .then((identities) =>
-        identities.flatMap(({ scoreMultiplierBps, activeFrom, retiredAt, ...identity }) =>
-          activeFrom
-            ? [
-                {
-                  ...identity,
-                  scoreMultiplier: scoreMultiplierBps / 10_000,
-                  activeFrom: toIso(activeFrom),
-                  retiredAt: retiredAt ? toIso(retiredAt) : null,
-                },
-              ]
-            : [],
+        identities.flatMap(
+          ({ scoreMultiplierBps, activeFrom, retiredAt, githubIntegrationId, ...identity }) =>
+            activeFrom
+              ? [
+                  {
+                    ...identity,
+                    integration: githubIntegrationId ? ("github" as const) : null,
+                    scoreMultiplier: scoreMultiplierBps / 10_000,
+                    activeFrom: toIso(activeFrom),
+                    retiredAt: retiredAt ? toIso(retiredAt) : null,
+                  },
+                ]
+              : [],
         ),
       );
   }
@@ -349,6 +358,7 @@ function parseActivityFeedEvent(
       publicKey: identity.publicKey,
       signingIdentityStatus: identity.retiredAt ? "retired" : "active",
       sourceDisplayName: identity.sourceDisplayName ?? source,
+      integration: identity.integration ?? null,
       trustStatus: identity.trustStatus ?? "standard",
       scoreMultiplier: identity.scoreMultiplier ?? 1,
       payloadClaimsVerified: false,

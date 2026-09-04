@@ -21,6 +21,8 @@ export const NEAR_ACCOUNT_ID_REGEX =
   /^(?=.{2,64}$)([a-z0-9]+(?:[-_][a-z0-9]+)*)(\.([a-z0-9]+(?:[-_][a-z0-9]+)*))*$/;
 export const ACTIVITY_SOURCE_ID_REGEX = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
 export const ACTIVITY_EVENT_TYPE_NAME_REGEX = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
+export const GITHUB_OWNER_REGEX = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
+export const GITHUB_REPOSITORY_REGEX = /^[A-Za-z0-9._-]+$/;
 
 const ActivityEventTypeNameSchema = z
   .string()
@@ -125,6 +127,82 @@ export const ActivitySourceApiKeySchema = z.object({
   revokedAt: z.string().nullable(),
 });
 
+const ActivityGithubRepositoryInputSchema = z.object({
+  owner: z.string().trim().min(1).max(39).regex(GITHUB_OWNER_REGEX),
+  repository: z.string().trim().min(1).max(100).regex(GITHUB_REPOSITORY_REGEX),
+});
+
+const ActivityGithubActorMappingSchema = z.object({
+  githubLogin: z.string().trim().min(1).max(39).regex(GITHUB_OWNER_REGEX),
+  nearAccountId: NearAccountIdSchema,
+});
+
+export const ActivityGithubConfigurationInputSchema = z
+  .object({
+    enabled: z.boolean(),
+    mergedPullRequestsEnabled: z.boolean(),
+    closedIssuesEnabled: z.boolean(),
+    repositories: z.array(ActivityGithubRepositoryInputSchema).max(20),
+    actorMappings: z.array(ActivityGithubActorMappingSchema).max(100),
+  })
+  .refine(({ enabled, repositories }) => !enabled || repositories.length > 0, {
+    message: "An enabled GitHub integration requires at least one repository",
+  })
+  .refine(
+    ({ enabled, mergedPullRequestsEnabled, closedIssuesEnabled }) =>
+      !enabled || mergedPullRequestsEnabled || closedIssuesEnabled,
+    { message: "An enabled GitHub integration requires at least one event type" },
+  )
+  .refine(
+    ({ repositories }) =>
+      new Set(repositories.map(({ owner, repository }) => `${owner}/${repository}`.toLowerCase()))
+        .size === repositories.length,
+    { message: "GitHub repositories must be unique" },
+  )
+  .refine(
+    ({ actorMappings }) =>
+      new Set(actorMappings.map(({ githubLogin }) => githubLogin.toLowerCase())).size ===
+      actorMappings.length,
+    { message: "GitHub logins must be unique" },
+  );
+
+export const ActivityGithubConfigurationSchema = z.object({
+  sourceId: z.string(),
+  enabled: z.boolean(),
+  mergedPullRequestsEnabled: z.boolean(),
+  closedIssuesEnabled: z.boolean(),
+  tokenConfigured: z.boolean(),
+  repositories: z.array(
+    ActivityGithubRepositoryInputSchema.extend({
+      etag: z.string().nullable(),
+      pollIntervalSeconds: z.number().int().positive(),
+      nextPollAt: z.string().nullable(),
+      lastPolledAt: z.string().nullable(),
+      lastError: z.string().nullable(),
+    }),
+  ),
+  actorMappings: z.array(ActivityGithubActorMappingSchema),
+  quarantineCount: z.number().int().nonnegative(),
+});
+
+export const ActivityGithubPollResultSchema = z.object({
+  repositoriesPolled: z.number().int().nonnegative(),
+  notModified: z.number().int().nonnegative(),
+  published: z.number().int().nonnegative(),
+  quarantined: z.number().int().nonnegative(),
+  failed: z.number().int().nonnegative(),
+});
+
+export const ActivityGithubQuarantineSchema = z.object({
+  id: z.string().uuid(),
+  githubEventId: z.string(),
+  repository: z.string(),
+  githubLogin: z.string(),
+  eventType: ActivityEventTypeNameSchema,
+  reason: z.string(),
+  createdAt: z.string(),
+});
+
 export const ActivityEventSubmissionSchema = z.object({
   eventType: ActivityEventTypeNameSchema,
   actor: NearAccountIdSchema,
@@ -137,6 +215,7 @@ export const ActivityEventProvenanceSchema = z.object({
   publicKey: z.string().regex(/^[a-f0-9]{64}$/),
   signingIdentityStatus: z.enum(["active", "retired"]),
   sourceDisplayName: z.string(),
+  integration: z.literal("github").nullable(),
   trustStatus: ActivitySourceTrustStatusSchema,
   scoreMultiplier: ActivityScoreMultiplierSchema,
   payloadClaimsVerified: z.literal(false),
@@ -537,6 +616,30 @@ export const contract = oc.router({
     .route({ method: "POST", path: "/activity/sources/{sourceId}/api-keys/{apiKeyId}/revoke" })
     .input(z.object({ sourceId: z.string(), apiKeyId: z.string() }))
     .output(ActivitySourceApiKeySchema)
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
+
+  getActivityGithubIntegration: oc
+    .route({ method: "GET", path: "/activity/sources/{sourceId}/github" })
+    .input(z.object({ sourceId: z.string() }))
+    .output(ActivityGithubConfigurationSchema.nullable())
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
+
+  configureActivityGithubIntegration: oc
+    .route({ method: "PUT", path: "/activity/sources/{sourceId}/github" })
+    .input(z.object({ sourceId: z.string() }).and(ActivityGithubConfigurationInputSchema))
+    .output(ActivityGithubConfigurationSchema)
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST, SERVICE_UNAVAILABLE }),
+
+  pollActivityGithubIntegration: oc
+    .route({ method: "POST", path: "/activity/sources/{sourceId}/github/poll" })
+    .input(z.object({ sourceId: z.string() }))
+    .output(ActivityGithubPollResultSchema)
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, SERVICE_UNAVAILABLE }),
+
+  listActivityGithubQuarantine: oc
+    .route({ method: "GET", path: "/activity/sources/{sourceId}/github/quarantine" })
+    .input(z.object({ sourceId: z.string() }))
+    .output(z.array(ActivityGithubQuarantineSchema))
     .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
 
   submitActivityEvent: oc

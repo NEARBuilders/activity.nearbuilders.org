@@ -40,6 +40,8 @@ The service is intended to become shared plumbing for reputation, loyalty points
 | `POST` | `/api/activity/events/{eventId}/hide` | Available (admin) | Hide an immutable event from service-controlled public views. |
 | `GET` | `/api/activity/hidden-events` | Available (admin) | Inspect hidden events and their moderation history. |
 | `POST` | `/api/activity/sources/{sourceId}/trust` | Available (admin) | Set an auditable source trust designation and score multiplier. |
+| `PUT` | `/api/activity/sources/{sourceId}/github` | Available (owner) | Configure public repositories, event types, and GitHub-to-NEAR actor mappings. |
+| `POST` | `/api/activity/sources/{sourceId}/github/poll` | Available (owner) | Run the configured GitHub poller immediately. |
 | `GET` | `/api/v1/leaderboard` | Available | Read exact weekly, monthly, or all-time rankings with optional source and Event Type filters. |
 
 ### Event shape
@@ -151,6 +153,16 @@ later views expose only its name, prefix, `event:write` permission, timestamps, 
 5. Connected clients receive the event through SSE.
 6. Feed and leaderboard queries reflect the new activity.
 
+### GitHub polling
+
+An approved Source Owner can enable GitHub polling from the Activity Sources page after adding
+`github.pr.merged` and/or `github.issue.closed` to the source's Event Types. Repositories are public
+`owner/repository` values, and every GitHub author must be explicitly mapped to the NEAR account
+that receives credit. Unmapped events remain quarantined until a mapping is added. The worker
+persists ETags and GitHub poll intervals across restarts, while object-based idempotency keys prevent
+duplicate Activity events. See [`docs/activity-protocol.md`](docs/activity-protocol.md) for polling,
+rate-limit, and backfill boundaries.
+
 ## Initial delivery scope
 
 - Configure one reliable Nostr relay and define the activity event kind.
@@ -213,6 +225,7 @@ base64-encoded 32-byte keys and select its current version:
 ```dotenv
 ACTIVITY_SIGNING_MASTER_KEYS={"v1":"<base64-encoded-32-byte-key>"}
 ACTIVITY_SIGNING_ACTIVE_KEY_VERSION=v1
+ACTIVITY_GITHUB_TOKEN=
 ```
 
 To rotate the encryption master key, retain previous entries for decryption and point the active

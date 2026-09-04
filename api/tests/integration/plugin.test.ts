@@ -1193,6 +1193,7 @@ describe("API Plugin Integration Tests", () => {
             publicKey: expect.stringMatching(/^[a-f0-9]{64}$/),
             signingIdentityStatus: "active",
             sourceDisplayName: "feed-source Source",
+            integration: null,
             trustStatus: "standard",
             scoreMultiplier: 1,
             payloadClaimsVerified: false,

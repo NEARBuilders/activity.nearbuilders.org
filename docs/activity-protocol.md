@@ -86,6 +86,7 @@ The response contains `data` and pagination metadata:
         "publicKey": "<64-character Nostr public key>",
         "signingIdentityStatus": "active",
         "sourceDisplayName": "Feedback Rounds",
+        "integration": null,
         "trustStatus": "standard",
         "scoreMultiplier": 1,
         "payloadClaimsVerified": false
@@ -105,9 +106,10 @@ association against the bound Signing Identity active at the event's signing tim
 remain valid only for events created during their active window. Malformed, forged, mismatched, and
 filter-inconsistent relay records are omitted before page boundaries are calculated. `skippedInvalid`
 makes those omissions observable to clients. The provenance object states exactly what was verified;
-it never implies that payload claims were independently checked. A malformed cursor returns `400 Bad
-Request`; a relay timeout or unsafe scan-limit result returns `503 Service Unavailable` rather than
-leaving the request open or returning an incomplete page.
+`integration` is `"github"` when the registered source has a GitHub polling integration, and it never
+implies that payload claims were independently checked. A malformed cursor returns `400 Bad Request`;
+a relay timeout or unsafe scan-limit result returns `503 Service Unavailable` rather than leaving the
+request open or returning an incomplete page.
 
 ## Event endorsements
 
@@ -133,6 +135,41 @@ Content-Type: application/json
 
 The Activity UI also consumes a typed live stream so a changed endorsement count appears on
 connected feed cards without one request per card or a page refresh.
+
+## GitHub repository polling
+
+An approved Source Owner can configure public GitHub repositories at
+`PUT /api/activity/sources/{sourceId}/github`, enable merged pull-request and closed-issue event
+types independently, and explicitly map GitHub logins to NEAR accounts. The Activity Source must
+have the corresponding `github.pr.merged` or `github.issue.closed` Event Type enabled. The source
+must also have an approved, NEAR-bound Signing Identity because polled records enter the same
+signed, idempotent ingestion path as direct gateway submissions.
+
+The worker reads GitHub's public repository Events API without authentication by default. A
+deployment may set `ACTIVITY_GITHUB_TOKEN` to receive a higher rate limit; it is sent only in the
+upstream Authorization header and API responses expose only `tokenConfigured: true` or `false`.
+Repository configuration is limited to public resources and never accepts or stores a token from a
+Source Owner.
+
+Each repository persists its `ETag`, GitHub-provided `X-Poll-Interval`, next eligible poll time,
+last successful attempt, and safe error text. A `304 Not Modified` advances the schedule without
+spending the normal GitHub rate-limit allowance. `403` and `429` responses honor `Retry-After` or
+`X-RateLimit-Reset`; malformed and failed responses retain the previous ETag so the next attempt
+resumes from the last valid state. Restarting the Activity service therefore does not reset polling
+state or emit the same Activity event again.
+
+Merged pull requests credit the pull-request author and closed issues credit the issue author. A
+record is published only when that GitHub login has an explicit NEAR mapping. Unmapped records are
+stored in a per-source quarantine and are retried after the mapping is added. Stable idempotency
+keys use `github:<owner>/<repository>:<event-type>:<github-object-id>`, so different GitHub delivery
+event IDs for the same pull request or issue still produce one Activity event. Published records
+appear in the normal public feed with a GitHub badge.
+
+This integration is a bounded polling import, not a historical backfill system. GitHub's Events API
+returns at most 300 timeline events and only events from the past 30 days, and its documented event
+latency can range from 30 seconds to six hours. The first poll imports only matching events still in
+that retained window. Older history requires a separate backfill source or direct gateway
+submission with stable idempotency keys; repeatedly polling the Events API cannot recover it.
 
 ## Transport boundary
 
