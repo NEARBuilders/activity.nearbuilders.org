@@ -1,5 +1,22 @@
 # api
 
+## 2.9.0
+
+### Minor Changes
+
+- dca58d9: Add the local Nostr and Redis Activity protocol boundary and NEAR-authenticated Activity Source registration, approval, and review history.
+- a310604: Add exact dynamically weighted weekly, monthly, and all-time Activity leaderboards backed by an idempotent Redis projection.
+- 94397a9: Add Source API Key-authenticated, exactly-once Activity event submission with durable idempotency and relay acknowledgement handling. Keep local relay selection configurable at runtime and disable incompatible optional WebSocket native accelerators in API bundles.
+- 3dde7ad: Add configurable public GitHub polling for merged pull requests and closed issues, including explicit NEAR actor mappings and feed provenance.
+- b3eb6ef: Add administrator-only, auditable Activity event suppression across public feeds and resumable streams without mutating signed relay events.
+- 825c0d2: Add a public, trusted, filtered, cursor-paginated Activity feed API and UI.
+- 96b4c77: Add encrypted Signing Identities, mainnet NEAR binding, and revocable source-scoped API credentials for approved Activity Sources.
+- 0d0aa02: Expose time-scoped cryptographic provenance, auditable source trust weighting, and trust-aware Activity feed and leaderboard presentation.
+
+### Patch Changes
+
+- ea5e852: Invalidate an Activity Source's Binding Proof when its NEAR account changes and reject Source API Keys whose Signing Identity is bound to a different account.
+
 ## 2.8.1
 
 ### Patch Changes
