@@ -124,7 +124,7 @@ activityDescribe("Activity Nostr boundary", () => {
     const source = `subscription-test:${randomUUID()}`;
     const received: NostrEvent[] = [];
     let receiveNext: (() => void) | undefined;
-    const subscription = boundary.subscribe({ source }, (event) => {
+    const subscription = await boundary.subscribe({ source }, (event) => {
       received.push(event);
       receiveNext?.();
     });

@@ -26,7 +26,10 @@ export type ActivityQueryResult = {
 export interface ActivityRelayAdapter {
   publish(event: Event): Promise<string>;
   query(filter: Filter): Promise<Event[]>;
-  subscribe(filter: Filter, onEvent: (event: Event) => void): { close: () => void };
+  subscribe(
+    filter: Filter,
+    onEvent: (event: Event) => void,
+  ): { close: () => void } | Promise<{ close: () => void }>;
   close(): void;
 }
 
@@ -148,7 +151,7 @@ export class NostrRelayAdapter implements ActivityRelayAdapter {
     });
   }
 
-  subscribe(filter: Filter, onEvent: (event: Event) => void): { close: () => void } {
+  async subscribe(filter: Filter, onEvent: (event: Event) => void): Promise<{ close: () => void }> {
     let closed = false;
     let reconnectAttempt = 0;
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
@@ -163,10 +166,10 @@ export class NostrRelayAdapter implements ActivityRelayAdapter {
       reconnectAttempt += 1;
       reconnectTimer = setTimeout(() => {
         reconnectTimer = undefined;
-        void connect();
+        void connect(true);
       }, delay);
     };
-    const connect = async () => {
+    const connect = async (reconnecting = false) => {
       if (closed || this.#destroyed) return;
       try {
         const relay = await this.#pool.ensureRelay(this.#relayUrl, { connectionTimeout: 5_000 });
@@ -190,6 +193,7 @@ export class NostrRelayAdapter implements ActivityRelayAdapter {
           },
         );
       } catch {
+        if (!reconnecting) throw new ActivityRelayUnavailableError();
         scheduleReconnect();
       }
     };
@@ -201,7 +205,12 @@ export class NostrRelayAdapter implements ActivityRelayAdapter {
       this.#subscriptionClosers.delete(close);
     };
     this.#subscriptionClosers.add(close);
-    void connect();
+    try {
+      await connect();
+    } catch (error) {
+      close();
+      throw error;
+    }
     return { close };
   }
 
@@ -266,11 +275,11 @@ export class ActivityRelay {
     };
   }
 
-  subscribe(
+  async subscribe(
     input: ActivityQuery,
     onEvent: (event: Event) => void,
     options: { since?: number } = {},
-  ): { close: () => void } {
+  ): Promise<{ close: () => void }> {
     const filter = activityFilter(input);
     if (options.since !== undefined) filter.since = options.since;
     return this.#adapter.subscribe(filter, onEvent);

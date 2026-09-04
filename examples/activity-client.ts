@@ -58,6 +58,54 @@ export class ActivityApiError extends Error {
   }
 }
 
+export class ActivityEventStream {
+  readonly #reader: ReadableStreamDefaultReader<Uint8Array>;
+  readonly #controller: AbortController;
+  readonly #timeout: ReturnType<typeof setTimeout>;
+  readonly #decoder = new TextDecoder();
+  #buffered = "";
+  #closed = false;
+
+  constructor(
+    reader: ReadableStreamDefaultReader<Uint8Array>,
+    controller: AbortController,
+    timeout: ReturnType<typeof setTimeout>,
+  ) {
+    this.#reader = reader;
+    this.#controller = controller;
+    this.#timeout = timeout;
+  }
+
+  async nextEvent(): Promise<ActivityEvent> {
+    while (true) {
+      const { done, value } = await this.#reader.read();
+      if (done) throw new Error("Activity event stream ended before an event arrived");
+      this.#buffered += this.#decoder.decode(value, { stream: true });
+      this.#buffered = this.#buffered.replaceAll("\r\n", "\n");
+      let boundary = this.#buffered.indexOf("\n\n");
+      while (boundary >= 0) {
+        const block = this.#buffered.slice(0, boundary);
+        this.#buffered = this.#buffered.slice(boundary + 2);
+        const data = block
+          .split("\n")
+          .filter((line) => line.startsWith("data:"))
+          .map((line) => line.slice(5).trimStart())
+          .join("\n");
+        if (data) return JSON.parse(data) as ActivityEvent;
+        boundary = this.#buffered.indexOf("\n\n");
+      }
+    }
+  }
+
+  async close(): Promise<void> {
+    if (this.#closed) return;
+    this.#closed = true;
+    clearTimeout(this.#timeout);
+    this.#controller.abort();
+    await this.#reader.cancel().catch(() => undefined);
+  }
+}
+
 export class ActivityClient {
   readonly #apiBaseUrl: string;
   readonly #apiKey?: string;
@@ -103,42 +151,31 @@ export class ActivityClient {
     return this.#json(`/v1/leaderboard${queryString(input)}`);
   }
 
-  async nextEvent(
+  async openEventStream(
     input: { source?: string; type?: string; actor?: string },
     options: { timeoutMs?: number; lastEventId?: string } = {},
-  ): Promise<ActivityEvent> {
-    const response = await fetch(`${this.#apiBaseUrl}/v1/events/stream${queryString(input)}`, {
-      headers: {
-        accept: "text/event-stream",
-        ...(options.lastEventId ? { "last-event-id": options.lastEventId } : {}),
-      },
-      signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
-    });
-    if (!response.ok || !response.body) throw await activityError(response);
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffered = "";
+  ): Promise<ActivityEventStream> {
+    const controller = new AbortController();
+    const timeout = setTimeout(
+      () => controller.abort(new DOMException("The operation timed out.", "TimeoutError")),
+      options.timeoutMs ?? 10_000,
+    );
     try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) throw new Error("Activity event stream ended before an event arrived");
-        buffered += decoder.decode(value, { stream: true });
-        buffered = buffered.replaceAll("\r\n", "\n");
-        let boundary = buffered.indexOf("\n\n");
-        while (boundary >= 0) {
-          const block = buffered.slice(0, boundary);
-          buffered = buffered.slice(boundary + 2);
-          const data = block
-            .split("\n")
-            .filter((line) => line.startsWith("data:"))
-            .map((line) => line.slice(5).trimStart())
-            .join("\n");
-          if (data) return JSON.parse(data) as ActivityEvent;
-          boundary = buffered.indexOf("\n\n");
-        }
+      const response = await fetch(`${this.#apiBaseUrl}/v1/events/stream${queryString(input)}`, {
+        headers: {
+          accept: "text/event-stream",
+          ...(options.lastEventId ? { "last-event-id": options.lastEventId } : {}),
+        },
+        signal: controller.signal,
+      });
+      if (!response.ok || !response.body) {
+        clearTimeout(timeout);
+        throw await activityError(response);
       }
-    } finally {
-      await reader.cancel().catch(() => undefined);
+      return new ActivityEventStream(response.body.getReader(), controller, timeout);
+    } catch (error) {
+      clearTimeout(timeout);
+      throw error;
     }
   }
 
@@ -156,7 +193,6 @@ export async function runActivityExample(input: {
   eventType: string;
   actor: string;
   runId: string;
-  subscriptionDelayMs?: number;
 }) {
   const client = new ActivityClient({ apiBaseUrl: input.apiBaseUrl, apiKey: input.apiKey });
   const idempotencyKey = `integration-guide:${input.runId}:duplicate`;
@@ -182,18 +218,29 @@ export async function runActivityExample(input: {
   }
 
   const liveKey = `integration-guide:${input.runId}:live`;
-  const streamed = client.nextEvent(
+  const stream = await client.openEventStream(
     { source: input.source, type: input.eventType, actor: input.actor },
-    { timeoutMs: 10_000, lastEventId: first.eventId },
+    { timeoutMs: 10_000 },
   );
-  await new Promise((resolve) => setTimeout(resolve, input.subscriptionDelayMs ?? 250));
-  const live = await client.submit({
-    eventType: input.eventType,
-    actor: input.actor,
-    idempotencyKey: liveKey,
-    payload: { example: "live", runId: input.runId },
-  });
-  const streamedEvent = await streamed;
+  let live: { eventId: string };
+  let streamedEvent: ActivityEvent;
+  try {
+    const streamed = (async () => {
+      while (true) {
+        const event = await stream.nextEvent();
+        if (event.idempotencyKey === liveKey) return event;
+      }
+    })();
+    live = await client.submit({
+      eventType: input.eventType,
+      actor: input.actor,
+      idempotencyKey: liveKey,
+      payload: { example: "live", runId: input.runId },
+    });
+    streamedEvent = await streamed;
+  } finally {
+    await stream.close();
+  }
   if (streamedEvent.id !== live.eventId) throw new Error("SSE returned an unexpected event");
 
   const leaderboard = await client.leaderboard({
