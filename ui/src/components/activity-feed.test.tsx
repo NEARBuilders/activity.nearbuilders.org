@@ -19,6 +19,7 @@ const event: ActivityFeedEventView = {
     publicKey: "b".repeat(64),
     signingIdentityStatus: "active",
     sourceDisplayName: "Feedback rounds",
+    integration: null,
     trustStatus: "trusted",
     scoreMultiplier: 1.5,
     payloadClaimsVerified: false,
@@ -48,6 +49,45 @@ describe("ActivityFeed", () => {
     expect(screen.getByText("Trusted · 1.5×")).toBeTruthy();
     expect(screen.getByText(/claims are not independently verified/i)).toBeTruthy();
     expect(container.querySelector("time")?.getAttribute("datetime")).toBe(event.timestamp);
+  });
+
+  it("labels GitHub-ingested events in the normal Activity feed", () => {
+    render(
+      <ActivityFeed
+        events={[
+          {
+            ...event,
+            type: "github.pr.merged",
+            provenance: { ...event.provenance, integration: "github" },
+          },
+        ]}
+        status="success"
+        skippedInvalid={0}
+        hasMore={false}
+        onApplyFilters={vi.fn()}
+        onNextPage={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("GitHub")).toBeTruthy();
+    expect(screen.getByText("github.pr.merged")).toBeTruthy();
+  });
+
+  it("does not label ordinary sources that use a GitHub-prefixed event type", () => {
+    render(
+      <ActivityFeed
+        events={[{ ...event, type: "github.pr.merged" }]}
+        status="success"
+        skippedInvalid={0}
+        hasMore={false}
+        onApplyFilters={vi.fn()}
+        onNextPage={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByText("GitHub")).toBeNull();
   });
 
   it("applies source, type, and actor filters", () => {

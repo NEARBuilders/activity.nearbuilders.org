@@ -66,6 +66,7 @@ export interface ActivityCredentialsService {
     apiKeyId: string,
   ): Promise<ActivitySourceApiKeyRecord>;
   authenticateEventWriteKey(secret: string): Promise<ActivityEventWriteCredential>;
+  getInternalEventWriteCredential(sourceId: string): Promise<ActivityEventWriteCredential>;
   rotateSigningIdentity(
     organizationId: string,
     sourceId: string,
@@ -555,6 +556,42 @@ export const ActivityCredentialsLive = (
               .where(eq(apiKeysTable.id, result.apiKey.id));
             return {
               keyId: result.apiKey.id,
+              sourceId: result.source.sourceId,
+              organizationId: result.source.organizationId,
+              publicKey: result.identity.publicKey,
+              permissions: ["event:write"],
+            };
+          } catch (error) {
+            throw toOrpcError(error);
+          }
+        },
+
+        getInternalEventWriteCredential: async (sourceId) => {
+          try {
+            const [result] = await db
+              .select({ source: sourcesTable, identity: identitiesTable })
+              .from(sourcesTable)
+              .innerJoin(
+                identitiesTable,
+                and(
+                  eq(identitiesTable.sourceRecordId, sourcesTable.id),
+                  isNull(identitiesTable.retiredAt),
+                ),
+              )
+              .where(eq(sourcesTable.sourceId, sourceId))
+              .limit(1);
+            if (!result || result.source.approvalStatus !== "approved") {
+              throw new ORPCError("FORBIDDEN", {
+                message: "Activity Source is not approved for ingestion",
+              });
+            }
+            if (!hasCurrentBinding(result.source, result.identity)) {
+              throw new ORPCError("FORBIDDEN", {
+                message: "Activity Source signing identity is not bound",
+              });
+            }
+            return {
+              keyId: "internal:github",
               sourceId: result.source.sourceId,
               organizationId: result.source.organizationId,
               publicKey: result.identity.publicKey,

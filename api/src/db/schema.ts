@@ -235,6 +235,92 @@ export const activityEventEndorsements = pgTable(
   }),
 );
 
+export const activityGithubIntegrations = pgTable(
+  "activity_github_integrations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sourceRecordId: uuid("source_record_id")
+      .notNull()
+      .references(() => activitySources.id, { onDelete: "cascade" }),
+    enabled: boolean("enabled").default(true).notNull(),
+    mergedPullRequestsEnabled: boolean("merged_pull_requests_enabled").default(true).notNull(),
+    closedIssuesEnabled: boolean("closed_issues_enabled").default(true).notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    sourceIdx: uniqueIndex("activity_github_integrations_source_idx").on(table.sourceRecordId),
+  }),
+);
+
+export const activityGithubRepositories = pgTable(
+  "activity_github_repositories",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    integrationId: uuid("integration_id")
+      .notNull()
+      .references(() => activityGithubIntegrations.id, { onDelete: "cascade" }),
+    owner: text("owner").notNull(),
+    repository: text("repository").notNull(),
+    etag: text("etag"),
+    pollIntervalSeconds: integer("poll_interval_seconds").default(60).notNull(),
+    nextPollAt: timestamp("next_poll_at", { mode: "date", withTimezone: true }),
+    lastPolledAt: timestamp("last_polled_at", { mode: "date", withTimezone: true }),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    integrationRepositoryIdx: uniqueIndex(
+      "activity_github_repositories_integration_repository_idx",
+    ).on(table.integrationId, table.owner, table.repository),
+    nextPollIdx: index("activity_github_repositories_next_poll_idx").on(table.nextPollAt),
+  }),
+);
+
+export const activityGithubActorMappings = pgTable(
+  "activity_github_actor_mappings",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    integrationId: uuid("integration_id")
+      .notNull()
+      .references(() => activityGithubIntegrations.id, { onDelete: "cascade" }),
+    githubLogin: text("github_login").notNull(),
+    nearAccountId: text("near_account_id").notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    integrationLoginIdx: uniqueIndex("activity_github_actor_mappings_integration_login_idx").on(
+      table.integrationId,
+      table.githubLogin,
+    ),
+  }),
+);
+
+export const activityGithubQuarantine = pgTable(
+  "activity_github_quarantine",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    integrationId: uuid("integration_id")
+      .notNull()
+      .references(() => activityGithubIntegrations.id, { onDelete: "cascade" }),
+    githubEventId: text("github_event_id").notNull(),
+    repository: text("repository").notNull(),
+    githubLogin: text("github_login").notNull(),
+    eventType: text("event_type").notNull(),
+    reason: text("reason").notNull(),
+    payloadJson: text("payload_json").notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    integrationEventIdx: uniqueIndex("activity_github_quarantine_integration_event_idx").on(
+      table.integrationId,
+      table.githubEventId,
+    ),
+  }),
+);
+
 export const activityHiddenEvents = pgTable(
   "activity_hidden_events",
   {

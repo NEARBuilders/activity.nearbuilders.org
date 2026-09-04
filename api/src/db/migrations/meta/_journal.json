@@ -71,6 +71,13 @@
       "when": 1788521697950,
       "tag": "0009_lively_skaar",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1788523653216,
+      "tag": "0010_daily_tigra",
+      "breakpoints": true
     }
   ]
 }

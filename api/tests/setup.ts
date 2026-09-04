@@ -11,6 +11,7 @@ import { type WebSocket, WebSocketServer } from "ws";
 import type { contract } from "@/contract";
 import Plugin from "@/index";
 import type { ActivityCredentialsService } from "@/services/activity-credentials";
+import { ActivityGithubService } from "@/services/activity-github";
 import type { ActivityLeaderboard } from "@/services/activity-leaderboard";
 import pluginDevConfig from "../plugin.dev";
 
@@ -225,6 +226,18 @@ export async function getActivityLeaderboardService() {
   if (!activityLeaderboardService) await getPluginClient();
   if (!activityLeaderboardService) throw new Error("Activity leaderboard is unavailable");
   return activityLeaderboardService;
+}
+
+export async function restartActivityGithubService() {
+  await getPluginClient();
+  const { initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, TEST_CONFIG);
+  initialized.context.activityGithub.stop();
+  const restarted = new ActivityGithubService({
+    db: initialized.context.database,
+    ingestion: initialized.context.activityIngestion,
+  });
+  restarted.start();
+  initialized.context.activityGithub = restarted;
 }
 
 export function authedContext(userId = "user-1"): Record<string, unknown> {

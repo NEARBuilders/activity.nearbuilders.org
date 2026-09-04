@@ -15,6 +15,7 @@ const event: ActivityFeedEvent = {
     publicKey: "a".repeat(64),
     signingIdentityStatus: "active",
     sourceDisplayName: "Feedback rounds",
+    integration: null,
     trustStatus: "standard",
     scoreMultiplier: 1,
     payloadClaimsVerified: false,

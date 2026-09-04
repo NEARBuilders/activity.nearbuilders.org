@@ -1,4 +1,11 @@
-import { AlertTriangle, Clock3, Heart, RadioTower, ShieldCheck } from "lucide-react";
+import {
+  AlertTriangle,
+  Clock3,
+  GitPullRequest,
+  Heart,
+  RadioTower,
+  ShieldCheck,
+} from "lucide-react";
 import { useState } from "react";
 import { ActivityTrustBadge } from "@/components/ui/activity-trust-badge";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +27,7 @@ export type ActivityFeedEventView = {
     publicKey: string;
     signingIdentityStatus: "active" | "retired";
     sourceDisplayName: string;
+    integration: "github" | null;
     trustStatus: "standard" | "trusted";
     scoreMultiplier: number;
     payloadClaimsVerified: false;
@@ -234,6 +242,13 @@ export function ActivityFeed({
                                 trustStatus={event.provenance.trustStatus}
                                 scoreMultiplier={event.provenance.scoreMultiplier}
                               />
+                              {event.provenance.integration === "github" &&
+                                event.type.startsWith("github.") && (
+                                  <Badge variant="outline">
+                                    <GitPullRequest />
+                                    GitHub
+                                  </Badge>
+                                )}
                               {event.provenance.signingIdentityStatus === "retired" && (
                                 <Badge variant="outline">Historical signing key</Badge>
                               )}
