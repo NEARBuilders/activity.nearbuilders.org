@@ -1,5 +1,16 @@
 # ui
 
+## 1.10.0
+
+### Minor Changes
+
+- dca58d9: Add the local Nostr and Redis Activity protocol boundary and NEAR-authenticated Activity Source registration, approval, and review history.
+- a310604: Add exact dynamically weighted weekly, monthly, and all-time Activity leaderboards backed by an idempotent Redis projection.
+- 3dde7ad: Add configurable public GitHub polling for merged pull requests and closed issues, including explicit NEAR actor mappings and feed provenance.
+- 825c0d2: Add a public, trusted, filtered, cursor-paginated Activity feed API and UI.
+- 96b4c77: Add encrypted Signing Identities, mainnet NEAR binding, and revocable source-scoped API credentials for approved Activity Sources.
+- 0d0aa02: Expose time-scoped cryptographic provenance, auditable source trust weighting, and trust-aware Activity feed and leaderboard presentation.
+
 ## 1.9.1
 
 ### Patch Changes
