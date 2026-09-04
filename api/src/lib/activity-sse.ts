@@ -15,14 +15,27 @@ function encodeActivityEvent(event: ActivityFeedEvent): Uint8Array {
  */
 export function createActivitySseStream(
   events: AsyncGenerator<ActivityFeedEvent>,
+  ready: Promise<void> = Promise.resolve(),
 ): ReadableStream<Uint8Array> {
+  let pendingEvent: Promise<IteratorResult<ActivityFeedEvent>> | undefined;
   return new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(encoder.encode(": \n\n"));
+    async start(controller) {
+      pendingEvent = events.next();
+      try {
+        const outcome = await Promise.race([
+          ready.then(() => ({ type: "ready" as const })),
+          pendingEvent.then((event) => ({ type: "event" as const, event })),
+        ]);
+        if (outcome.type === "event") pendingEvent = Promise.resolve(outcome.event);
+        controller.enqueue(encoder.encode(": ready\n\n"));
+      } catch (error) {
+        controller.error(error);
+      }
     },
     async pull(controller) {
       try {
-        const next = await events.next();
+        const next = await (pendingEvent ?? events.next());
+        pendingEvent = undefined;
         if (next.done) {
           controller.close();
           return;

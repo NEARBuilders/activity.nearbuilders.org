@@ -71,6 +71,9 @@ jobs:
       - name: Run tests
         run: bun run test
 
+      - name: Run clean-room integration guide smoke test
+        run: bun run test:integration-guide
+
       - name: Start Activity infrastructure
         run: bun run dev:activity-infra
 

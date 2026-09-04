@@ -707,13 +707,17 @@ export default createPlugin.withPlugins<PluginsClient>()({
       streamActivityEventsSse: builder.streamActivityEventsSse.handler(
         ({ input, context, signal }) => {
           const lastEventId = context.reqHeaders?.get("last-event-id") ?? undefined;
+          let markReady: () => void = () => undefined;
+          const ready = new Promise<void>((resolve) => {
+            markReady = resolve;
+          });
           const events = services.activityFeed.stream(
             {
               source: input.source,
               eventType: input.type,
               actor: input.actor,
             },
-            { lastEventId, signal },
+            { lastEventId, signal, onReady: markReady },
           ) as AsyncGenerator<ActivityFeedEvent>;
 
           return {
@@ -722,7 +726,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
               "cache-control": "no-cache",
               "content-type": "text/event-stream; charset=utf-8",
             },
-            body: createActivitySseStream(events),
+            body: createActivitySseStream(events, ready),
           };
         },
       ),

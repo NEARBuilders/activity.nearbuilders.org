@@ -188,7 +188,7 @@ export class ActivityFeedService {
 
   async *stream(
     input: ActivityQuery,
-    options: { lastEventId?: string; signal?: AbortSignal } = {},
+    options: { lastEventId?: string; signal?: AbortSignal; onReady?: () => void } = {},
   ): AsyncGenerator<ActivityFeedEvent> {
     if (options.lastEventId !== undefined && !/^[a-f0-9]{64}$/.test(options.lastEventId)) {
       throw new ActivityResumeError();
@@ -201,7 +201,7 @@ export class ActivityFeedService {
       wake?.();
       wake = undefined;
     };
-    const subscription = this.#relay.subscribe(
+    const subscription = await this.#relay.subscribe(
       input,
       (event) => {
         const parsed = parseActivityFeedEvent(event, registeredIdentities, input);
@@ -213,6 +213,7 @@ export class ActivityFeedService {
       { since: Math.floor(Date.now() / 1_000) },
     );
     options.signal?.addEventListener("abort", wakeStream, { once: true });
+    options.onReady?.();
 
     try {
       const replay = options.lastEventId

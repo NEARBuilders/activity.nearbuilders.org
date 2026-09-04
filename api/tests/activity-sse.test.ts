@@ -30,7 +30,7 @@ describe("createActivitySseStream", () => {
 
     const body = await new Response(createActivitySseStream(events())).text();
 
-    expect(body).toContain(": \n\n");
+    expect(body).toContain(": ready\n\n");
     expect(body).toContain("event: message\n");
     expect(body).toContain("retry: 1000\n");
     expect(body).toContain(`id: ${event.id}\n`);

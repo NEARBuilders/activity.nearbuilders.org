@@ -65,7 +65,10 @@ export class ActivityBoundary {
     return this.#relay.query(input);
   }
 
-  subscribe(input: ActivityQuery, onEvent: (event: Event) => void): { close: () => void } {
+  async subscribe(
+    input: ActivityQuery,
+    onEvent: (event: Event) => void,
+  ): Promise<{ close: () => void }> {
     return this.#relay.subscribe(input, onEvent);
   }
 
