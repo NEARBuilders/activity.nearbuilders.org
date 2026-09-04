@@ -50,6 +50,20 @@
       "when": 1788466734303,
       "tag": "0006_peaceful_red_skull",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788479107120,
+      "tag": "0007_loud_zemo",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788510850495,
+      "tag": "0008_spooky_selene",
+      "breakpoints": true
     }
   ]
 }

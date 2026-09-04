@@ -14,6 +14,8 @@ export {
   type ActivityLeaderboardPeriod,
   type ActivityLeaderboardView,
 } from "./ui/activity-leaderboard";
+export { ActivitySourceTrustCard } from "./ui/activity-source-trust-card";
+export { ActivityTrustBadge } from "./ui/activity-trust-badge";
 export { Badge } from "./ui/badge";
 export { Button } from "./ui/button";
 export {

@@ -14,6 +14,15 @@ const event: ActivityFeedEventView = {
   idempotencyKey: "feedback:round-1:alice",
   timestamp: "2026-09-03T01:46:40.000Z",
   payload: { rating: 5, note: "Useful feedback" },
+  provenance: {
+    signatureVerified: true,
+    publicKey: "b".repeat(64),
+    signingIdentityStatus: "active",
+    sourceDisplayName: "Feedback rounds",
+    trustStatus: "trusted",
+    scoreMultiplier: 1.5,
+    payloadClaimsVerified: false,
+  },
 };
 
 describe("ActivityFeed", () => {
@@ -34,6 +43,10 @@ describe("ActivityFeed", () => {
     expect(screen.getByText("feedback.submitted")).toBeTruthy();
     expect(screen.getByText(/feedback-rounds/)).toBeTruthy();
     expect(screen.getByText(/Useful feedback/)).toBeTruthy();
+    expect(screen.getByText("Feedback rounds")).toBeTruthy();
+    expect(screen.getByText("Verified signature")).toBeTruthy();
+    expect(screen.getByText("Trusted · 1.5×")).toBeTruthy();
+    expect(screen.getByText(/claims are not independently verified/i)).toBeTruthy();
     expect(container.querySelector("time")?.getAttribute("datetime")).toBe(event.timestamp);
   });
 

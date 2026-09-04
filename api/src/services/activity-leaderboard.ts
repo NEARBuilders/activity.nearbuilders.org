@@ -13,8 +13,11 @@ export type { ActivityLeaderboardPeriod, ActivityLeaderboardResult } from "../co
 
 export type ActivityPointValue = {
   source: string;
+  sourceDisplayName?: string;
   type: string;
   pointValue: number;
+  trustStatus?: "standard" | "trusted";
+  scoreMultiplier?: number;
 };
 
 export type ActivityLeaderboardEvent = {
@@ -52,19 +55,33 @@ export class DatabaseActivityPointValueProvider implements ActivityPointValuePro
     this.#db = db;
   }
 
-  listPointValues(): Promise<ActivityPointValue[]> {
-    return this.#db
+  async listPointValues(): Promise<ActivityPointValue[]> {
+    const values = await this.#db
       .select({
         source: sourcesTable.sourceId,
+        sourceDisplayName: sourcesTable.displayName,
         type: eventTypesTable.name,
         pointValue: eventTypesTable.pointValue,
+        trustStatus: sourcesTable.trustStatus,
+        scoreMultiplierBps: sourcesTable.scoreMultiplierBps,
       })
       .from(eventTypesTable)
       .innerJoin(sourcesTable, eq(eventTypesTable.sourceRecordId, sourcesTable.id));
+    return values.map(({ scoreMultiplierBps, ...value }) => ({
+      ...value,
+      scoreMultiplier: scoreMultiplierBps / 10_000,
+    }));
   }
 }
 
-type ActivityDimension = ActivityPointValue;
+type ActivityDimension = {
+  source: string;
+  sourceDisplayName: string;
+  type: string;
+  pointValue: number;
+  trustStatus: "standard" | "trusted";
+  scoreMultiplier: number;
+};
 
 type ActivityBucket = {
   id: string;
@@ -129,7 +146,7 @@ class InMemoryActivityLeaderboardProjection implements ActivityLeaderboardProjec
         breakdown.push({
           ...dimension,
           eventCount,
-          score: eventCount * dimension.pointValue,
+          score: weightedScore(eventCount, dimension),
         });
         actors.set(actor, breakdown);
       }
@@ -256,7 +273,7 @@ class RedisActivityLeaderboardProjection implements ActivityLeaderboardProjectio
         String(countKeys.length),
         ...countKeys,
         "WEIGHTS",
-        ...dimensions.map(({ pointValue }) => String(pointValue)),
+        ...dimensions.map((dimension) => String(dimensionWeight(dimension))),
         "AGGREGATE",
         "SUM",
       ]);
@@ -281,7 +298,7 @@ class RedisActivityLeaderboardProjection implements ActivityLeaderboardProjectio
           breakdown.push({
             ...dimension,
             eventCount,
-            score: eventCount * dimension.pointValue,
+            score: weightedScore(eventCount, dimension),
           });
         }
         actors.set(actor, breakdown);
@@ -376,17 +393,23 @@ export class ActivityLeaderboard {
     const pointValues = new Map(
       (await this.#pointValues.listPointValues()).map((value) => [
         dimensionKey(value.source, value.type),
-        value.pointValue,
+        value,
       ]),
     );
     const dimensions = (await this.#projection.listDimensions(bucket))
       .filter(({ source }) => !input.source || source === input.source)
       .filter(({ type }) => !input.type || type === input.type)
-      .map(({ source, type }) => ({
-        source,
-        type,
-        pointValue: pointValues.get(dimensionKey(source, type)) ?? 0,
-      }))
+      .map(({ source, type }) => {
+        const configured = pointValues.get(dimensionKey(source, type));
+        return {
+          source,
+          sourceDisplayName: configured?.sourceDisplayName ?? source,
+          type,
+          pointValue: configured?.pointValue ?? 0,
+          trustStatus: configured?.trustStatus ?? "standard",
+          scoreMultiplier: configured?.scoreMultiplier ?? 1,
+        } satisfies ActivityDimension;
+      })
       .sort((left, right) =>
         left.source === right.source
           ? left.type.localeCompare(right.type)
@@ -560,6 +583,14 @@ function rankEntries(
     .sort((left, right) => right.score - left.score || left.actor.localeCompare(right.actor))
     .slice(0, limit)
     .map((entry, index) => ({ ...entry, rank: index + 1 }));
+}
+
+function dimensionWeight(dimension: ActivityDimension): number {
+  return dimension.pointValue * (dimension.scoreMultiplier ?? 1);
+}
+
+function weightedScore(eventCount: number, dimension: ActivityDimension): number {
+  return eventCount * dimensionWeight(dimension);
 }
 
 function dimensionKey(source: string, type: string): string {

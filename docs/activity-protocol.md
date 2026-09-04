@@ -80,7 +80,16 @@ The response contains `data` and pagination metadata:
       "actor": "alice.near",
       "idempotencyKey": "feedback:round-42:alice.near",
       "timestamp": "2026-09-03T01:46:40.000Z",
-      "payload": { "rating": 5 }
+      "payload": { "rating": 5 },
+      "provenance": {
+        "signatureVerified": true,
+        "publicKey": "<64-character Nostr public key>",
+        "signingIdentityStatus": "active",
+        "sourceDisplayName": "Feedback Rounds",
+        "trustStatus": "standard",
+        "scoreMultiplier": 1,
+        "payloadClaimsVerified": false
+      }
     }
   ],
   "meta": {
@@ -92,12 +101,13 @@ The response contains `data` and pagination metadata:
 ```
 
 The gateway verifies each event envelope, content hash, signature, required tags, and source-to-key
-association against every bound Signing Identity retained for that source. Retired identities remain
-trusted for historical events. Malformed, forged, mismatched, and filter-inconsistent relay records
-are omitted before page boundaries are calculated. `skippedInvalid` makes those omissions observable
-to clients. A malformed cursor returns `400 Bad Request`; a relay timeout or unsafe scan-limit result
-returns `503 Service Unavailable` rather than leaving the request open or returning an incomplete
-page.
+association against the bound Signing Identity active at the event's signing time. Retired identities
+remain valid only for events created during their active window. Malformed, forged, mismatched, and
+filter-inconsistent relay records are omitted before page boundaries are calculated. `skippedInvalid`
+makes those omissions observable to clients. The provenance object states exactly what was verified;
+it never implies that payload claims were independently checked. A malformed cursor returns `400 Bad
+Request`; a relay timeout or unsafe scan-limit result returns `503 Service Unavailable` rather than
+leaving the request open or returning an incomplete page.
 
 ## Transport boundary
 
@@ -122,6 +132,10 @@ encoded 32-byte keys. `ACTIVITY_SIGNING_ACTIVE_KEY_VERSION` selects the key used
 Old versions must remain available until every Signing Identity encrypted under them has been
 rotated.
 
+Signing Identity history records who created and retired each key, when it was active, and the stated
+rotation reason. This history is used to validate old events without accepting events signed outside
+a key's active window.
+
 A Binding Proof follows the shared `near-nostr` convention. The gateway signs a kind-27235 challenge
 with the custodied identity and prepares a mainnet `contextual.near.__fastdata_kv` write under
 `nostr/<source-account>`. The connected wallet must use the Activity Source's exact mainnet NEAR
@@ -134,6 +148,11 @@ exactly one Activity Source and always carry the single `event:write` permission
 returned by the creation response once; list and revoke responses contain safe metadata only. The
 ingestion authentication boundary rejects revoked keys, unapproved sources, and sources without a
 bound active Signing Identity.
+
+Source approval and source trust are independent controls. Approval alone determines whether the
+source can ingest. A Platform Administrator can separately set `standard` or `trusted` weighting and
+a current score multiplier through `POST /api/activity/sources/{sourceId}/trust`. Every change records
+the administrator, old and new values, reason, and timestamp in an append-only audit history.
 
 Queries order events by `(created_at DESC, id DESC)`. The opaque cursor contains both values. Relay
 queries include the cursor second, then discard IDs at or ahead of the cursor locally, preventing

@@ -4,14 +4,17 @@ import { ORPCError } from "every-plugin/orpc";
 import { DatabaseTag } from "../db/layer";
 import {
   type activitySourceApprovalStatus,
+  type activitySourceTrustStatus,
   activityEventTypes as eventTypesTable,
   activitySigningIdentities as identitiesTable,
   activitySourceReviews as reviewsTable,
   activitySources as sourcesTable,
+  activitySourceTrustChanges as trustChangesTable,
 } from "../db/schema";
 
 export type ActivitySourceApprovalStatus =
   (typeof activitySourceApprovalStatus)["enumValues"][number];
+export type ActivitySourceTrustStatus = (typeof activitySourceTrustStatus)["enumValues"][number];
 
 export interface ActivityEventTypeInput {
   name: string;
@@ -35,8 +38,11 @@ export interface ActivitySourceRecord {
   organizationId: string;
   approvalStatus: ActivitySourceApprovalStatus;
   canIngest: boolean;
+  trustStatus: ActivitySourceTrustStatus;
+  scoreMultiplier: number;
   eventTypes: ActivityEventTypeInput[];
   reviewHistory: ActivitySourceReviewRecord[];
+  trustHistory: ActivitySourceTrustChangeRecord[];
   reviewedBy: string | null;
   reviewReason: string | null;
   reviewedAt: string | null;
@@ -49,6 +55,14 @@ export interface ActivitySourceReviewRecord {
   reason: string;
   administratorId: string;
   reviewedAt: string;
+}
+
+export interface ActivitySourceTrustChangeRecord {
+  trustStatus: ActivitySourceTrustStatus;
+  scoreMultiplier: number;
+  reason: string;
+  administratorId: string;
+  changedAt: string;
 }
 
 export interface ActivitySourcesService {
@@ -69,6 +83,13 @@ export interface ActivitySourcesService {
     reason: string;
     administratorId: string;
   }): Promise<ActivitySourceRecord>;
+  updateSourceTrust(input: {
+    sourceId: string;
+    trustStatus: ActivitySourceTrustStatus;
+    scoreMultiplier: number;
+    reason: string;
+    administratorId: string;
+  }): Promise<ActivitySourceRecord>;
 }
 
 export class ActivitySourcesTag extends Context.Tag("api/ActivitySources")<
@@ -79,6 +100,7 @@ export class ActivitySourcesTag extends Context.Tag("api/ActivitySources")<
 type SourceRow = typeof sourcesTable.$inferSelect;
 type EventTypeRow = typeof eventTypesTable.$inferSelect;
 type ReviewRow = typeof reviewsTable.$inferSelect;
+type TrustChangeRow = typeof trustChangesTable.$inferSelect;
 
 function iso(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : String(value);
@@ -88,6 +110,7 @@ function toRecord(
   source: SourceRow,
   eventTypes: EventTypeRow[],
   reviews: ReviewRow[],
+  trustChanges: TrustChangeRow[] = [],
 ): ActivitySourceRecord {
   return {
     sourceId: source.sourceId,
@@ -96,6 +119,8 @@ function toRecord(
     organizationId: source.organizationId,
     approvalStatus: source.approvalStatus,
     canIngest: source.approvalStatus === "approved",
+    trustStatus: source.trustStatus,
+    scoreMultiplier: source.scoreMultiplierBps / 10_000,
     eventTypes: eventTypes.map(({ name, description, enabled, pointValue }) => ({
       name,
       description,
@@ -108,6 +133,15 @@ function toRecord(
       administratorId,
       reviewedAt: iso(reviewedAt),
     })),
+    trustHistory: trustChanges.map(
+      ({ trustStatus, scoreMultiplierBps, reason, administratorId, changedAt }) => ({
+        trustStatus,
+        scoreMultiplier: scoreMultiplierBps / 10_000,
+        reason,
+        administratorId,
+        changedAt: iso(changedAt),
+      }),
+    ),
     reviewedBy: source.reviewedBy,
     reviewReason: source.reviewReason,
     reviewedAt: source.reviewedAt ? iso(source.reviewedAt) : null,
@@ -145,6 +179,15 @@ export const ActivitySourcesLive = Layer.effect(
         .from(reviewsTable)
         .where(inArray(reviewsTable.sourceRecordId, sourceRecordIds))
         .orderBy(asc(reviewsTable.reviewedAt));
+    };
+
+    const trustChangesFor = async (sourceRecordIds: string[]) => {
+      if (sourceRecordIds.length === 0) return [];
+      return await db
+        .select()
+        .from(trustChangesTable)
+        .where(inArray(trustChangesTable.sourceRecordId, sourceRecordIds))
+        .orderBy(asc(trustChangesTable.changedAt));
     };
 
     const service: ActivitySourcesService = {
@@ -213,11 +256,13 @@ export const ActivitySourcesLive = Layer.effect(
             .orderBy(desc(sourcesTable.createdAt));
           const eventTypes = await eventTypesFor(sources.map(({ id }) => id));
           const reviews = await reviewsFor(sources.map(({ id }) => id));
+          const trustChanges = await trustChangesFor(sources.map(({ id }) => id));
           return sources.map((source) =>
             toRecord(
               source,
               eventTypes.filter(({ sourceRecordId }) => sourceRecordId === source.id),
               reviews.filter(({ sourceRecordId }) => sourceRecordId === source.id),
+              trustChanges.filter(({ sourceRecordId }) => sourceRecordId === source.id),
             ),
           );
         } catch (error) {
@@ -292,7 +337,8 @@ export const ActivitySourcesLive = Layer.effect(
           });
           const eventTypes = await eventTypesFor([source.id]);
           const reviews = await reviewsFor([source.id]);
-          return toRecord(source, eventTypes, reviews);
+          const trustChanges = await trustChangesFor([source.id]);
+          return toRecord(source, eventTypes, reviews, trustChanges);
         } catch (error) {
           throw toOrpcError(error);
         }
@@ -307,11 +353,13 @@ export const ActivitySourcesLive = Layer.effect(
           ).orderBy(desc(sourcesTable.createdAt));
           const eventTypes = await eventTypesFor(sources.map(({ id }) => id));
           const reviews = await reviewsFor(sources.map(({ id }) => id));
+          const trustChanges = await trustChangesFor(sources.map(({ id }) => id));
           return sources.map((source) =>
             toRecord(
               source,
               eventTypes.filter(({ sourceRecordId }) => sourceRecordId === source.id),
               reviews.filter(({ sourceRecordId }) => sourceRecordId === source.id),
+              trustChanges.filter(({ sourceRecordId }) => sourceRecordId === source.id),
             ),
           );
         } catch (error) {
@@ -363,7 +411,48 @@ export const ActivitySourcesLive = Layer.effect(
           });
           const eventTypes = await eventTypesFor([source.id]);
           const reviews = await reviewsFor([source.id]);
-          return toRecord(source, eventTypes, reviews);
+          const trustChanges = await trustChangesFor([source.id]);
+          return toRecord(source, eventTypes, reviews, trustChanges);
+        } catch (error) {
+          throw toOrpcError(error);
+        }
+      },
+
+      updateSourceTrust: async (input) => {
+        try {
+          const scoreMultiplierBps = Math.round(input.scoreMultiplier * 10_000);
+          const source = await db.transaction(async (tx) => {
+            const [existing] = await tx
+              .select()
+              .from(sourcesTable)
+              .where(eq(sourcesTable.sourceId, input.sourceId))
+              .limit(1);
+            if (!existing) {
+              throw new ORPCError("NOT_FOUND", { message: "Activity Source not found" });
+            }
+            const [updated] = await tx
+              .update(sourcesTable)
+              .set({
+                trustStatus: input.trustStatus,
+                scoreMultiplierBps,
+                updatedAt: new Date(),
+              })
+              .where(eq(sourcesTable.id, existing.id))
+              .returning();
+            if (!updated) throw new Error("Activity Source trust was not updated");
+            await tx.insert(trustChangesTable).values({
+              sourceRecordId: updated.id,
+              trustStatus: input.trustStatus,
+              scoreMultiplierBps,
+              reason: input.reason,
+              administratorId: input.administratorId,
+            });
+            return updated;
+          });
+          const eventTypes = await eventTypesFor([source.id]);
+          const reviews = await reviewsFor([source.id]);
+          const trustChanges = await trustChangesFor([source.id]);
+          return toRecord(source, eventTypes, reviews, trustChanges);
         } catch (error) {
           throw toOrpcError(error);
         }

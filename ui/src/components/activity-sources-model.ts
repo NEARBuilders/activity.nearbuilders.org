@@ -12,12 +12,21 @@ export interface ActivitySourceView {
   organizationId: string;
   approvalStatus: "pending" | "approved" | "rejected";
   canIngest: boolean;
+  trustStatus: "standard" | "trusted";
+  scoreMultiplier: number;
   eventTypes: ActivityEventTypeView[];
   reviewHistory: Array<{
     decision: "approved" | "rejected";
     reason: string;
     administratorId: string;
     reviewedAt: string;
+  }>;
+  trustHistory: Array<{
+    trustStatus: "standard" | "trusted";
+    scoreMultiplier: number;
+    reason: string;
+    administratorId: string;
+    changedAt: string;
   }>;
   reviewedBy: string | null;
   reviewReason: string | null;
@@ -39,13 +48,23 @@ export interface ReviewActivitySourceInput {
   reason: string;
 }
 
+export interface UpdateActivitySourceTrustInput {
+  sourceId: string;
+  trustStatus: "standard" | "trusted";
+  scoreMultiplier: number;
+  reason: string;
+}
+
 export interface ActivitySigningIdentityView {
   publicKey: string;
   bindingStatus: "pending" | "bound";
   boundNearAccountId: string | null;
   boundAt: string | null;
   keyVersion: string;
+  createdBy: string | null;
   createdAt: string;
+  retiredBy: string | null;
+  retirementReason: string | null;
   retiredAt: string | null;
 }
 

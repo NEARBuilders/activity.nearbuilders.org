@@ -1,5 +1,7 @@
-import { AlertTriangle, Clock3, RadioTower } from "lucide-react";
+import { AlertTriangle, Clock3, RadioTower, ShieldCheck } from "lucide-react";
 import { useState } from "react";
+import { ActivityTrustBadge } from "@/components/ui/activity-trust-badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -13,6 +15,15 @@ export type ActivityFeedEventView = {
   idempotencyKey: string;
   timestamp: string;
   payload: unknown;
+  provenance: {
+    signatureVerified: true;
+    publicKey: string;
+    signingIdentityStatus: "active" | "retired";
+    sourceDisplayName: string;
+    trustStatus: "standard" | "trusted";
+    scoreMultiplier: number;
+    payloadClaimsVerified: false;
+  };
 };
 
 export type ActivityFeedFilters = {
@@ -193,7 +204,21 @@ export function ActivityFeed({
                           <p className="font-semibold text-foreground">{event.actor}</p>
                           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                             <span className="font-mono">{event.type}</span>
-                            <span>from {event.source}</span>
+                            <span>{event.provenance.sourceDisplayName}</span>
+                            <span className="font-mono">{event.source}</span>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 pt-1">
+                            <Badge variant="secondary">
+                              <ShieldCheck />
+                              Verified signature
+                            </Badge>
+                            <ActivityTrustBadge
+                              trustStatus={event.provenance.trustStatus}
+                              scoreMultiplier={event.provenance.scoreMultiplier}
+                            />
+                            {event.provenance.signingIdentityStatus === "retired" && (
+                              <Badge variant="outline">Historical signing key</Badge>
+                            )}
                           </div>
                         </div>
                         <time
@@ -207,6 +232,10 @@ export function ActivityFeed({
                       <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-[8px] border border-border bg-muted p-3 text-xs text-foreground">
                         {payloadSummary(event.payload)}
                       </pre>
+                      <p className="text-xs text-muted-foreground">
+                        The signature matches this Activity Source&apos;s registered key. Payload
+                        claims are not independently verified.
+                      </p>
                     </CardContent>
                   </Card>
                 </li>

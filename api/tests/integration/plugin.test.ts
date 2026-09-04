@@ -418,6 +418,56 @@ describe("API Plugin Integration Tests", () => {
         ],
       });
     });
+
+    it("lets only a platform administrator designate source trust without granting ingestion", async () => {
+      const owner = await getPluginClient(orgOwnerContext("trust-owner", "org-trust"));
+      await owner.createActivitySource({
+        sourceId: "trust-source",
+        displayName: "Trust Source",
+        nearAccountId: "trust-owner.near",
+        eventTypes: [
+          {
+            name: "trust.event",
+            description: "An event with separately administered trust",
+            enabled: true,
+            pointValue: 4,
+          },
+        ],
+      });
+
+      await expect(
+        owner.updateActivitySourceTrust({
+          sourceId: "trust-source",
+          trustStatus: "trusted",
+          scoreMultiplier: 1.5,
+          reason: "Owner cannot designate their own source as trusted",
+        }),
+      ).rejects.toThrow("Requires role: admin");
+
+      const administrator = await getPluginClient(adminContext());
+      const trusted = await administrator.updateActivitySourceTrust({
+        sourceId: "trust-source",
+        trustStatus: "trusted",
+        scoreMultiplier: 1.5,
+        reason: "Source operating history reviewed",
+      });
+
+      expect(trusted).toMatchObject({
+        approvalStatus: "pending",
+        canIngest: false,
+        trustStatus: "trusted",
+        scoreMultiplier: 1.5,
+        trustHistory: [
+          {
+            trustStatus: "trusted",
+            scoreMultiplier: 1.5,
+            reason: "Source operating history reviewed",
+            administratorId: "platform-admin-1",
+            changedAt: expect.any(String),
+          },
+        ],
+      });
+    });
   });
 
   describe("Activity source credentials", () => {
@@ -458,7 +508,10 @@ describe("API Plugin Integration Tests", () => {
         boundNearAccountId: null,
         boundAt: null,
         keyVersion: "v1",
+        createdBy: "credential-owner",
         createdAt: expect.any(String),
+        retiredBy: null,
+        retirementReason: null,
         retiredAt: null,
       });
       expect(Object.keys(identity).sort()).toEqual([
@@ -466,13 +519,17 @@ describe("API Plugin Integration Tests", () => {
         "boundAt",
         "boundNearAccountId",
         "createdAt",
+        "createdBy",
         "keyVersion",
         "publicKey",
         "retiredAt",
+        "retiredBy",
+        "retirementReason",
       ]);
 
       const rotated = await owner.rotateActivitySigningIdentity({
         sourceId: "credential-source",
+        reason: "Routine credential rotation",
       });
       const history = await owner.listActivitySigningIdentities({
         sourceId: "credential-source",
@@ -489,6 +546,8 @@ describe("API Plugin Integration Tests", () => {
         expect.arrayContaining([
           expect.objectContaining({
             publicKey: identity.publicKey,
+            retiredBy: "credential-owner",
+            retirementReason: "Routine credential rotation",
             retiredAt: expect.any(String),
           }),
           rotated,
@@ -1129,8 +1188,35 @@ describe("API Plugin Integration Tests", () => {
           type: "feedback.submitted",
           actor: "alice.near",
           payload: { rating: 5 },
+          provenance: {
+            signatureVerified: true,
+            publicKey: expect.stringMatching(/^[a-f0-9]{64}$/),
+            signingIdentityStatus: "active",
+            sourceDisplayName: "feed-source Source",
+            trustStatus: "standard",
+            scoreMultiplier: 1,
+            payloadClaimsVerified: false,
+          },
         }),
       ]);
+
+      const administrator = await getPluginClient(adminContext("feed-trust-admin"));
+      await administrator.updateActivitySourceTrust({
+        sourceId: "feed-source",
+        trustStatus: "trusted",
+        scoreMultiplier: 1.25,
+        reason: "Public feed source reviewed",
+      });
+      await expect(publicClient.listActivityEvents({ actor: "alice.near" })).resolves.toMatchObject(
+        {
+          data: [
+            {
+              id: firstSubmitted.eventId,
+              provenance: { trustStatus: "trusted", scoreMultiplier: 1.25 },
+            },
+          ],
+        },
+      );
 
       const rawResponse = await fetch(
         `${await getPluginBaseUrl()}/v1/events?source=feed-source&limit=1`,
@@ -1146,6 +1232,44 @@ describe("API Plugin Integration Tests", () => {
       await expect(publicClient.listActivityEvents({ cursor: "invalid" })).rejects.toThrow(
         "Activity cursor is invalid",
       );
+    });
+
+    it("validates historical events with the database-backed identity active when signed", async () => {
+      const { owner, secret } = await provisionIngestionSource({
+        sourceId: "rotation-history-source",
+        ownerId: "rotation-history-owner",
+        organizationId: "org-rotation-history",
+        eventType: "rotation.recorded",
+      });
+      const gateway = await getPluginClient(undefined, {
+        authorization: `Bearer ${secret}`,
+      });
+      const submitted = await gateway.submitActivityEvent({
+        eventType: "rotation.recorded",
+        actor: "historian.near",
+        idempotencyKey: "rotation:before",
+        payload: { sequence: 1 },
+      });
+
+      await owner.rotateActivitySigningIdentity({
+        sourceId: "rotation-history-source",
+        reason: "Scheduled production rotation",
+      });
+
+      const publicClient = await getPluginClient();
+      const feed = await publicClient.listActivityEvents({
+        source: "rotation-history-source",
+        limit: 10,
+      });
+      expect(feed.data).toEqual([
+        expect.objectContaining({
+          id: submitted.eventId,
+          provenance: expect.objectContaining({
+            signatureVerified: true,
+            signingIdentityStatus: "retired",
+          }),
+        }),
+      ]);
     });
 
     it("streams newly submitted events that match all public feed filters", async () => {
@@ -1723,6 +1847,39 @@ describe("API Plugin Integration Tests", () => {
       ]);
 
       const administrator = await getPluginClient(adminContext("leaderboard-moderator"));
+      await administrator.updateActivitySourceTrust({
+        sourceId: "leaderboard-source",
+        trustStatus: "trusted",
+        scoreMultiplier: 1.5,
+        reason: "Established source with reviewed operating history",
+      });
+      const trustWeighted = await publicClient.getActivityLeaderboard({
+        period: "all-time",
+        source: "leaderboard-source",
+        limit: 10,
+      });
+      expect(trustWeighted.data).toMatchObject([
+        {
+          rank: 1,
+          actor: "alice.near",
+          score: 36,
+          eventCount: 2,
+          breakdown: [
+            {
+              source: "leaderboard-source",
+              sourceDisplayName: "leaderboard-source Source",
+              type: "leaderboard.scored",
+              pointValue: 12,
+              trustStatus: "trusted",
+              scoreMultiplier: 1.5,
+              eventCount: 2,
+              score: 36,
+            },
+          ],
+        },
+        { rank: 2, actor: "bob.near", score: 18, eventCount: 1 },
+      ]);
+
       await administrator.hideActivityEvent({
         eventId: first.eventId,
         reason: "Exclude from leaderboard",
@@ -1734,8 +1891,8 @@ describe("API Plugin Integration Tests", () => {
         limit: 10,
       });
       expect(afterHide.data).toMatchObject([
-        { rank: 1, actor: "alice.near", score: 12, eventCount: 1 },
-        { rank: 2, actor: "bob.near", score: 12, eventCount: 1 },
+        { rank: 1, actor: "alice.near", score: 18, eventCount: 1 },
+        { rank: 2, actor: "bob.near", score: 18, eventCount: 1 },
       ]);
 
       const hiddenEvents = (await administrator.listHiddenActivityEvents()).filter(
@@ -1764,8 +1921,8 @@ describe("API Plugin Integration Tests", () => {
       ).resolves.toMatchObject({
         projection: { state: "ready", seen: 2, applied: 2, hidden: 1 },
         data: [
-          { rank: 1, actor: "alice.near", score: 12, eventCount: 1 },
-          { rank: 2, actor: "bob.near", score: 12, eventCount: 1 },
+          { rank: 1, actor: "alice.near", score: 18, eventCount: 1 },
+          { rank: 2, actor: "bob.near", score: 18, eventCount: 1 },
         ],
       });
     });

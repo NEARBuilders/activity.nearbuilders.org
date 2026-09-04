@@ -19,7 +19,7 @@ type HiddenRow = typeof hiddenEventsTable.$inferSelect;
 type RequestRow = typeof requestsTable.$inferSelect;
 
 export interface ActivityEventModerationLookup {
-  findTrustedEventById(eventId: string): Promise<ActivityFeedEvent | null>;
+  findVerifiedEventById(eventId: string): Promise<ActivityFeedEvent | null>;
 }
 
 function iso(value: Date | string): string {
@@ -214,7 +214,7 @@ export class ActivityModerationService {
     }
 
     const alreadyHidden = await this.#store.getHidden(input.eventId);
-    const event = alreadyHidden?.event ?? (await this.#events.findTrustedEventById(input.eventId));
+    const event = alreadyHidden?.event ?? (await this.#events.findVerifiedEventById(input.eventId));
     if (!event) {
       throw new ORPCError("NOT_FOUND", { message: "Activity event not found" });
     }

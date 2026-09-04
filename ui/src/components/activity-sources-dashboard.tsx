@@ -6,7 +6,9 @@ import type {
   ActivitySourceView,
   CreateActivitySourceInput,
   ReviewActivitySourceInput,
+  UpdateActivitySourceTrustInput,
 } from "@/components/activity-sources-model";
+import { ActivitySourceTrustCard } from "@/components/ui/activity-source-trust-card";
 import { Card } from "@/components/ui/card";
 import type { ActivitySourceRegistrationAccess } from "@/lib/activity-source-permissions";
 
@@ -15,27 +17,32 @@ export type {
   ActivitySourceView,
   CreateActivitySourceInput,
   ReviewActivitySourceInput,
+  UpdateActivitySourceTrustInput,
 } from "@/components/activity-sources-model";
 
 interface ActivitySourcesDashboardProps {
   sources: ActivitySourceView[];
   reviewQueue: ActivitySourceView[];
+  adminSources: ActivitySourceView[];
   isAdmin: boolean;
   registrationAccess: ActivitySourceRegistrationAccess;
   isSubmitting: boolean;
   onCreate: (input: CreateActivitySourceInput) => void | Promise<void>;
   onReview: (input: ReviewActivitySourceInput) => void | Promise<void>;
+  onTrust: (input: UpdateActivitySourceTrustInput) => void | Promise<void>;
   renderCredentials?: (source: ActivitySourceView) => ReactNode;
 }
 
 export function ActivitySourcesDashboard({
   sources,
   reviewQueue,
+  adminSources,
   isAdmin,
   registrationAccess,
   isSubmitting,
   onCreate,
   onReview,
+  onTrust,
   renderCredentials,
 }: ActivitySourcesDashboardProps) {
   return (
@@ -100,6 +107,31 @@ export function ActivitySourcesDashboard({
                   source={source}
                   isSubmitting={isSubmitting}
                   onReview={onReview}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {isAdmin && (
+        <section className="space-y-3">
+          <div className="flex items-end justify-between gap-3">
+            <h2 className="text-lg font-semibold text-foreground">Source trust controls</h2>
+            <span className="text-xs text-muted-foreground">{adminSources.length} sources</span>
+          </div>
+          {adminSources.length === 0 ? (
+            <Card className="p-8 text-center text-sm text-muted-foreground">
+              No sources are available for trust configuration.
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {adminSources.map((source) => (
+                <ActivitySourceTrustCard
+                  key={source.sourceId}
+                  source={source}
+                  isSubmitting={isSubmitting}
+                  onTrust={onTrust}
                 />
               ))}
             </div>

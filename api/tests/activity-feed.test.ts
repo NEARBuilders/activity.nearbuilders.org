@@ -36,6 +36,90 @@ function signedActivityEvent(
 }
 
 describe("ActivityFeedService", () => {
+  it("reports signature provenance and validates events against the key active when signed", async () => {
+    const retiredKey = generateSecretKey();
+    const activeKey = generateSecretKey();
+    const duringRetiredKeyWindow = signedActivityEvent(retiredKey, {
+      source: "rotating-source",
+      eventType: "rotation.event",
+      actor: "alice.near",
+      idempotencyKey: "rotation:historical",
+      payload: { sequence: 1 },
+      createdAt: Date.parse("2026-09-01T12:00:00.000Z") / 1_000,
+    });
+    const afterRetirement = signedActivityEvent(retiredKey, {
+      source: "rotating-source",
+      eventType: "rotation.event",
+      actor: "mallory.near",
+      idempotencyKey: "rotation:stale-key",
+      payload: { sequence: 2 },
+      createdAt: Date.parse("2026-09-03T12:00:00.000Z") / 1_000,
+    });
+    const current = signedActivityEvent(activeKey, {
+      source: "rotating-source",
+      eventType: "rotation.event",
+      actor: "bob.near",
+      idempotencyKey: "rotation:current",
+      payload: { sequence: 3 },
+      createdAt: Date.parse("2026-09-03T12:00:01.000Z") / 1_000,
+    });
+    const adapter: ActivityRelayAdapter = {
+      publish: async () => "",
+      query: async () => [duringRetiredKeyWindow, afterRetirement, current],
+      subscribe: () => ({ close: () => {} }),
+      close: () => {},
+    };
+    const identities: ActivityIdentityStore = {
+      listBound: async () => [
+        {
+          sourceId: "rotating-source",
+          sourceDisplayName: "Rotating Source",
+          trustStatus: "trusted",
+          scoreMultiplier: 1.5,
+          publicKey: getPublicKey(retiredKey),
+          activeFrom: "2026-09-01T00:00:00.000Z",
+          retiredAt: "2026-09-02T00:00:00.000Z",
+        },
+        {
+          sourceId: "rotating-source",
+          sourceDisplayName: "Rotating Source",
+          trustStatus: "trusted",
+          scoreMultiplier: 1.5,
+          publicKey: getPublicKey(activeKey),
+          activeFrom: "2026-09-02T00:00:00.000Z",
+          retiredAt: null,
+        },
+      ],
+    };
+    const service = new ActivityFeedService(
+      new ActivityRelay(adapter, { scanLimit: 100 }),
+      identities,
+    );
+
+    const result = await service.list({ source: "rotating-source", limit: 10 });
+
+    expect(result.meta.skippedInvalid).toBe(1);
+    expect(result.data.map(({ id }) => id)).toEqual([current.id, duringRetiredKeyWindow.id]);
+    expect(result.data[0]).toMatchObject({
+      provenance: {
+        signatureVerified: true,
+        publicKey: getPublicKey(activeKey),
+        signingIdentityStatus: "active",
+        sourceDisplayName: "Rotating Source",
+        trustStatus: "trusted",
+        scoreMultiplier: 1.5,
+        payloadClaimsVerified: false,
+      },
+    });
+    expect(result.data[1]).toMatchObject({
+      provenance: {
+        signatureVerified: true,
+        publicKey: getPublicKey(retiredKey),
+        signingIdentityStatus: "retired",
+      },
+    });
+  });
+
   it("returns only well-formed events signed by the registered Activity Source", async () => {
     const trustedKey = generateSecretKey();
     const untrustedKey = generateSecretKey();
@@ -84,6 +168,15 @@ describe("ActivityFeedService", () => {
           idempotencyKey: "feedback:round-1:alice",
           timestamp: "2026-09-03T01:46:40.000Z",
           payload: { rating: 5 },
+          provenance: {
+            signatureVerified: true,
+            publicKey: getPublicKey(trustedKey),
+            signingIdentityStatus: "active",
+            sourceDisplayName: "feedback-rounds",
+            trustStatus: "standard",
+            scoreMultiplier: 1,
+            payloadClaimsVerified: false,
+          },
         },
       ],
       meta: { hasMore: false, nextCursor: null, skippedInvalid: 4 },
@@ -246,6 +339,6 @@ describe("ActivityFeedService", () => {
       identities,
     );
 
-    await expect(service.findTrustedEventById("f".repeat(64))).resolves.toBeNull();
+    await expect(service.findVerifiedEventById("f".repeat(64))).resolves.toBeNull();
   });
 });

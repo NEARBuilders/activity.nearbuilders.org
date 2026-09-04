@@ -27,7 +27,10 @@ export interface ActivitySigningIdentityRecord {
   boundNearAccountId: string | null;
   boundAt: string | null;
   keyVersion: string;
+  createdBy: string | null;
   createdAt: string;
+  retiredBy: string | null;
+  retirementReason: string | null;
   retiredAt: string | null;
 }
 
@@ -35,6 +38,7 @@ export interface ActivityCredentialsService {
   createSigningIdentity(
     organizationId: string,
     sourceId: string,
+    actorId: string,
   ): Promise<ActivitySigningIdentityRecord>;
   prepareSigningIdentityBinding(
     organizationId: string,
@@ -65,6 +69,8 @@ export interface ActivityCredentialsService {
   rotateSigningIdentity(
     organizationId: string,
     sourceId: string,
+    actorId: string,
+    reason: string,
   ): Promise<ActivitySigningIdentityRecord>;
   listSigningIdentities(
     organizationId: string,
@@ -129,7 +135,10 @@ function toIdentityRecord(
     boundNearAccountId: identity.boundNearAccountId,
     boundAt: identity.boundAt ? toIsoTimestamp(identity.boundAt) : null,
     keyVersion: identity.encryptionKeyVersion,
+    createdBy: identity.createdBy,
     createdAt: toIsoTimestamp(identity.createdAt),
+    retiredBy: identity.retiredBy,
+    retirementReason: identity.retirementReason,
     retiredAt: identity.retiredAt ? toIsoTimestamp(identity.retiredAt) : null,
   };
 }
@@ -164,12 +173,14 @@ function hasCurrentBinding(
 function createEncryptedSigningIdentity(
   sourceRecordId: string,
   masterKeys: ActivityMasterKeys,
+  createdBy: string,
 ): typeof identitiesTable.$inferInsert {
   const privateKey = generateSecretKey();
   try {
     const encrypted = encryptActivitySecret(privateKey, masterKeys);
     return {
       sourceRecordId,
+      createdBy,
       publicKey: getPublicKey(privateKey),
       encryptedPrivateKey: encrypted.ciphertext,
       encryptionIv: encrypted.iv,
@@ -223,7 +234,7 @@ export const ActivityCredentialsLive = (
       };
 
       const service: ActivityCredentialsService = {
-        createSigningIdentity: async (organizationId, sourceId) => {
+        createSigningIdentity: async (organizationId, sourceId, actorId) => {
           try {
             return await db.transaction(async (tx) => {
               const [source] = await tx
@@ -262,7 +273,7 @@ export const ActivityCredentialsLive = (
 
               const [created] = await tx
                 .insert(identitiesTable)
-                .values(createEncryptedSigningIdentity(source.id, masterKeys))
+                .values(createEncryptedSigningIdentity(source.id, masterKeys, actorId))
                 .returning();
               if (!created) throw new Error("Signing Identity was not created");
               return toIdentityRecord(created);
@@ -554,7 +565,7 @@ export const ActivityCredentialsLive = (
           }
         },
 
-        rotateSigningIdentity: async (organizationId, sourceId) => {
+        rotateSigningIdentity: async (organizationId, sourceId, actorId, reason) => {
           try {
             return await db.transaction(async (tx) => {
               const [result] = await tx
@@ -585,11 +596,11 @@ export const ActivityCredentialsLive = (
 
               await tx
                 .update(identitiesTable)
-                .set({ retiredAt: new Date() })
+                .set({ retiredAt: new Date(), retiredBy: actorId, retirementReason: reason })
                 .where(eq(identitiesTable.id, result.identity.id));
               const [created] = await tx
                 .insert(identitiesTable)
-                .values(createEncryptedSigningIdentity(result.source.id, masterKeys))
+                .values(createEncryptedSigningIdentity(result.source.id, masterKeys, actorId))
                 .returning();
               if (!created) throw new Error("Signing Identity was not rotated");
               return toIdentityRecord(created);

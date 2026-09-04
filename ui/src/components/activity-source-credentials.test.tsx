@@ -40,7 +40,10 @@ describe("ActivitySourceCredentials", () => {
           boundNearAccountId: null,
           boundAt: null,
           keyVersion: "v1",
+          createdBy: "owner-1",
           createdAt: "2026-09-03T00:00:00.000Z",
+          retiredBy: null,
+          retirementReason: null,
           retiredAt: null,
         }}
         apiKeys={[]}
@@ -78,7 +81,10 @@ describe("ActivitySourceCredentials", () => {
           boundNearAccountId: "feedback.near",
           boundAt: "2026-09-03T00:00:00.000Z",
           keyVersion: "v1",
+          createdBy: "owner-1",
           createdAt: "2026-09-03T00:00:00.000Z",
+          retiredBy: null,
+          retirementReason: null,
           retiredAt: null,
         }}
         apiKeys={[

@@ -47,6 +47,8 @@ export const TenantSchema = z.object({
 export type Tenant = z.infer<typeof TenantSchema>;
 
 export const ActivitySourceApprovalStatusSchema = z.enum(["pending", "approved", "rejected"]);
+export const ActivitySourceTrustStatusSchema = z.enum(["standard", "trusted"]);
+export const ActivityScoreMultiplierSchema = z.number().min(1).max(10).multipleOf(0.0001);
 
 export const ActivityEventTypeSchema = z.object({
   name: ActivityEventTypeNameSchema,
@@ -62,6 +64,14 @@ export const ActivitySourceReviewSchema = z.object({
   reviewedAt: z.string(),
 });
 
+export const ActivitySourceTrustChangeSchema = z.object({
+  trustStatus: ActivitySourceTrustStatusSchema,
+  scoreMultiplier: ActivityScoreMultiplierSchema,
+  reason: z.string(),
+  administratorId: z.string(),
+  changedAt: z.string(),
+});
+
 export const ActivitySourceSchema = z.object({
   sourceId: z.string(),
   displayName: z.string(),
@@ -69,8 +79,11 @@ export const ActivitySourceSchema = z.object({
   organizationId: z.string(),
   approvalStatus: ActivitySourceApprovalStatusSchema,
   canIngest: z.boolean(),
+  trustStatus: ActivitySourceTrustStatusSchema,
+  scoreMultiplier: ActivityScoreMultiplierSchema,
   eventTypes: z.array(ActivityEventTypeSchema),
   reviewHistory: z.array(ActivitySourceReviewSchema),
+  trustHistory: z.array(ActivitySourceTrustChangeSchema),
   reviewedBy: z.string().nullable(),
   reviewReason: z.string().nullable(),
   reviewedAt: z.string().nullable(),
@@ -84,7 +97,10 @@ export const ActivitySigningIdentitySchema = z.object({
   boundNearAccountId: z.string().nullable(),
   boundAt: z.string().nullable(),
   keyVersion: z.string(),
+  createdBy: z.string().nullable(),
   createdAt: z.string(),
+  retiredBy: z.string().nullable(),
+  retirementReason: z.string().nullable(),
   retiredAt: z.string().nullable(),
 });
 
@@ -116,6 +132,16 @@ export const ActivityEventSubmissionSchema = z.object({
   payload: z.json(),
 });
 
+export const ActivityEventProvenanceSchema = z.object({
+  signatureVerified: z.literal(true),
+  publicKey: z.string().regex(/^[a-f0-9]{64}$/),
+  signingIdentityStatus: z.enum(["active", "retired"]),
+  sourceDisplayName: z.string(),
+  trustStatus: ActivitySourceTrustStatusSchema,
+  scoreMultiplier: ActivityScoreMultiplierSchema,
+  payloadClaimsVerified: z.literal(false),
+});
+
 export const ActivityFeedEventSchema = z.object({
   id: z.string().regex(/^[a-f0-9]{64}$/),
   source: z.string(),
@@ -124,6 +150,7 @@ export const ActivityFeedEventSchema = z.object({
   idempotencyKey: z.string(),
   timestamp: z.iso.datetime(),
   payload: z.json(),
+  provenance: ActivityEventProvenanceSchema,
 });
 
 export type ActivityFeedEvent = z.infer<typeof ActivityFeedEventSchema>;
@@ -207,15 +234,18 @@ export const ActivityLeaderboardSchema = z.object({
     z.object({
       rank: z.number().int().positive(),
       actor: NearAccountIdSchema,
-      score: z.number().int().nonnegative(),
+      score: z.number().nonnegative(),
       eventCount: z.number().int().nonnegative(),
       breakdown: z.array(
         z.object({
           source: z.string(),
+          sourceDisplayName: z.string(),
           type: ActivityEventTypeNameSchema,
           pointValue: z.number().int().min(0).max(1_000_000),
+          trustStatus: ActivitySourceTrustStatusSchema,
+          scoreMultiplier: ActivityScoreMultiplierSchema,
           eventCount: z.number().int().positive(),
-          score: z.number().int().nonnegative(),
+          score: z.number().nonnegative(),
         }),
       ),
     }),
@@ -409,6 +439,24 @@ export const contract = oc.router({
       CONFLICT: { status: 409 },
     }),
 
+  updateActivitySourceTrust: oc
+    .route({ method: "POST", path: "/activity/sources/{sourceId}/trust" })
+    .input(
+      z
+        .object({
+          sourceId: z.string(),
+          trustStatus: ActivitySourceTrustStatusSchema,
+          scoreMultiplier: ActivityScoreMultiplierSchema,
+          reason: z.string().trim().min(1).max(1_000),
+        })
+        .refine(
+          ({ trustStatus, scoreMultiplier }) => trustStatus === "trusted" || scoreMultiplier === 1,
+          { message: "Standard Activity Sources must use a 1× score multiplier" },
+        ),
+    )
+    .output(ActivitySourceSchema)
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST }),
+
   createActivitySigningIdentity: oc
     .route({ method: "POST", path: "/activity/sources/{sourceId}/signing-identity" })
     .input(z.object({ sourceId: z.string() }))
@@ -434,7 +482,12 @@ export const contract = oc.router({
 
   rotateActivitySigningIdentity: oc
     .route({ method: "POST", path: "/activity/sources/{sourceId}/signing-identity/rotate" })
-    .input(z.object({ sourceId: z.string() }))
+    .input(
+      z.object({
+        sourceId: z.string(),
+        reason: z.string().trim().min(1).max(1_000).optional(),
+      }),
+    )
     .output(ActivitySigningIdentitySchema)
     .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
 
@@ -495,7 +548,8 @@ export const contract = oc.router({
       method: "GET",
       path: "/v1/events",
       summary: "Browse Activity events",
-      description: "Returns trusted Activity events in deterministic reverse-chronological order.",
+      description:
+        "Returns signature-verified Activity events in deterministic reverse-chronological order.",
       tags: ["Activity"],
     })
     .input(
@@ -534,7 +588,8 @@ export const contract = oc.router({
       path: "/v1/events/stream",
       outputStructure: "detailed",
       summary: "Stream Activity events",
-      description: "Streams trusted Activity events and supports resuming with Last-Event-ID.",
+      description:
+        "Streams signature-verified Activity events and supports resuming with Last-Event-ID.",
       tags: ["Activity"],
     })
     .input(
