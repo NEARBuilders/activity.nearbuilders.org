@@ -109,6 +109,31 @@ it never implies that payload claims were independently checked. A malformed cur
 Request`; a relay timeout or unsafe scan-limit result returns `503 Service Unavailable` rather than
 leaving the request open or returning an incomplete page.
 
+## Event endorsements
+
+Signed-in users can endorse a verified, visible Activity event once and later remove that
+endorsement. Endorsements are local interaction records keyed by event ID and user ID; they do not
+modify the immutable Nostr event and they are not negative votes.
+
+`POST /api/v1/events/{eventId}/endorsement` adds the current user's endorsement and
+`DELETE /api/v1/events/{eventId}/endorsement` removes it. Both operations are idempotent and return
+the current total plus `endorsedByCurrentUser`. Adding an endorsement first verifies that the event
+is still available in the public feed.
+
+Clients fetch counts and current-user state for up to 100 visible events with one request:
+
+```http
+POST /api/v1/events/endorsements
+Content-Type: application/json
+
+{
+  "eventIds": ["<64-character Nostr event ID>"]
+}
+```
+
+The Activity UI also consumes a typed live stream so a changed endorsement count appears on
+connected feed cards without one request per card or a page refresh.
+
 ## Transport boundary
 
 The local boundary pins `nostr-tools@2.24.1`, `ws@8.21.3`, and `redis@6.2.1`, matching the transport

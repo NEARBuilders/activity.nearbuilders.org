@@ -155,4 +155,71 @@ describe("ActivityFeed", () => {
     fireEvent.click(screen.getByRole("button", { name: "Next page" }));
     expect(onNextPage).toHaveBeenCalledOnce();
   });
+
+  it("shows endorsement count and current-user state without downvote language", () => {
+    const onToggleEndorsement = vi.fn();
+    const { rerender } = render(
+      <ActivityFeed
+        events={[event]}
+        status="success"
+        skippedInvalid={0}
+        hasMore={false}
+        endorsements={{
+          [event.id]: { totalCount: 1, endorsedByCurrentUser: true },
+        }}
+        canEndorse
+        onApplyFilters={vi.fn()}
+        onToggleEndorsement={onToggleEndorsement}
+        onNextPage={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    const endorsed = screen.getByRole("button", { name: "Endorsed" });
+    expect(endorsed.getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByText("1 endorsement")).toBeTruthy();
+    fireEvent.click(endorsed);
+    expect(onToggleEndorsement).toHaveBeenCalledWith(event.id);
+    expect(screen.queryByText(/downvote/i)).toBeNull();
+
+    rerender(
+      <ActivityFeed
+        events={[event]}
+        status="success"
+        skippedInvalid={0}
+        hasMore={false}
+        endorsements={{
+          [event.id]: { totalCount: 2, endorsedByCurrentUser: false },
+        }}
+        canEndorse
+        onApplyFilters={vi.fn()}
+        onToggleEndorsement={onToggleEndorsement}
+        onNextPage={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Endorse" }).getAttribute("aria-pressed")).toBe(
+      "false",
+    );
+    expect(screen.getByText("2 endorsements")).toBeTruthy();
+  });
+
+  it("requires sign-in before the endorsement action is available", () => {
+    render(
+      <ActivityFeed
+        events={[event]}
+        status="success"
+        skippedInvalid={0}
+        hasMore={false}
+        onApplyFilters={vi.fn()}
+        onNextPage={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    const button = screen.getByRole("button", { name: "Endorse" });
+    expect(button.hasAttribute("disabled")).toBe(true);
+    expect(button.getAttribute("title")).toBe("Sign in to endorse Activity events");
+  });
 });

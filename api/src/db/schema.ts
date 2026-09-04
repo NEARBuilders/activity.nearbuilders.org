@@ -218,6 +218,23 @@ export const activityEventSubmissions = pgTable(
   }),
 );
 
+export const activityEventEndorsements = pgTable(
+  "activity_event_endorsements",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    eventId: text("event_id").notNull(),
+    userId: text("user_id").notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    eventUserIdx: uniqueIndex("activity_event_endorsements_event_user_idx").on(
+      table.eventId,
+      table.userId,
+    ),
+    eventIdx: index("activity_event_endorsements_event_idx").on(table.eventId),
+  }),
+);
+
 export const activityHiddenEvents = pgTable(
   "activity_hidden_events",
   {
