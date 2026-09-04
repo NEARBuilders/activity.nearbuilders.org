@@ -9,6 +9,7 @@ import {
   type ActivitySourceView,
   type CreateActivitySourceInput,
   type ReviewActivitySourceInput,
+  type UpdateActivitySourceTrustInput,
 } from "@/components/activity-sources-dashboard";
 import { PageContainer } from "@/components/layout/page-container";
 import {
@@ -18,7 +19,7 @@ import {
 import { getActivitySourceRegistrationAccess } from "@/lib/activity-source-permissions";
 
 const activitySourcesQueryKey = ["activity-sources"] as const;
-const sourceReviewQueueQueryKey = ["activity-source-reviews", "pending"] as const;
+const adminActivitySourcesQueryKey = ["activity-source-reviews", "all"] as const;
 
 function credentialQueryKey(sourceId: string) {
   return ["activity-source-credentials", sourceId] as const;
@@ -43,9 +44,8 @@ export const Route = createFileRoute("/_layout/_authenticated/activity-sources")
 
     if (context.auth.isAdmin) {
       await context.queryClient.ensureQueryData({
-        queryKey: sourceReviewQueueQueryKey,
-        queryFn: () =>
-          context.apiClient.listActivitySourcesForReview({ approvalStatus: "pending" }),
+        queryKey: adminActivitySourcesQueryKey,
+        queryFn: () => context.apiClient.listActivitySourcesForReview({}),
         staleTime: 30_000,
       });
     }
@@ -65,9 +65,9 @@ function ActivitySourcesPage() {
     staleTime: 30_000,
   });
 
-  const { data: reviewQueue = [] } = useQuery({
-    queryKey: sourceReviewQueueQueryKey,
-    queryFn: () => apiClient.listActivitySourcesForReview({ approvalStatus: "pending" }),
+  const { data: adminSources = [] } = useQuery({
+    queryKey: adminActivitySourcesQueryKey,
+    queryFn: () => apiClient.listActivitySourcesForReview({}),
     enabled: auth.isAdmin,
     staleTime: 30_000,
   });
@@ -78,7 +78,7 @@ function ActivitySourcesPage() {
       toast.success("Activity Source registered for review");
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: activitySourcesQueryKey }),
-        queryClient.invalidateQueries({ queryKey: sourceReviewQueueQueryKey }),
+        queryClient.invalidateQueries({ queryKey: adminActivitySourcesQueryKey }),
       ]);
     },
     onError: (error: Error) => {
@@ -96,7 +96,7 @@ function ActivitySourcesPage() {
       );
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: activitySourcesQueryKey }),
-        queryClient.invalidateQueries({ queryKey: sourceReviewQueueQueryKey }),
+        queryClient.invalidateQueries({ queryKey: adminActivitySourcesQueryKey }),
       ]);
     },
     onError: (error: Error) => {
@@ -104,23 +104,42 @@ function ActivitySourcesPage() {
     },
   });
 
+  const updateTrust = useMutation({
+    mutationFn: (input: UpdateActivitySourceTrustInput) =>
+      apiClient.updateActivitySourceTrust(input),
+    onSuccess: async () => {
+      toast.success("Activity Source trust updated");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: activitySourcesQueryKey }),
+        queryClient.invalidateQueries({ queryKey: adminActivitySourcesQueryKey }),
+      ]);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to update Activity Source trust");
+    },
+  });
+
   return (
     <PageContainer variant="wide">
       <ActivitySourcesDashboard
         sources={sources}
-        reviewQueue={reviewQueue}
+        reviewQueue={adminSources.filter(({ approvalStatus }) => approvalStatus === "pending")}
+        adminSources={adminSources}
         isAdmin={auth.isAdmin}
         registrationAccess={getActivitySourceRegistrationAccess({
           activeOrganizationId: auth.activeOrganizationId,
           organizationRole: auth.activeOrganizationRole,
           hasNearAccount: auth.hasNearAccount,
         })}
-        isSubmitting={createSource.isPending || reviewSource.isPending}
+        isSubmitting={createSource.isPending || reviewSource.isPending || updateTrust.isPending}
         onCreate={async (input) => {
           await createSource.mutateAsync(input);
         }}
         onReview={async (input) => {
           await reviewSource.mutateAsync(input);
+        }}
+        onTrust={async (input) => {
+          await updateTrust.mutateAsync(input);
         }}
         renderCredentials={(source) =>
           source.approvalStatus === "approved" && auth.activeOrganizationRole === "owner" ? (

@@ -1,5 +1,6 @@
 import { AlertTriangle, Trophy } from "lucide-react";
 import type { ApiClient } from "@/app";
+import { ActivityTrustBadge } from "@/components/ui/activity-trust-badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -119,8 +120,19 @@ export function ActivityLeaderboard({
                         key={`${item.source}:${item.type}`}
                         className="rounded-[8px] border border-border bg-muted px-3 py-2 text-xs text-muted-foreground"
                       >
-                        <span className="font-mono text-foreground">{item.type}</span>
-                        {` · ${item.eventCount} × ${item.pointValue} · ${item.source}`}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-foreground">
+                            {item.sourceDisplayName}
+                          </span>
+                          <ActivityTrustBadge
+                            trustStatus={item.trustStatus}
+                            scoreMultiplier={item.scoreMultiplier}
+                          />
+                        </div>
+                        <div className="mt-1">
+                          <span className="font-mono text-foreground">{item.type}</span>
+                          {` · ${item.eventCount} × ${item.pointValue} × ${item.scoreMultiplier} · ${item.score} points`}
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -135,7 +147,7 @@ export function ActivityLeaderboard({
 }
 
 function periodDescription(result?: ActivityLeaderboardView): string {
-  if (!result?.startsAt || !result.endsAt) return "All trusted Activity events";
+  if (!result?.startsAt || !result.endsAt) return "All signature-verified Activity events";
   const startsAt = new Date(result.startsAt).toLocaleDateString(undefined, { timeZone: "UTC" });
   const endsAt = new Date(new Date(result.endsAt).getTime() - 1).toLocaleDateString(undefined, {
     timeZone: "UTC",

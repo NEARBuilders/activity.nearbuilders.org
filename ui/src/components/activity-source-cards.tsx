@@ -4,6 +4,7 @@ import type {
   ActivitySourceView,
   ReviewActivitySourceInput,
 } from "@/components/activity-sources-model";
+import { ActivityTrustBadge } from "@/components/ui/activity-trust-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -34,7 +35,14 @@ export function ActivitySourceCard({
             {source.sourceId} · {source.nearAccountId}
           </p>
         </div>
-        <Badge variant={statusVariant}>{statusLabel[source.approvalStatus]}</Badge>
+        <div className="flex flex-wrap gap-2">
+          <Badge variant={statusVariant}>{statusLabel[source.approvalStatus]}</Badge>
+          <ActivityTrustBadge
+            trustStatus={source.trustStatus}
+            scoreMultiplier={source.scoreMultiplier}
+            standardLabel="Standard weighting"
+          />
+        </div>
       </div>
 
       <div className="mt-5 space-y-2">
@@ -138,6 +146,11 @@ function ActivitySourceCardContent({ source }: { source: ActivitySourceView }) {
         </p>
         <p className="mt-1 font-mono text-[11px] text-muted-foreground">
           Organization {source.organizationId}
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {source.trustStatus === "trusted"
+            ? `Trusted weighting · ${source.scoreMultiplier}×`
+            : "Standard weighting · 1×"}
         </p>
       </div>
       <div className="space-y-1">

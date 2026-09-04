@@ -11,7 +11,8 @@ period has no start, end, or expiry boundary.
 ranking endpoint is unavailable.
 
 Each response includes rank, actor, dynamically weighted score, raw event count, per-source and
-per-Event-Type breakdown, the exact period boundaries, and projection rebuild status.
+per-Event-Type breakdown, the source display name, current trust designation and score multiplier,
+the exact period boundaries, and projection rebuild status.
 
 ## Redis representation
 
@@ -21,10 +22,11 @@ as included or excluded. Lua updates the state and all three period counts atomi
 retries, relay replay, repeated hides, and hide-before-replay cannot double count or resurrect an
 event.
 
-Leaderboard reads fetch current Event Type point values from Postgres and use a temporary Redis
-weighted union to calculate the exact score. The temporary result is used only to select the top
-actors; their raw counts are then returned as a full breakdown. A point-value update changes the next
-read without modifying Redis or replaying Nostr history.
+Leaderboard reads fetch current Event Type point values and current source multipliers from Postgres,
+then use a temporary Redis weighted union to calculate the exact score. The temporary result is used
+only to select the top actors; their raw counts are then returned as a full breakdown. A point-value
+or source-trust update changes the next read—including historical periods—without modifying Redis or
+replaying Nostr history. Source approval still controls ingestion independently of trust weighting.
 
 Weekly and monthly sorted sets expire 24 hours after their period closes. The all-time sorted sets
 and event-state hash do not expire because they provide the permanent exactly-once record.

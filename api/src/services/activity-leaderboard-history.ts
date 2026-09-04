@@ -1,23 +1,23 @@
 import { isNotNull } from "drizzle-orm";
-import type { Event } from "nostr-tools/pure";
-import { ACTIVITY_EVENT_KIND } from "../activity/activity-relay";
 import type { ActivityFeedEvent } from "../contract";
 import type { Database } from "../db";
 import { activityEventSubmissions as submissionsTable } from "../db/schema";
-import { parseStoredActivityEvent } from "./activity-ingestion";
 import type { ActivityLeaderboardEvent } from "./activity-leaderboard";
 
-type ActivityRelayConfirmation = {
-  findTrustedEventById(eventId: string): Promise<ActivityFeedEvent | null>;
+type ActivityEventVerifier = {
+  findVerifiedEventById(eventId: string): Promise<ActivityFeedEvent | null>;
+  verifyStoredEvents(
+    records: readonly { eventId: string; eventJson: string }[],
+  ): Promise<ActivityFeedEvent[]>;
 };
 
 export class DatabaseActivityLeaderboardHistory {
   readonly #db: Database;
-  readonly #relayConfirmation: ActivityRelayConfirmation;
+  readonly #eventVerifier: ActivityEventVerifier;
 
-  constructor(db: Database, relayConfirmation: ActivityRelayConfirmation) {
+  constructor(db: Database, eventVerifier: ActivityEventVerifier) {
     this.#db = db;
-    this.#relayConfirmation = relayConfirmation;
+    this.#eventVerifier = eventVerifier;
   }
 
   async *list(): AsyncGenerator<ActivityLeaderboardEvent> {
@@ -29,41 +29,27 @@ export class DatabaseActivityLeaderboardHistory {
       })
       .from(submissionsTable)
       .where(isNotNull(submissionsTable.eventJson));
+    const publishedRecords = submissions.flatMap(({ eventId, eventJson, publishedAt }) =>
+      publishedAt && eventId && eventJson ? [{ eventId, eventJson }] : [],
+    );
+    const verifiedPublished = new Map(
+      (await this.#eventVerifier.verifyStoredEvents(publishedRecords)).map((event) => [
+        event.id,
+        event,
+      ]),
+    );
 
     for (const submission of submissions) {
       if (!submission.eventId || !submission.eventJson) throw invalidStoredActivityEvent();
       if (!submission.publishedAt) {
-        const confirmed = await this.#relayConfirmation.findTrustedEventById(submission.eventId);
+        const confirmed = await this.#eventVerifier.findVerifiedEventById(submission.eventId);
         if (confirmed) yield confirmed;
         continue;
       }
-      yield toLeaderboardEvent(parseStoredActivityEvent(submission.eventJson, submission.eventId));
+      const verified = verifiedPublished.get(submission.eventId);
+      if (verified) yield verified;
     }
   }
-}
-
-function toLeaderboardEvent(event: Event): ActivityLeaderboardEvent {
-  if (
-    event.kind !== ACTIVITY_EVENT_KIND ||
-    !Number.isSafeInteger(event.created_at) ||
-    event.created_at < 0
-  ) {
-    throw invalidStoredActivityEvent();
-  }
-  const source = singleTagValue(event, "s");
-  const type = singleTagValue(event, "t");
-  const actor = singleTagValue(event, "n");
-  const timestamp = new Date(event.created_at * 1_000);
-  if (!source || !type || !actor || Number.isNaN(timestamp.getTime())) {
-    throw invalidStoredActivityEvent();
-  }
-  return { id: event.id, source, type, actor, timestamp: timestamp.toISOString() };
-}
-
-function singleTagValue(event: Event, name: string): string | null {
-  const matches = event.tags.filter((tag) => tag[0] === name);
-  if (matches.length !== 1 || matches[0]?.length !== 2) return null;
-  return matches[0][1] ?? null;
 }
 
 function invalidStoredActivityEvent(): Error {

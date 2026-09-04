@@ -17,6 +17,8 @@ const pendingSource: ActivitySourceView = {
   organizationId: "org-1",
   approvalStatus: "pending",
   canIngest: false,
+  trustStatus: "standard",
+  scoreMultiplier: 1,
   eventTypes: [
     {
       name: "catalog.project.published",
@@ -26,6 +28,7 @@ const pendingSource: ActivitySourceView = {
     },
   ],
   reviewHistory: [],
+  trustHistory: [],
   reviewedBy: null,
   reviewReason: null,
   reviewedAt: null,
@@ -39,11 +42,13 @@ describe("ActivitySourcesDashboard", () => {
       <ActivitySourcesDashboard
         sources={[pendingSource]}
         reviewQueue={[]}
+        adminSources={[]}
         isAdmin={false}
         registrationAccess="allowed"
         isSubmitting={false}
         onCreate={vi.fn()}
         onReview={vi.fn()}
+        onTrust={vi.fn()}
       />,
     );
 
@@ -52,6 +57,7 @@ describe("ActivitySourcesDashboard", () => {
     expect(markup).toContain("catalog.project.published");
     expect(markup).toContain("25 points");
     expect(markup).toContain("Pending approval");
+    expect(markup).toContain("Standard weighting");
     expect(markup).not.toContain("Approve source");
   });
 
@@ -60,11 +66,13 @@ describe("ActivitySourcesDashboard", () => {
       <ActivitySourcesDashboard
         sources={[]}
         reviewQueue={[pendingSource]}
+        adminSources={[pendingSource]}
         isAdmin
         registrationAccess="owner-required"
         isSubmitting={false}
         onCreate={vi.fn()}
         onReview={vi.fn()}
+        onTrust={vi.fn()}
       />,
     );
 
@@ -78,11 +86,13 @@ describe("ActivitySourcesDashboard", () => {
       <ActivitySourcesDashboard
         sources={[]}
         reviewQueue={[]}
+        adminSources={[]}
         isAdmin={false}
         registrationAccess="organization-required"
         isSubmitting={false}
         onCreate={vi.fn()}
         onReview={vi.fn()}
+        onTrust={vi.fn()}
       />,
     );
 
@@ -95,11 +105,13 @@ describe("ActivitySourcesDashboard", () => {
       <ActivitySourcesDashboard
         sources={[]}
         reviewQueue={[]}
+        adminSources={[]}
         isAdmin={false}
         registrationAccess="owner-required"
         isSubmitting={false}
         onCreate={vi.fn()}
         onReview={vi.fn()}
+        onTrust={vi.fn()}
       />,
     );
 
@@ -111,11 +123,13 @@ describe("ActivitySourcesDashboard", () => {
       <ActivitySourcesDashboard
         sources={[]}
         reviewQueue={[]}
+        adminSources={[]}
         isAdmin={false}
         registrationAccess="near-required"
         isSubmitting={false}
         onCreate={vi.fn()}
         onReview={vi.fn()}
+        onTrust={vi.fn()}
       />,
     );
 
@@ -128,11 +142,13 @@ describe("ActivitySourcesDashboard", () => {
       <ActivitySourcesDashboard
         sources={[]}
         reviewQueue={[]}
+        adminSources={[]}
         isAdmin={false}
         registrationAccess="allowed"
         isSubmitting={false}
         onCreate={onCreate}
         onReview={vi.fn()}
+        onTrust={vi.fn()}
       />,
     );
 
@@ -172,11 +188,13 @@ describe("ActivitySourcesDashboard", () => {
       <ActivitySourcesDashboard
         sources={[]}
         reviewQueue={[]}
+        adminSources={[]}
         isAdmin={false}
         registrationAccess="allowed"
         isSubmitting={false}
         onCreate={onCreate}
         onReview={vi.fn()}
+        onTrust={vi.fn()}
       />,
     );
 
@@ -197,11 +215,13 @@ describe("ActivitySourcesDashboard", () => {
       <ActivitySourcesDashboard
         sources={[]}
         reviewQueue={[pendingSource]}
+        adminSources={[pendingSource]}
         isAdmin
         registrationAccess="owner-required"
         isSubmitting={false}
         onCreate={vi.fn()}
         onReview={onReview}
+        onTrust={vi.fn()}
       />,
     );
 
@@ -215,6 +235,43 @@ describe("ActivitySourcesDashboard", () => {
         sourceId: "near-catalog",
         decision: "approved",
         reason: "Verified repository ownership",
+      });
+    });
+  });
+
+  it("lets an administrator configure trust weighting with an auditable reason", async () => {
+    const onTrust = vi.fn().mockResolvedValue(undefined);
+    render(
+      <ActivitySourcesDashboard
+        sources={[]}
+        reviewQueue={[]}
+        adminSources={[pendingSource]}
+        isAdmin
+        registrationAccess="owner-required"
+        isSubmitting={false}
+        onCreate={vi.fn()}
+        onReview={vi.fn()}
+        onTrust={onTrust}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Trust designation for near-catalog"), {
+      target: { value: "trusted" },
+    });
+    fireEvent.change(screen.getByLabelText("Score multiplier for near-catalog"), {
+      target: { value: "1.5" },
+    });
+    fireEvent.change(screen.getByLabelText("Auditable trust reason for near-catalog"), {
+      target: { value: "Established source with reviewed operating history" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save trust for near-catalog" }));
+
+    await waitFor(() => {
+      expect(onTrust).toHaveBeenCalledWith({
+        sourceId: "near-catalog",
+        trustStatus: "trusted",
+        scoreMultiplier: 1.5,
+        reason: "Established source with reviewed operating history",
       });
     });
   });

@@ -427,12 +427,22 @@ export default createPlugin.withPlugins<PluginsClient>()({
           }),
         ),
 
+      updateActivitySourceTrust: builder.updateActivitySourceTrust
+        .use(requireAdmin)
+        .handler(async ({ input, context }) =>
+          services.activitySources.updateSourceTrust({
+            ...input,
+            administratorId: context.userId,
+          }),
+        ),
+
       createActivitySigningIdentity: builder.createActivitySigningIdentity
         .use(requireOrgRole("owner"))
         .handler(async ({ input, context }) =>
           services.activityCredentials.createSigningIdentity(
             context.organization.activeOrganizationId,
             input.sourceId,
+            context.userId,
           ),
         ),
 
@@ -460,6 +470,8 @@ export default createPlugin.withPlugins<PluginsClient>()({
           services.activityCredentials.rotateSigningIdentity(
             context.organization.activeOrganizationId,
             input.sourceId,
+            context.userId,
+            input.reason ?? "Signing Identity rotated by Source Owner",
           ),
         ),
 

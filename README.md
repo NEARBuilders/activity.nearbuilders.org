@@ -24,7 +24,7 @@ The service is intended to become shared plumbing for reputation, loyalty points
 ## Product principles
 
 - **Portable:** activity belongs to the actor and can be consumed across applications.
-- **Source-verifiable:** every event is attributable to an approved Activity Source identity.
+- **Source-verifiable:** every displayed event is attributable to the registered Signing Identity that signed it.
 - **Immutable:** accepted events are never edited; administrators may only hide them.
 - **Idempotent:** repeat submissions produce the same immutable event identity.
 - **Dynamically scored:** point-value changes affect historical leaderboard results immediately, without replaying events.
@@ -35,10 +35,11 @@ The service is intended to become shared plumbing for reputation, loyalty points
 | Method | Endpoint | Status | Purpose |
 | --- | --- | --- | --- |
 | `POST` | `/api/v1/events` | Available | Submit an event using a Source API Key. |
-| `GET` | `/api/v1/events` | Available | Query trusted events by source, type, actor, limit, and opaque cursor. |
+| `GET` | `/api/v1/events` | Available | Query signature-verified events by source, type, actor, limit, and opaque cursor. |
 | `GET` | `/api/v1/events/stream` | Available | Subscribe to new events over resumable SSE, optionally filtered by source, type, or actor. |
 | `POST` | `/api/activity/events/{eventId}/hide` | Available (admin) | Hide an immutable event from service-controlled public views. |
 | `GET` | `/api/activity/hidden-events` | Available (admin) | Inspect hidden events and their moderation history. |
+| `POST` | `/api/activity/sources/{sourceId}/trust` | Available (admin) | Set an auditable source trust designation and score multiplier. |
 | `GET` | `/api/v1/leaderboard` | Available | Read exact weekly, monthly, or all-time rankings with optional source and Event Type filters. |
 
 ### Event shape
@@ -53,19 +54,26 @@ Each event contains:
 
 The gateway validates the source and event type, signs the event with the Activity Source's Nostr key, publishes it to configured relays, and returns its immutable event ID.
 
-Public consumers can browse trusted events at `/activity` or call `GET /api/v1/events`. Results are
-ordered newest-first by timestamp and event ID. Only events signed by a bound Signing Identity for
-their tagged Activity Source are returned.
+Public consumers can browse signature-verified events at `/activity` or call `GET /api/v1/events`.
+Results are ordered newest-first by timestamp and event ID. Only events signed by a Signing Identity
+registered to their tagged Activity Source—and active when the event was signed—are returned. Each
+event exposes its signing public key, whether that identity is active or retired, the source's current
+trust designation and multiplier, and an explicit reminder that cryptographic provenance does not
+independently verify claims inside the payload.
 
-Platform administrators can hide a trusted event without changing or deleting its signed Nostr
+Platform administrators can hide a verified event without changing or deleting its signed Nostr
 record. A local suppression projection removes the event from feed queries, live delivery, and SSE
 replay. The first hide and every distinct moderation request are retained for audit, while
 idempotency keys prevent request retries from applying the projection more than once.
 
-Leaderboard queries rank actors from raw per-source and per-Event-Type Redis counts, then apply the
-current point values stored with Activity Source configuration. Changing a point value therefore
-changes the next response without replaying relay history. Weeks begin Monday at 00:00 UTC, months
-begin on the first day at 00:00 UTC, and all-time counts have no expiry boundary. See
+Source approval controls whether a source may ingest events. Separately, a Platform Administrator
+may designate an approved or pending source as trusted and configure its score multiplier, with an
+append-only reasoned audit trail. The administrator dashboard exposes these controls and the trust
+history independently of the approval queue. Leaderboard queries rank actors from raw per-source and
+per-Event-Type Redis counts, then apply both the current point value and current source multiplier.
+Changing either value therefore changes historical rankings on the next response without replaying
+relay history. Weeks begin Monday at 00:00 UTC, months begin on the first day at 00:00 UTC, and
+all-time counts have no expiry boundary. See
 [`docs/activity-leaderboard.md`](docs/activity-leaderboard.md) for storage, rebuild, and benchmark
 details.
 
@@ -95,7 +103,9 @@ Activity UI and external consumers
 
 Activity events use regular, immutable Nostr kind `1701`. Each registered Activity Source will receive or link its own Nostr keypair so its events can be verified independently. Private signing keys will be encrypted at rest with AES-256, decrypted only while signing, and never returned by the API.
 
-Rotating a source key affects only new signatures. Historical relay events remain valid, while actor-based Redis counts and leaderboard history continue without a rebuild.
+Rotating a source key affects only new signatures. Historical relay events are checked against the
+identity active at their signing time and remain valid, while rotation actors and reasons are retained
+for audit. Actor-based Redis counts and leaderboard history continue without a rebuild.
 
 The service depends on the shared NEAR-to-Nostr work:
 

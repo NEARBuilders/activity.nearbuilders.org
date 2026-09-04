@@ -40,15 +40,21 @@ describe("ActivityLeaderboard", () => {
               breakdown: [
                 {
                   source: "feedback",
+                  sourceDisplayName: "Feedback rounds",
                   type: "feedback.written",
                   pointValue: 5,
+                  trustStatus: "trusted",
+                  scoreMultiplier: 1.5,
                   eventCount: 3,
                   score: 15,
                 },
                 {
                   source: "events",
+                  sourceDisplayName: "Builder events",
                   type: "event.attended",
                   pointValue: 10,
+                  trustStatus: "standard",
+                  scoreMultiplier: 1,
                   eventCount: 1,
                   score: 10,
                 },
@@ -66,6 +72,9 @@ describe("ActivityLeaderboard", () => {
     expect(screen.getByText("25 points")).toBeTruthy();
     expect(screen.getByText("4 events")).toBeTruthy();
     expect(screen.getByText(/feedback\.written/)).toBeTruthy();
+    expect(screen.getByText(/Feedback rounds/)).toBeTruthy();
+    expect(screen.getByText("Trusted · 1.5×")).toBeTruthy();
+    expect(screen.getByText("Standard source")).toBeTruthy();
     expect(screen.getByText("Aug 31, 2026 – Sep 6, 2026 · UTC")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Monthly" }));
     expect(onPeriodChange).toHaveBeenCalledWith("monthly");

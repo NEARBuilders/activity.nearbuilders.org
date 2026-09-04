@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNotNull } from "drizzle-orm";
 import { type Event, getEventHash, validateEvent, verifyEvent } from "nostr-tools/pure";
 import {
   ACTIVITY_EVENT_KIND,
@@ -16,11 +16,16 @@ import {
   activitySigningIdentities as identitiesTable,
   activitySources as sourcesTable,
 } from "../db/schema";
-import { ACTIVITY_EVENT_PAYLOAD_MAX_BYTES } from "./activity-ingestion";
+import { ACTIVITY_EVENT_PAYLOAD_MAX_BYTES, parseStoredActivityEvent } from "./activity-ingestion";
 
 export type BoundActivityIdentity = {
   sourceId: string;
+  sourceDisplayName?: string;
+  trustStatus?: "standard" | "trusted";
+  scoreMultiplier?: number;
   publicKey: string;
+  activeFrom?: string;
+  retiredAt?: string | null;
 };
 
 export interface ActivityIdentityStore {
@@ -46,13 +51,39 @@ export class DatabaseActivityIdentityStore implements ActivityIdentityStore {
 
   async listBound(source?: string): Promise<BoundActivityIdentity[]> {
     return this.#db
-      .select({ sourceId: sourcesTable.sourceId, publicKey: identitiesTable.publicKey })
+      .select({
+        sourceId: sourcesTable.sourceId,
+        sourceDisplayName: sourcesTable.displayName,
+        trustStatus: sourcesTable.trustStatus,
+        scoreMultiplierBps: sourcesTable.scoreMultiplierBps,
+        publicKey: identitiesTable.publicKey,
+        activeFrom: identitiesTable.boundAt,
+        retiredAt: identitiesTable.retiredAt,
+      })
       .from(identitiesTable)
       .innerJoin(sourcesTable, eq(identitiesTable.sourceRecordId, sourcesTable.id))
       .where(
         source
-          ? and(eq(identitiesTable.bindingStatus, "bound"), eq(sourcesTable.sourceId, source))
-          : eq(identitiesTable.bindingStatus, "bound"),
+          ? and(
+              eq(identitiesTable.bindingStatus, "bound"),
+              isNotNull(identitiesTable.boundAt),
+              eq(sourcesTable.sourceId, source),
+            )
+          : and(eq(identitiesTable.bindingStatus, "bound"), isNotNull(identitiesTable.boundAt)),
+      )
+      .then((identities) =>
+        identities.flatMap(({ scoreMultiplierBps, activeFrom, retiredAt, ...identity }) =>
+          activeFrom
+            ? [
+                {
+                  ...identity,
+                  scoreMultiplier: scoreMultiplierBps / 10_000,
+                  activeFrom: toIso(activeFrom),
+                  retiredAt: retiredAt ? toIso(retiredAt) : null,
+                },
+              ]
+            : [],
+        ),
       );
   }
 }
@@ -94,18 +125,33 @@ export class ActivityFeedService {
     return { ...result, data: result.data.filter(({ id }) => !hidden.has(id)) };
   }
 
-  async findTrustedEventById(eventId: string): Promise<ActivityFeedEvent | null> {
+  async findVerifiedEventById(eventId: string): Promise<ActivityFeedEvent | null> {
     const result = await this.#listRelayEvents({ eventId, limit: 1 });
     return result.data[0] ?? null;
   }
 
+  async verifyStoredEvents(
+    records: readonly { eventId: string; eventJson: string }[],
+  ): Promise<ActivityFeedEvent[]> {
+    const registeredIdentities = await this.#registeredIdentities();
+    return records.flatMap(({ eventId, eventJson }) => {
+      try {
+        const event = parseStoredActivityEvent(eventJson, eventId);
+        const parsed = parseActivityFeedEvent(event, registeredIdentities, {});
+        return parsed ? [parsed] : [];
+      } catch {
+        return [];
+      }
+    });
+  }
+
   async #listRelayEvents(input: ActivityQuery, excludeHidden = false): Promise<ActivityFeedResult> {
-    const trustedIdentities = await this.#trustedIdentities(input.source);
+    const registeredIdentities = await this.#registeredIdentities(input.source);
     const parsedEvents = new Map<string, ActivityFeedEvent>();
     const result = await this.#relay.query(
       input,
       (event) => {
-        const parsed = parseActivityFeedEvent(event, trustedIdentities, input);
+        const parsed = parseActivityFeedEvent(event, registeredIdentities, input);
         if (!parsed) return false;
         parsedEvents.set(event.id, parsed);
         return true;
@@ -138,7 +184,7 @@ export class ActivityFeedService {
     if (options.lastEventId !== undefined && !/^[a-f0-9]{64}$/.test(options.lastEventId)) {
       throw new ActivityResumeError();
     }
-    const trustedIdentities = await this.#trustedIdentities(input.source);
+    const registeredIdentities = await this.#registeredIdentities(input.source);
     const queued: ActivityFeedEvent[] = [];
     const deliveredIds = new Set(options.lastEventId ? [options.lastEventId] : []);
     let wake: (() => void) | undefined;
@@ -149,7 +195,7 @@ export class ActivityFeedService {
     const subscription = this.#relay.subscribe(
       input,
       (event) => {
-        const parsed = parseActivityFeedEvent(event, trustedIdentities, input);
+        const parsed = parseActivityFeedEvent(event, registeredIdentities, input);
         if (!parsed) return;
         if (deliveredIds.has(parsed.id)) return;
         queued.push(parsed);
@@ -215,15 +261,17 @@ export class ActivityFeedService {
     throw new ActivityResumeError();
   }
 
-  async #trustedIdentities(source?: string): Promise<Map<string, Set<string>>> {
+  async #registeredIdentities(
+    source?: string,
+  ): Promise<Map<string, Map<string, BoundActivityIdentity>>> {
     const identities = await this.#identities.listBound(source);
-    const trustedIdentities = new Map<string, Set<string>>();
-    for (const { sourceId, publicKey } of identities) {
-      const sourceKeys = trustedIdentities.get(sourceId) ?? new Set<string>();
-      sourceKeys.add(publicKey);
-      trustedIdentities.set(sourceId, sourceKeys);
+    const registeredIdentities = new Map<string, Map<string, BoundActivityIdentity>>();
+    for (const identity of identities) {
+      const sourceKeys = registeredIdentities.get(identity.sourceId) ?? new Map();
+      sourceKeys.set(identity.publicKey, identity);
+      registeredIdentities.set(identity.sourceId, sourceKeys);
     }
-    return trustedIdentities;
+    return registeredIdentities;
   }
 }
 
@@ -236,7 +284,7 @@ function isAfter(event: ActivityFeedEvent, baseline: ActivityFeedEvent): boolean
 
 function parseActivityFeedEvent(
   event: Event,
-  trustedIdentities: ReadonlyMap<string, ReadonlySet<string>>,
+  registeredIdentities: ReadonlyMap<string, ReadonlyMap<string, BoundActivityIdentity>>,
   query: ActivityQuery,
 ): ActivityFeedEvent | null {
   if (
@@ -257,6 +305,7 @@ function parseActivityFeedEvent(
   const type = singleTagValue(event, "t");
   const actor = singleTagValue(event, "n");
   const idempotencyKey = singleTagValue(event, "i");
+  const identity = source ? registeredIdentities.get(source)?.get(event.pubkey) : undefined;
   if (
     !source ||
     source.length < 2 ||
@@ -269,7 +318,8 @@ function parseActivityFeedEvent(
     !NEAR_ACCOUNT_ID_REGEX.test(actor) ||
     !idempotencyKey ||
     idempotencyKey.length > 200 ||
-    !trustedIdentities.get(source)?.has(event.pubkey) ||
+    !identity ||
+    !isIdentityActiveAt(identity, event.created_at) ||
     (query.eventId !== undefined && event.id !== query.eventId) ||
     (query.source !== undefined && source !== query.source) ||
     (query.eventType !== undefined && type !== query.eventType) ||
@@ -294,7 +344,30 @@ function parseActivityFeedEvent(
     idempotencyKey,
     timestamp: timestamp.toISOString(),
     payload,
+    provenance: {
+      signatureVerified: true,
+      publicKey: identity.publicKey,
+      signingIdentityStatus: identity.retiredAt ? "retired" : "active",
+      sourceDisplayName: identity.sourceDisplayName ?? source,
+      trustStatus: identity.trustStatus ?? "standard",
+      scoreMultiplier: identity.scoreMultiplier ?? 1,
+      payloadClaimsVerified: false,
+    },
   };
+}
+
+function isIdentityActiveAt(identity: BoundActivityIdentity, createdAt: number): boolean {
+  const activeFrom = identity.activeFrom ? Date.parse(identity.activeFrom) / 1_000 : 0;
+  const retiredAt = identity.retiredAt ? Date.parse(identity.retiredAt) / 1_000 : null;
+  return (
+    Number.isFinite(activeFrom) &&
+    createdAt >= Math.floor(activeFrom) &&
+    (retiredAt === null || (Number.isFinite(retiredAt) && createdAt < retiredAt))
+  );
+}
+
+function toIso(value: Date | string): string {
+  return value instanceof Date ? value.toISOString() : String(value);
 }
 
 function verifyUncached(event: Event): boolean {

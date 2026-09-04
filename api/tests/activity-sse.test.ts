@@ -10,6 +10,15 @@ const event: ActivityFeedEvent = {
   idempotencyKey: "feedback:1",
   timestamp: "2026-09-03T00:00:00.000Z",
   payload: { rating: 5 },
+  provenance: {
+    signatureVerified: true,
+    publicKey: "a".repeat(64),
+    signingIdentityStatus: "active",
+    sourceDisplayName: "Feedback rounds",
+    trustStatus: "standard",
+    scoreMultiplier: 1,
+    payloadClaimsVerified: false,
+  },
 };
 
 describe("createActivitySseStream", () => {

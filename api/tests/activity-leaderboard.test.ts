@@ -20,6 +20,83 @@ function event(input: {
 }
 
 describe("Activity leaderboard", () => {
+  it("reweights historical counts using the current source trust multiplier", async () => {
+    let pointValues: ActivityPointValue[] = [
+      {
+        source: "feedback",
+        sourceDisplayName: "Feedback rounds",
+        type: "feedback.written",
+        pointValue: 5,
+        trustStatus: "standard",
+        scoreMultiplier: 1,
+      },
+      {
+        source: "events",
+        sourceDisplayName: "Builder events",
+        type: "event.attended",
+        pointValue: 8,
+        trustStatus: "standard",
+        scoreMultiplier: 1,
+      },
+    ];
+    const leaderboard = createInMemoryActivityLeaderboard({
+      listPointValues: async () => pointValues,
+      now: () => NOW,
+    });
+
+    await leaderboard.apply({
+      operation: "include",
+      event: event({
+        id: "7".repeat(64),
+        source: "feedback",
+        type: "feedback.written",
+        actor: "alice.near",
+      }),
+    });
+    await leaderboard.apply({
+      operation: "include",
+      event: event({
+        id: "8".repeat(64),
+        source: "events",
+        type: "event.attended",
+        actor: "bob.near",
+      }),
+    });
+
+    expect(
+      (await leaderboard.getLeaderboard({ period: "all-time", limit: 10 })).data.map(
+        ({ actor, score }) => ({ actor, score }),
+      ),
+    ).toEqual([
+      { actor: "bob.near", score: 8 },
+      { actor: "alice.near", score: 5 },
+    ]);
+
+    pointValues = pointValues.map((value) =>
+      value.source === "feedback"
+        ? { ...value, trustStatus: "trusted", scoreMultiplier: 2 }
+        : value,
+    );
+
+    const reweighted = await leaderboard.getLeaderboard({ period: "all-time", limit: 10 });
+    expect(reweighted.data.map(({ actor, score }) => ({ actor, score }))).toEqual([
+      { actor: "alice.near", score: 10 },
+      { actor: "bob.near", score: 8 },
+    ]);
+    expect(reweighted.data[0]?.breakdown).toEqual([
+      {
+        source: "feedback",
+        sourceDisplayName: "Feedback rounds",
+        type: "feedback.written",
+        pointValue: 5,
+        trustStatus: "trusted",
+        scoreMultiplier: 2,
+        eventCount: 1,
+        score: 10,
+      },
+    ]);
+  });
+
   it("reweights historical counts using current Event Type point values", async () => {
     let pointValues: ActivityPointValue[] = [
       { source: "feedback", type: "feedback.written", pointValue: 5 },
@@ -81,7 +158,10 @@ describe("Activity leaderboard", () => {
     expect(reweighted.data[0]?.breakdown).toEqual([
       {
         source: "events",
+        sourceDisplayName: "events",
         type: "event.attended",
+        trustStatus: "standard",
+        scoreMultiplier: 1,
         pointValue: 20,
         eventCount: 1,
         score: 20,

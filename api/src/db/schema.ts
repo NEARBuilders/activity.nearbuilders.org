@@ -48,6 +48,11 @@ export const activitySourceReviewDecision = pgEnum("activity_source_review_decis
   "rejected",
 ]);
 
+export const activitySourceTrustStatus = pgEnum("activity_source_trust_status", [
+  "standard",
+  "trusted",
+]);
+
 export const activitySigningIdentityBindingStatus = pgEnum(
   "activity_signing_identity_binding_status",
   ["pending", "bound"],
@@ -62,6 +67,8 @@ export const activitySources = pgTable(
     nearAccountId: text("near_account_id").notNull().unique(),
     organizationId: text("organization_id").notNull(),
     approvalStatus: activitySourceApprovalStatus("approval_status").default("pending").notNull(),
+    trustStatus: activitySourceTrustStatus("trust_status").default("standard").notNull(),
+    scoreMultiplierBps: integer("score_multiplier_bps").default(10_000).notNull(),
     reviewedBy: text("reviewed_by"),
     reviewReason: text("review_reason"),
     reviewedAt: timestamp("reviewed_at", { mode: "date", withTimezone: true }),
@@ -118,6 +125,27 @@ export const activitySourceReviews = pgTable(
   }),
 );
 
+export const activitySourceTrustChanges = pgTable(
+  "activity_source_trust_changes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sourceRecordId: uuid("source_record_id")
+      .notNull()
+      .references(() => activitySources.id, { onDelete: "cascade" }),
+    trustStatus: activitySourceTrustStatus("trust_status").notNull(),
+    scoreMultiplierBps: integer("score_multiplier_bps").notNull(),
+    reason: text("reason").notNull(),
+    administratorId: text("administrator_id").notNull(),
+    changedAt: timestamp("changed_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    sourceChangedAtIdx: index("activity_source_trust_changes_source_changed_at_idx").on(
+      table.sourceRecordId,
+      table.changedAt,
+    ),
+  }),
+);
+
 export const activitySigningIdentities = pgTable(
   "activity_signing_identities",
   {
@@ -130,12 +158,15 @@ export const activitySigningIdentities = pgTable(
     encryptionIv: text("encryption_iv").notNull(),
     encryptionAuthTag: text("encryption_auth_tag").notNull(),
     encryptionKeyVersion: text("encryption_key_version").notNull(),
+    createdBy: text("created_by"),
     bindingStatus: activitySigningIdentityBindingStatus("binding_status")
       .default("pending")
       .notNull(),
     boundNearAccountId: text("bound_near_account_id"),
     boundAt: timestamp("bound_at", { mode: "date", withTimezone: true }),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    retiredBy: text("retired_by"),
+    retirementReason: text("retirement_reason"),
     retiredAt: timestamp("retired_at", { mode: "date", withTimezone: true }),
   },
   (table) => ({
