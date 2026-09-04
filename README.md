@@ -77,7 +77,8 @@ Changing either value therefore changes historical rankings on the next response
 relay history. Weeks begin Monday at 00:00 UTC, months begin on the first day at 00:00 UTC, and
 all-time counts have no expiry boundary. See
 [`docs/activity-leaderboard.md`](docs/activity-leaderboard.md) for storage, rebuild, and benchmark
-details.
+details. External projects can follow the standalone
+[`docs/integration-guide.md`](docs/integration-guide.md) and run its typed client example.
 
 ## Proposed architecture
 

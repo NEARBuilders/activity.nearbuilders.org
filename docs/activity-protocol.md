@@ -158,9 +158,10 @@ spending the normal GitHub rate-limit allowance. `403` and `429` responses honor
 resumes from the last valid state. Restarting the Activity service therefore does not reset polling
 state or emit the same Activity event again.
 
-Merged pull requests credit the pull-request author and closed issues credit the issue author. A
-record is published only when that GitHub login has an explicit NEAR mapping. Unmapped records are
-stored in a per-source quarantine and are retried after the mapping is added. Stable idempotency
+Merged pull requests credit the GitHub actor who performed the merge, and closed issues credit the
+actor who closed the issue. A record is published only when that GitHub login has an explicit NEAR
+mapping. Unmapped records are stored in a per-source quarantine and are retried after the mapping is
+added. Stable idempotency
 keys use `github:<owner>/<repository>:<event-type>:<github-object-id>`, so different GitHub delivery
 event IDs for the same pull request or issue still produce one Activity event. Published records
 appear in the normal public feed with a GitHub badge.
