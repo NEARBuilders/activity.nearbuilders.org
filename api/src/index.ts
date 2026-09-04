@@ -19,6 +19,7 @@ import { createAuthMiddleware } from "./lib/auth";
 import { ContextSchema } from "./lib/context";
 import type { PluginsClient } from "./lib/plugins-types.gen";
 import { ActivityCredentialsLive, ActivityCredentialsTag } from "./services/activity-credentials";
+import { ActivityEndorsementsService } from "./services/activity-endorsements";
 import {
   ActivityFeedService,
   ActivityResumeError,
@@ -158,6 +159,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityFeedService,
         activityLeaderboard,
       );
+      const activityEndorsementsService = new ActivityEndorsementsService(database);
       const activityLeaderboardHistory = new DatabaseActivityLeaderboardHistory(
         database,
         activityFeedService,
@@ -188,6 +190,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityCredentials: activityCredentialsService,
         activityIngestion: activityIngestionService,
         activityFeed: activityFeedService,
+        activityEndorsements: activityEndorsementsService,
         activityModeration: activityModerationService,
         activityLeaderboard,
         activityRelay,
@@ -229,6 +232,23 @@ export default createPlugin.withPlugins<PluginsClient>()({
         });
       }
       return tenant;
+    };
+    const requireVisibleActivityEvent = async (eventId: string) => {
+      try {
+        const result = await services.activityFeed.list({ eventId, limit: 1 });
+        if (!result.data[0]) {
+          throw new ORPCError("NOT_FOUND", { message: "Activity event not found" });
+        }
+      } catch (error) {
+        if (
+          error instanceof ActivityRelayQueryTimeoutError ||
+          error instanceof ActivityRelayScanLimitError ||
+          error instanceof ActivityRelayUnavailableError
+        ) {
+          throw new ORPCError("SERVICE_UNAVAILABLE", { message: error.message });
+        }
+        throw error;
+      }
     };
 
     return {
@@ -568,6 +588,42 @@ export default createPlugin.withPlugins<PluginsClient>()({
           throw error;
         }
       }),
+
+      endorseActivityEvent: builder.endorseActivityEvent
+        .use(requireAuth)
+        .handler(async ({ input, context }) => {
+          await requireVisibleActivityEvent(input.eventId);
+          return services.activityEndorsements.endorse(input.eventId, context.userId);
+        }),
+
+      unendorseActivityEvent: builder.unendorseActivityEvent
+        .use(requireAuth)
+        .handler(async ({ input, context }) =>
+          services.activityEndorsements.unendorse(input.eventId, context.userId),
+        ),
+
+      getActivityEventEndorsements: builder.getActivityEventEndorsements.handler(
+        async ({ input, context }) =>
+          services.activityEndorsements.getStates(input.eventIds, context.userId ?? undefined),
+      ),
+
+      streamActivityEventEndorsements: builder.streamActivityEventEndorsements.handler(
+        async function* ({ context, signal, lastEventId }) {
+          const iterator = services.activityEndorsements.publisher.subscribe("endorsement", {
+            signal,
+            lastEventId,
+          });
+          for await (const update of iterator) {
+            yield {
+              operation: update.operation,
+              eventId: update.eventId,
+              timestamp: update.timestamp,
+              totalCount: update.totalCount,
+              changedByCurrentUser: context.userId === update.userId,
+            };
+          }
+        },
+      ),
 
       streamActivityEvents: builder.streamActivityEvents.handler(async function* ({
         input,

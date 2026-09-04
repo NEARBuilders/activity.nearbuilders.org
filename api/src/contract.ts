@@ -176,6 +176,21 @@ export const ActivityFeedSchema = z.object({
   }),
 });
 
+export const ActivityEventEndorsementSchema = z.object({
+  eventId: z.string().regex(/^[a-f0-9]{64}$/),
+  totalCount: z.number().int().nonnegative(),
+  endorsedByCurrentUser: z.boolean(),
+});
+export type ActivityEventEndorsement = z.infer<typeof ActivityEventEndorsementSchema>;
+
+export const ActivityEndorsementUpdateSchema = z.object({
+  operation: z.enum(["endorsed", "unendorsed"]),
+  eventId: z.string().regex(/^[a-f0-9]{64}$/),
+  timestamp: z.iso.datetime(),
+  totalCount: z.number().int().nonnegative(),
+  changedByCurrentUser: z.boolean(),
+});
+
 export const ActivityModerationHistorySchema = z.object({
   id: z.string().uuid(),
   administratorId: z.string(),
@@ -563,6 +578,60 @@ export const contract = oc.router({
     )
     .output(ActivityFeedSchema)
     .errors({ BAD_REQUEST, SERVICE_UNAVAILABLE }),
+
+  endorseActivityEvent: oc
+    .route({
+      method: "POST",
+      path: "/v1/events/{eventId}/endorsement",
+      summary: "Endorse an Activity event",
+      description: "Adds the authenticated user's endorsement to a verified Activity event.",
+      tags: ["Activity"],
+    })
+    .input(z.object({ eventId: z.string().regex(/^[a-f0-9]{64}$/) }))
+    .output(ActivityEventEndorsementSchema)
+    .errors({ UNAUTHORIZED, NOT_FOUND, SERVICE_UNAVAILABLE }),
+
+  unendorseActivityEvent: oc
+    .route({
+      method: "DELETE",
+      path: "/v1/events/{eventId}/endorsement",
+      summary: "Remove an Activity event endorsement",
+      description: "Removes the authenticated user's endorsement from an Activity event.",
+      tags: ["Activity"],
+    })
+    .input(z.object({ eventId: z.string().regex(/^[a-f0-9]{64}$/) }))
+    .output(ActivityEventEndorsementSchema)
+    .errors({ UNAUTHORIZED }),
+
+  getActivityEventEndorsements: oc
+    .route({
+      method: "POST",
+      path: "/v1/events/endorsements",
+      summary: "Get Activity event endorsements",
+      description:
+        "Returns endorsement counts and the current user's state for up to 100 events in one request.",
+      tags: ["Activity"],
+    })
+    .input(
+      z.object({
+        eventIds: z
+          .array(z.string().regex(/^[a-f0-9]{64}$/))
+          .min(1)
+          .max(100),
+      }),
+    )
+    .output(z.record(z.string(), ActivityEventEndorsementSchema)),
+
+  streamActivityEventEndorsements: oc
+    .route({
+      method: "GET",
+      path: "/internal/activity/events/endorsements/stream",
+      summary: "Stream Activity endorsement updates",
+      description: "Internal typed stream used to update visible endorsement counts live.",
+      tags: ["Activity"],
+    })
+    .input(z.object({}))
+    .output(eventIterator(ActivityEndorsementUpdateSchema)),
 
   streamActivityEvents: oc
     .route({

@@ -1,4 +1,4 @@
-import { AlertTriangle, Clock3, RadioTower, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Clock3, Heart, RadioTower, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { ActivityTrustBadge } from "@/components/ui/activity-trust-badge";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,11 @@ export type ActivityFeedFilters = {
   actor?: string;
 };
 
+export type ActivityEndorsementView = {
+  totalCount: number;
+  endorsedByCurrentUser: boolean;
+};
+
 type ActivityFeedProps = {
   events: ActivityFeedEventView[];
   filters?: ActivityFeedFilters;
@@ -41,7 +46,11 @@ type ActivityFeedProps = {
   skippedInvalid: number;
   hasMore: boolean;
   canGoBack?: boolean;
+  endorsements?: Record<string, ActivityEndorsementView>;
+  canEndorse?: boolean;
+  pendingEndorsementId?: string;
   onApplyFilters: (filters: ActivityFeedFilters) => void;
+  onToggleEndorsement?: (eventId: string) => void;
   onNextPage: () => void;
   onPreviousPage?: () => void;
   onRetry: () => void;
@@ -56,7 +65,11 @@ export function ActivityFeed({
   skippedInvalid,
   hasMore,
   canGoBack = false,
+  endorsements = {},
+  canEndorse = false,
+  pendingEndorsementId,
   onApplyFilters,
+  onToggleEndorsement,
   onNextPage,
   onPreviousPage,
   onRetry,
@@ -195,51 +208,79 @@ export function ActivityFeed({
             </Card>
           ) : (
             <ol className="space-y-3" aria-label="Activity events">
-              {events.map((event) => (
-                <li key={event.id}>
-                  <Card>
-                    <CardContent className="space-y-4 p-5">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="space-y-1">
-                          <p className="font-semibold text-foreground">{event.actor}</p>
-                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                            <span className="font-mono">{event.type}</span>
-                            <span>{event.provenance.sourceDisplayName}</span>
-                            <span className="font-mono">{event.source}</span>
+              {events.map((event) => {
+                const endorsement = endorsements[event.id] ?? {
+                  totalCount: 0,
+                  endorsedByCurrentUser: false,
+                };
+                return (
+                  <li key={event.id}>
+                    <Card>
+                      <CardContent className="space-y-4 p-5">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <p className="font-semibold text-foreground">{event.actor}</p>
+                            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                              <span className="font-mono">{event.type}</span>
+                              <span>{event.provenance.sourceDisplayName}</span>
+                              <span className="font-mono">{event.source}</span>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 pt-1">
+                              <Badge variant="secondary">
+                                <ShieldCheck />
+                                Verified signature
+                              </Badge>
+                              <ActivityTrustBadge
+                                trustStatus={event.provenance.trustStatus}
+                                scoreMultiplier={event.provenance.scoreMultiplier}
+                              />
+                              {event.provenance.signingIdentityStatus === "retired" && (
+                                <Badge variant="outline">Historical signing key</Badge>
+                              )}
+                            </div>
                           </div>
-                          <div className="flex flex-wrap items-center gap-2 pt-1">
-                            <Badge variant="secondary">
-                              <ShieldCheck />
-                              Verified signature
-                            </Badge>
-                            <ActivityTrustBadge
-                              trustStatus={event.provenance.trustStatus}
-                              scoreMultiplier={event.provenance.scoreMultiplier}
-                            />
-                            {event.provenance.signingIdentityStatus === "retired" && (
-                              <Badge variant="outline">Historical signing key</Badge>
-                            )}
-                          </div>
+                          <time
+                            dateTime={event.timestamp}
+                            className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                          >
+                            <Clock3 className="h-3.5 w-3.5" />
+                            {new Date(event.timestamp).toLocaleString()}
+                          </time>
                         </div>
-                        <time
-                          dateTime={event.timestamp}
-                          className="flex items-center gap-1.5 text-xs text-muted-foreground"
-                        >
-                          <Clock3 className="h-3.5 w-3.5" />
-                          {new Date(event.timestamp).toLocaleString()}
-                        </time>
-                      </div>
-                      <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-[8px] border border-border bg-muted p-3 text-xs text-foreground">
-                        {payloadSummary(event.payload)}
-                      </pre>
-                      <p className="text-xs text-muted-foreground">
-                        The signature matches this Activity Source&apos;s registered key. Payload
-                        claims are not independently verified.
-                      </p>
-                    </CardContent>
-                  </Card>
-                </li>
-              ))}
+                        <pre className="overflow-x-auto whitespace-pre-wrap break-words rounded-[8px] border border-border bg-muted p-3 text-xs text-foreground">
+                          {payloadSummary(event.payload)}
+                        </pre>
+                        <p className="text-xs text-muted-foreground">
+                          The signature matches this Activity Source&apos;s registered key. Payload
+                          claims are not independently verified.
+                        </p>
+                        <div className="flex items-center gap-2 border-t border-border pt-3">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={endorsement.endorsedByCurrentUser ? "secondary" : "outline"}
+                            aria-pressed={endorsement.endorsedByCurrentUser}
+                            disabled={!canEndorse || pendingEndorsementId === event.id}
+                            title={canEndorse ? undefined : "Sign in to endorse Activity events"}
+                            onClick={() => onToggleEndorsement?.(event.id)}
+                          >
+                            <Heart />
+                            {pendingEndorsementId === event.id
+                              ? "Updating…"
+                              : endorsement.endorsedByCurrentUser
+                                ? "Endorsed"
+                                : "Endorse"}
+                          </Button>
+                          <span className="text-sm text-muted-foreground" aria-live="polite">
+                            {endorsement.totalCount}{" "}
+                            {endorsement.totalCount === 1 ? "endorsement" : "endorsements"}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </li>
+                );
+              })}
             </ol>
           )}
 

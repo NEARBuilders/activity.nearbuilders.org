@@ -160,7 +160,7 @@ later views expose only its name, prefix, `event:write` permission, timestamps, 
 - Stream new events to clients through filtered SSE subscriptions.
 - Add provenance and verification signals to leaderboard entries.
 - Show source badges and distinguish verified from unverified events.
-- Connect public event upvotes and downvotes through the existing votes service.
+- Let signed-in users endorse public events and remove their endorsement.
 - Support hiding immutable events through moderation controls.
 - Register one external polling integration, initially a GitHub activity poller.
 - Migrate nearbuilders.org activity emission from its existing Postgres plugin to the gateway.
