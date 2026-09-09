@@ -12,3 +12,4 @@ export type AuthPluginContext = Partial<AuthRequestContext> & {
   reqHeaders?: Headers;
   getRawBody?: () => Promise<string>;
 };
+
