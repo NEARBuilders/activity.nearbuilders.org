@@ -3,7 +3,10 @@ import { Effect, Layer } from "every-plugin/effect";
 import { ORPCError, withEventMeta } from "every-plugin/orpc";
 import { z } from "every-plugin/zod";
 import { resolveActivityRelayUrl } from "./activity/activity-config";
-import { parseActivityMasterKeys } from "./activity/activity-credentials-crypto";
+import {
+  assertMasterKeysConfigured,
+  parseActivityMasterKeys,
+} from "./activity/activity-credentials-crypto";
 import {
   ActivityCursorError,
   ActivityRelay,
@@ -117,8 +120,10 @@ export default createPlugin.withPlugins<PluginsClient>()({
         ActivitySourcesTag,
         ActivitySourcesLive.pipe(Layer.provide(databaseLayer)),
       );
+      const masterKeysRaw = config.secrets.ACTIVITY_SIGNING_MASTER_KEYS;
+      assertMasterKeysConfigured(masterKeysRaw, process.env.NODE_ENV);
       const masterKeys = parseActivityMasterKeys(
-        config.secrets.ACTIVITY_SIGNING_MASTER_KEYS,
+        masterKeysRaw,
         config.secrets.ACTIVITY_SIGNING_ACTIVE_KEY_VERSION,
       );
       const activityCredentialsService = yield* tools.buildService(

@@ -195,6 +195,19 @@ encoded 32-byte keys. `ACTIVITY_SIGNING_ACTIVE_KEY_VERSION` selects the key used
 Old versions must remain available until every Signing Identity encrypted under them has been
 rotated.
 
+Generate a fresh 32-byte key plus the matching env snippet with `bun run keys:gen` (pass
+`--version=` when adding a new rotation target). The plugin entry point refuses to boot with an
+empty keyring when `NODE_ENV=production`, so the operator must provision the secret before the
+first deploy. The dev plugin (`api/plugin.dev.ts`) supplies a deterministic keyring only when
+the value is empty locally; do not reuse it in any deployed environment.
+
+The signing identity record stores the key version that encrypted it, which is why keeping old
+versions in the keyring is required: every Signing Identity created under `v1` can only be
+decrypted while `v1` remains in `ACTIVITY_SIGNING_MASTER_KEYS`. Removing `v1` from the keyring
+before every identity encrypted under it has been rotated (or retired) renders those identities
+unrecoverable. See the README "Master keys" section for the rotation runbook and the loss
+warning.
+
 Signing Identity history records who created and retired each key, when it was active, and the stated
 rotation reason. This history is used to validate old events without accepting events signed outside
 a key's active window.

@@ -12,6 +12,15 @@ export interface ActivityMasterKeys {
   keys: ReadonlyMap<string, Uint8Array>;
 }
 
+export function assertMasterKeysConfigured(rawValue: string, nodeEnv: string | undefined): void {
+  if (rawValue.trim() !== "") return;
+  const isProduction = nodeEnv === "production";
+  const hint = isProduction
+    ? "Generate a key with `bun run keys:gen` and provision it through your secret store before booting."
+    : "Set ACTIVITY_SIGNING_MASTER_KEYS in .env, or rely on the dev fallback supplied by api/plugin.dev.ts.";
+  throw new Error(`ACTIVITY_SIGNING_MASTER_KEYS is empty. ${hint}`);
+}
+
 export function parseActivityMasterKeys(
   serialized: string,
   activeVersion: string,

@@ -71,6 +71,7 @@
     "dev:proxy": "bos dev --proxy",
     "dev:activity-infra": "docker compose -f compose.activity.yml up -d --wait",
     "dev:activity-infra:down": "docker compose -f compose.activity.yml down",
+    "keys:gen": "bun run scripts/keys-gen.ts",
     "build": "bos build",
     "deploy": "bos build --deploy",
     "publish": "bos publish",
