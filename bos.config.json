@@ -2,15 +2,12 @@
   "extends": "bos://dev.everything.near/dev.everything.dev",
   "account": "nearbuilding.near",
   "domain": "activity.nearbuilders.org",
-  "title": "everything.dev",
-  "description": "Open runtime for apps on NEAR, composed from published config and loaded through a shared host, UI, and API runtime.",
-  "staging": {
-    "domain": "dev.everything.dev"
-  },
+  "title": "Activity | NearBuilders",
+  "description": "Shared activity and reputation layer for the NEAR ecosystem — Activity Sources submit signed events through one HTTP gateway; Nostr relays store and distribute them.",
   "repository": "https://github.com/NEARBuilders/activity.nearbuilders.org",
   "ci": {
     "railway": {
-      "service": "app"
+      "service": "activity-app"
     }
   },
   "app": {
@@ -33,5 +30,12 @@
       ]
     }
   },
-  "plugins": {}
+  "plugins": {
+    "nostr": {
+      "extends": "bos://nearbuilding.near/nostr.nearbuilders.org",
+      "variables": {
+        "clientName": "activity.nearbuilders.org"
+      }
+    }
+  }
 }
