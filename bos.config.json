@@ -12,7 +12,9 @@
   },
   "app": {
     "ui": {
-      "development": "local:ui"
+      "development": "local:ui",
+      "production": "https://elliot-braem-7908-ui-activity-nearbuilders-org-ne-cce9505dc-ze.zephyrcloud.app",
+      "integrity": "sha384-zxm5jXUCmxG+AUqyC4jcd+B+SvKjutw+iom2hJsJCKF06+8b+m3cpOuslrmF/sbK"
     },
     "api": {
       "development": "local:api",
