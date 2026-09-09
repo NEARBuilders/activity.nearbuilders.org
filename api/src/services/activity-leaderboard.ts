@@ -190,11 +190,12 @@ if current then
   return 0
 end
 redis.call("HSET", KEYS[1], ARGV[1], "included")
+local now = tonumber(redis.call("TIME")[1])
 for index = 2, #KEYS, 2 do
   redis.call("ZINCRBY", KEYS[index], 1, ARGV[2])
   redis.call("SADD", KEYS[index + 1], ARGV[3])
   local expiresAt = tonumber(ARGV[3 + (index / 2)])
-  if expiresAt and expiresAt > 0 then
+  if expiresAt and expiresAt > 0 and expiresAt > now then
     redis.call("EXPIREAT", KEYS[index], expiresAt)
     redis.call("EXPIREAT", KEYS[index + 1], expiresAt)
   end
