@@ -13,7 +13,7 @@ export function NetworkToggle() {
   if (supportedNetworks.length <= 1) return null;
 
   return (
-    <div className="border-l-2 border-border fixed top-0 right-0 z-50">
+    <div className="relative">
       <Tabs
         value={currentNetwork}
         onValueChange={(network) => {

@@ -1,8 +1,8 @@
-import { Copy } from "lucide-react";
+import { CopyIcon as Copy } from "@phosphor-icons/react/ssr";
 import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "./ui/button";
-import { Card, CardContent } from "./ui/card";
+import { Card } from "./ui/card";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 
@@ -17,7 +17,7 @@ interface ApiKeyFormProps {
 }
 
 const EXPIRATION_PRESETS = [
-  { label: "no expiry", value: 0 },
+  { label: "No expiry", value: 0 },
   { label: "7 days", value: 7 * 24 * 60 * 60 },
   { label: "30 days", value: 30 * 24 * 60 * 60 },
   { label: "90 days", value: 90 * 24 * 60 * 60 },
@@ -40,8 +40,8 @@ export function ApiKeyForm({ onCreate, isPending }: ApiKeyFormProps) {
 
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground uppercase tracking-wide">name</Label>
+      <div className="space-y-1.5">
+        <Label>Name</Label>
         <Input
           type="text"
           value={name}
@@ -50,8 +50,8 @@ export function ApiKeyForm({ onCreate, isPending }: ApiKeyFormProps) {
         />
       </div>
 
-      <div className="space-y-2">
-        <Label className="text-xs text-muted-foreground uppercase tracking-wide">expiration</Label>
+      <div className="space-y-1.5">
+        <Label>Expiration</Label>
         <div className="flex flex-wrap gap-2">
           {EXPIRATION_PRESETS.map((preset) => (
             <Button
@@ -79,7 +79,7 @@ export function ApiKeyForm({ onCreate, isPending }: ApiKeyFormProps) {
           variant="outline"
           size="sm"
         >
-          {isPending ? "creating..." : "create key"}
+          {isPending ? "Creating…" : "Create key"}
         </Button>
       </div>
     </div>
@@ -109,46 +109,44 @@ export function ApiKeyReveal({ apiKey, onDismiss }: ApiKeyRevealProps) {
   };
 
   return (
-    <Card>
-      <CardContent className="p-6 space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="space-y-1">
-            <div className="font-medium">New API key ready</div>
-            <p className="text-sm text-muted-foreground leading-relaxed">
-              Copy and store this key now. You will only be able to see the full secret once.
-            </p>
-          </div>
-          <Button onClick={onDismiss} variant="outline" size="sm">
-            dismiss
-          </Button>
+    <Card className="gap-4 border-brand-accent-border/60 p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="space-y-1">
+          <div className="font-medium">New API key ready</div>
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Copy and store this key now. You will only be able to see the full secret once.
+          </p>
         </div>
-        <div className="grid gap-3 md:grid-cols-[1fr_auto]">
-          <Input
-            readOnly
-            value={apiKey.key}
-            className="font-mono text-xs"
-            onFocus={(e) => e.target.select()}
-            onClick={(e) => e.currentTarget.select()}
-          />
-          <Button onClick={handleCopy} variant="outline" size="sm">
-            <Copy className="h-3.5 w-3.5 mr-1" />
-            copy
-          </Button>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-sm">
-          <InfoRow label="name" value={apiKey.name ?? "unnamed"} />
-          <InfoRow label="prefix" value={`${apiKey.prefix ?? "api_"}...`} mono />
-          <InfoRow label="created" value={new Date(apiKey.createdAt).toLocaleString()} />
-        </div>
-      </CardContent>
+        <Button onClick={onDismiss} variant="outline" size="sm">
+          Dismiss
+        </Button>
+      </div>
+      <div className="grid gap-3 md:grid-cols-[1fr_auto]">
+        <Input
+          readOnly
+          value={apiKey.key}
+          className="font-mono text-xs"
+          onFocus={(e) => e.target.select()}
+          onClick={(e) => e.currentTarget.select()}
+        />
+        <Button onClick={handleCopy} variant="outline" size="sm">
+          <Copy className="h-3.5 w-3.5 mr-1" />
+          Copy
+        </Button>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+        <InfoRow label="name" value={apiKey.name ?? "unnamed"} />
+        <InfoRow label="prefix" value={`${apiKey.prefix ?? "api_"}...`} mono />
+        <InfoRow label="created" value={new Date(apiKey.createdAt).toLocaleString()} />
+      </div>
     </Card>
   );
 }
 
 function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="border-2 border-outset border-[rgb(51,51,51)] dark:border-[rgb(100,100,100)] bg-muted/30 p-3 grid gap-1 sm:grid-cols-[100px_1fr] sm:gap-4">
-      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+    <div className="rounded-lg border border-border bg-muted/30 p-3 grid gap-1 sm:grid-cols-[100px_1fr] sm:gap-4">
+      <div className="text-xs text-muted-foreground">{label}</div>
       <div className={mono ? "text-xs font-mono break-all" : "text-sm break-all"}>{value}</div>
     </div>
   );

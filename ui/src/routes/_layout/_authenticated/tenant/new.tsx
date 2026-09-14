@@ -1,18 +1,17 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { Sparkles } from "lucide-react";
 import type { TransactionBuilder } from "near-kit";
 import { useState } from "react";
 import { toast } from "sonner";
 import { getAccount, getActiveRuntime, useApiClient, useAuthClient } from "@/app";
-import { Button, Card, CardContent, Field, FieldLabel, Input } from "@/components";
+import { Button, Field, FieldLabel, Input } from "@/components";
 import { PageContainer } from "@/components/layout/page-container";
 import { StepList, useStepper } from "@/components/ui/stepper";
 import { getOptionalAppsClient } from "@/lib/optional-plugin-clients";
 
 export const Route = createFileRoute("/_layout/_authenticated/tenant/new")({
   head: () => ({
-    title: "New Tenant | app",
+    title: "New Tenant | NEAR Builders Activity",
     meta: [{ name: "description", content: "Create a new tenant." }],
   }),
   component: NewTenantPage,
@@ -336,13 +335,7 @@ function NewTenantPage() {
     <PageContainer variant="narrow">
       <div className="space-y-8">
         <header className="space-y-2">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            <Sparkles className="h-3 w-3" />
-            Create
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-            New Tenant
-          </h1>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">New Tenant</h1>
         </header>
 
         <form
@@ -352,8 +345,8 @@ function NewTenantPage() {
           }}
           className="space-y-6"
         >
-          <Card>
-            <CardContent className="p-6 space-y-4">
+          <section className="border-t border-border py-6">
+            <div className=" space-y-4">
               <Field>
                 <FieldLabel htmlFor="tenant-name">tenant name</FieldLabel>
                 <Input
@@ -392,8 +385,8 @@ function NewTenantPage() {
                   </p>
                 )}
               </Field>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
           <div className="flex gap-2">
             <Button
@@ -413,22 +406,18 @@ function NewTenantPage() {
 
         {isCreating || createMutation.isSuccess || createMutation.isError ? (
           <section className="space-y-4">
-            <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              Progress
-            </h2>
-            <Card>
-              <CardContent className="p-4 space-y-3">
+            <h2 className="text-sm font-medium  text-muted-foreground">Progress</h2>
+            <section className="border-t border-border py-6">
+              <div className="p-4 space-y-3">
                 <StepList steps={steps} />
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           </section>
         ) : (
           <section className="space-y-4">
-            <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-              What Happens
-            </h2>
-            <Card>
-              <CardContent className="p-4 space-y-2 text-xs text-muted-foreground">
+            <h2 className="text-sm font-medium  text-muted-foreground">What Happens</h2>
+            <section className="border-t border-border py-6">
+              <div className="p-4 space-y-2 text-xs text-muted-foreground">
                 <p>
                   1. <strong>Organization</strong> — A Better-Auth organization is created first
                   (you become owner)
@@ -462,8 +451,8 @@ function NewTenantPage() {
                   Funded subaccount (≥0.1 NEAR). Parent retains full-access key for recovery. You
                   can delete and reclaim later.
                 </p>
-              </CardContent>
-            </Card>
+              </div>
+            </section>
           </section>
         )}
       </div>

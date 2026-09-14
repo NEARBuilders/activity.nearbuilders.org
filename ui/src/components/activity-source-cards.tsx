@@ -1,4 +1,4 @@
-import { Check, X } from "lucide-react";
+import { CheckIcon as Check, XIcon as X } from "@phosphor-icons/react/ssr";
 import { type ReactNode, useState } from "react";
 import type {
   ActivitySourceView,
@@ -27,7 +27,7 @@ export function ActivitySourceCard({
   const statusVariant = source.approvalStatus === "rejected" ? "destructive" : "secondary";
 
   return (
-    <Card className="p-5">
+    <Card className="gap-4 p-5">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <h3 className="font-semibold text-foreground">{source.displayName}</h3>
@@ -45,7 +45,7 @@ export function ActivitySourceCard({
         </div>
       </div>
 
-      <div className="mt-5 space-y-2">
+      <div className="space-y-2">
         {source.eventTypes.map((eventType) => (
           <div
             key={eventType.name}
@@ -64,12 +64,17 @@ export function ActivitySourceCard({
       </div>
 
       {source.reviewReason && (
-        <p className="mt-4 rounded-[8px] bg-muted p-3 text-xs text-muted-foreground">
-          Review: {source.reviewReason}
-        </p>
+        <p className="text-xs text-muted-foreground">Review: {source.reviewReason}</p>
       )}
 
-      {credentials}
+      {credentials && (
+        <details className="border-t pt-3">
+          <summary className="cursor-pointer text-sm font-medium">
+            Credentials and publishing
+          </summary>
+          <div className="mt-4">{credentials}</div>
+        </details>
+      )}
     </Card>
   );
 }
@@ -95,7 +100,7 @@ export function ActivitySourceReviewCard({
   };
 
   return (
-    <Card className="p-5">
+    <Card className="gap-5 border-brand-accent-border/60 p-5">
       <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
         <ActivitySourceCardContent source={source} />
         <div className="space-y-3">

@@ -255,9 +255,8 @@ describe("ActivitySourcesDashboard", () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText("Trust designation for near-catalog"), {
-      target: { value: "trusted" },
-    });
+    fireEvent.click(screen.getByLabelText("Trust designation for near-catalog"));
+    fireEvent.click(screen.getByRole("option", { name: "Trusted" }));
     fireEvent.change(screen.getByLabelText("Score multiplier for near-catalog"), {
       target: { value: "1.5" },
     });

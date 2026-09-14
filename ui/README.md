@@ -1,8 +1,8 @@
-# ui
+# Activity UI
 
-UI package for the app shell, routes, and client runtime.
+UI package for Activity Source onboarding, administration, the public activity feed, and leaderboards.
 
-## Runtime Surface
+## Runtime surface
 
 The package runtime lives in `everything-dev/ui`:
 
@@ -32,7 +32,7 @@ bos dev --api remote    # Isolate UI work
 
 `bos.config.json` only needs the UI runtime URLs and package metadata. Build-time module exposes stay in `ui/rsbuild.config.ts`.
 
-## Route Protection
+## Route protection
 
 File-based routing with auth guards via TanStack Router:
 
@@ -50,6 +50,6 @@ File-based routing with auth guards via TanStack Router:
 
 ## Scripts
 
-- `bun dev` - Start dev server (port 3003)
+- `bun dev` - Start the standalone UI development server
 - `bun build` - Build for production
-- `bun type-check` - Type checking
+- `bun typecheck` - Type checking

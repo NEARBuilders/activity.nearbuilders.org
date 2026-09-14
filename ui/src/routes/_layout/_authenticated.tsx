@@ -18,9 +18,10 @@ export const Route = createFileRoute("/_layout/_authenticated")({
   beforeLoad: async ({ context, location }) => {
     const { queryClient, authClient } = context;
 
-    const session = await queryClient.ensureQueryData(
-      sessionQueryOptions(authClient, context.session),
-    );
+    const session = await queryClient.fetchQuery({
+      ...sessionQueryOptions(authClient),
+      staleTime: 0,
+    });
 
     if (!session?.user) {
       throw redirect({
@@ -38,12 +39,11 @@ export const Route = createFileRoute("/_layout/_authenticated")({
       });
     }
 
+    const activeOrganizationId = session.session?.activeOrganizationId ?? null;
     const activeOrganization = await resolveActiveOrganizationMembership({
-      activeOrganizationId: session.session?.activeOrganizationId ?? null,
-      getActiveMemberRole: async ({ organizationId }) => {
-        const { data, error } = await authClient.organization.getActiveMember({
-          query: { organizationId },
-        });
+      activeOrganizationId,
+      getActiveMemberRole: async () => {
+        const { data, error } = await authClient.organization.getActiveMember();
         if (error) throw new Error(error.message || "Failed to read the active workspace role");
         return { role: data?.role ?? null };
       },

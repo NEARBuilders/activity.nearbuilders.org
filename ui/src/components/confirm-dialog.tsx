@@ -25,8 +25,8 @@ export function ConfirmDialog({
   onOpenChange,
   title,
   description,
-  confirmLabel = "confirm",
-  cancelLabel = "cancel",
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
   variant = "default",
   onConfirm,
   isPending,
@@ -48,17 +48,12 @@ export function ConfirmDialog({
             {cancelLabel}
           </Button>
           <Button
-            variant={variant === "destructive" ? "default" : "outline"}
+            variant={variant === "destructive" ? "destructive" : "default"}
             size="sm"
             onClick={onConfirm}
             disabled={isPending}
-            className={
-              variant === "destructive"
-                ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                : ""
-            }
           >
-            {isPending ? "..." : confirmLabel}
+            {isPending ? "Working…" : confirmLabel}
           </Button>
         </DialogFooter>
       </DialogContent>

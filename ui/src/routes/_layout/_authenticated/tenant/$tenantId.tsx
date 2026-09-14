@@ -1,11 +1,16 @@
+import {
+  ArrowSquareOutIcon as ExternalLink,
+  PencilSimpleIcon as Pencil,
+  TrashIcon as Trash2,
+  UsersIcon as Users,
+} from "@phosphor-icons/react/ssr";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { Building2, ExternalLink, Pencil, Trash2, Users } from "lucide-react";
 import type { TransactionBuilder } from "near-kit";
 import { useState } from "react";
 import { toast } from "sonner";
 import { getAccount, getActiveRuntime, useApiClient, useAuthClient } from "@/app";
-import { Badge, Button, Card, CardContent, ConfirmDialog, InfoRow, Input } from "@/components";
+import { Badge, Button, ConfirmDialog, InfoRow, Input } from "@/components";
 import { PageContainer } from "@/components/layout/page-container";
 import { getOptionalAppsClient } from "@/lib/optional-plugin-clients";
 
@@ -56,7 +61,7 @@ async function publishTenantConfig(
 
 export const Route = createFileRoute("/_layout/_authenticated/tenant/$tenantId")({
   head: () => ({
-    meta: [{ title: "Tenant | app" }],
+    meta: [{ title: "Tenant | NEAR Builders Activity" }],
   }),
   component: TenantDetail,
 });
@@ -231,18 +236,11 @@ function TenantDetail() {
     <PageContainer variant="wide">
       <div className="space-y-8">
         <header className="space-y-3">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            <Building2 className="h-3 w-3" />
-            Tenant
-          </div>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="space-y-1">
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              <h1 className="text-xl font-semibold tracking-tight text-foreground">
                 {tenant.name}
               </h1>
-              <p className="text-[11px] font-mono text-muted-foreground">
-                {tenant.subdomain}.{gatewayId} · {tenant.accountId}
-              </p>
             </div>
 
             <div className="flex gap-2">
@@ -302,8 +300,8 @@ function TenantDetail() {
               </Button>
             )}
           </div>
-          <Card>
-            <CardContent className="p-6 space-y-4">
+          <section className="border-t border-border py-6">
+            <div className=" space-y-4">
               {editing ? (
                 <form
                   onSubmit={(e) => {
@@ -363,15 +361,15 @@ function TenantDetail() {
                   />
                 </>
               )}
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         </section>
 
         <section className="space-y-3">
           <div className="flex items-end justify-between gap-3">
             <h2 className="text-lg font-semibold text-foreground">Live site</h2>
           </div>
-          <Card className="p-4 space-y-3">
+          <section className="space-y-3 border-t border-border py-6">
             <p className="text-sm text-muted-foreground">
               Your tenant is served at the subdomain below. The site resolves through the parent
               gateway's host.
@@ -380,7 +378,7 @@ function TenantDetail() {
               href={`https://${tenant.subdomain}.${gatewayId}`}
               target="_blank"
               rel="noreferrer"
-              className="h-9 px-3 inline-flex items-center gap-1.5 text-xs font-medium border-2 border-outset border-border-strong bg-card text-foreground shadow-sm hover:shadow-md active:border-inset active:shadow-none transition-all duration-200 ease-out rounded-[10px] w-fit"
+              className="h-9 px-3 inline-flex items-center gap-1.5 text-xs font-medium rounded-lg border border-border bg-card text-foreground transition-colors rounded-[10px] w-fit"
             >
               <ExternalLink className="h-3.5 w-3.5" />
               open {tenant.subdomain}.{gatewayId}
@@ -393,14 +391,14 @@ function TenantDetail() {
             >
               republish config
             </Button>
-          </Card>
+          </section>
         </section>
 
         <section className="space-y-3">
           <div className="flex items-end justify-between gap-3">
             <h2 className="text-lg font-semibold text-foreground">Members & permissions</h2>
           </div>
-          <Card className="p-4 space-y-3">
+          <section className="space-y-3 border-t border-border py-6">
             <p className="text-sm text-muted-foreground">
               This tenant is backed by an organization. Manage members, roles, and invitations
               there.
@@ -411,7 +409,7 @@ function TenantDetail() {
                 open organization
               </Link>
             </Button>
-          </Card>
+          </section>
         </section>
 
         {isOwner && (
@@ -419,7 +417,7 @@ function TenantDetail() {
             <div className="flex items-end justify-between gap-3">
               <h2 className="text-lg font-semibold text-foreground">Danger zone</h2>
             </div>
-            <Card className="p-4 space-y-3">
+            <section className="space-y-3 border-t border-border py-6">
               <p className="text-sm text-muted-foreground">
                 Deleting a tenant suspends it immediately and permanently removes it after a 30-day
                 grace period.
@@ -433,7 +431,7 @@ function TenantDetail() {
                 <Trash2 className="h-3.5 w-3.5" />
                 delete tenant
               </Button>
-            </Card>
+            </section>
           </section>
         )}
 

@@ -197,7 +197,10 @@ export function sessionQueryOptions(authClient: AuthClient, initialSession?: Ses
   const baseOptions = {
     queryKey: sessionQueryKey,
     queryFn: async () => {
-      const { data: session } = await authClient.getSession();
+      const { data: session, error } = await authClient.getSession({
+        query: { disableCookieCache: true },
+      });
+      if (error) throw new Error(error.message || "Failed to verify your session");
       return session ?? null;
     },
     staleTime: 60 * 1000,
