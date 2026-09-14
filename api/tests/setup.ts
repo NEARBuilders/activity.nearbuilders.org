@@ -136,7 +136,11 @@ export async function getPluginClient(
     const activityRelayUrl = await ensureTestRelay();
     const config = {
       ...TEST_CONFIG,
-      variables: { ...TEST_CONFIG.variables, activityRelayUrl },
+      variables: {
+        ...TEST_CONFIG.variables,
+        activityRelayUrl,
+        activityNostrRpcUrl: "",
+      },
     } as typeof TEST_CONFIG;
     const { router, initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, config);
     activityCredentialsService = initialized.context.activityCredentials;
