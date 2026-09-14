@@ -6,6 +6,8 @@ import WebSocket from "ws";
 useWebSocketImplementation(WebSocket);
 
 export const ACTIVITY_EVENT_KIND = 1701;
+const RELAY_QUERY_TIMEOUT_MS = 5_000;
+const NOSTR_CLIENT_EOSE_TIMEOUT_MS = RELAY_QUERY_TIMEOUT_MS + 1_000;
 
 export type ActivityQuery = {
   eventId?: string;
@@ -29,6 +31,7 @@ export interface ActivityRelayAdapter {
   subscribe(
     filter: Filter,
     onEvent: (event: Event) => void,
+    onError?: (error: Error) => void,
   ): { close: () => void } | Promise<{ close: () => void }>;
   close(): void;
 }
@@ -127,7 +130,7 @@ export class NostrRelayAdapter implements ActivityRelayAdapter {
         settled = true;
         subscription?.close("Activity relay query timed out");
         reject(new ActivityRelayQueryTimeoutError());
-      }, 5_000);
+      }, RELAY_QUERY_TIMEOUT_MS);
       const settle = (result: () => void) => {
         if (settled) return;
         settled = true;
@@ -141,9 +144,7 @@ export class NostrRelayAdapter implements ActivityRelayAdapter {
           onevent: (event) => events.push(event),
           oneose: () => settle(() => resolve(events)),
           onclose: () => settle(() => reject(new ActivityRelayUnavailableError())),
-          // The adapter timer above must report a missing EOSE instead of letting
-          // nostr-tools turn its own EOSE timeout into a successful empty result.
-          eoseTimeout: 6_000,
+          eoseTimeout: NOSTR_CLIENT_EOSE_TIMEOUT_MS,
         });
       } catch {
         settle(() => reject(new ActivityRelayUnavailableError()));
@@ -278,11 +279,11 @@ export class ActivityRelay {
   async subscribe(
     input: ActivityQuery,
     onEvent: (event: Event) => void,
-    options: { since?: number } = {},
+    options: { since?: number; onError?: (error: Error) => void } = {},
   ): Promise<{ close: () => void }> {
     const filter = activityFilter(input);
     if (options.since !== undefined) filter.since = options.since;
-    return this.#adapter.subscribe(filter, onEvent);
+    return this.#adapter.subscribe(filter, onEvent, options.onError);
   }
 
   close(): void {

@@ -2,8 +2,8 @@
   "extends": "bos://dev.everything.near/dev.everything.dev",
   "account": "nearbuilding.near",
   "domain": "activity.nearbuilders.org",
-  "title": "everything.dev",
-  "description": "Open runtime for apps on NEAR, composed from published config and loaded through a shared host, UI, and API runtime.",
+  "title": "NEAR Builders Activity",
+  "description": "Shared activity, provenance, and reputation infrastructure for the NEAR ecosystem.",
   "staging": {
     "domain": "dev.everything.dev"
   },
@@ -23,13 +23,19 @@
         "activityNostrBindingContract": "contextual.near",
         "activityNostrBindingRelay": "wss://relay.nearbuilders.org",
         "activityNostrKvApiUrl": "https://kv.main.fastnear.com",
-        "activityRelayUrl": "wss://relay.nearbuilders.org"
+        "activityRelayUrl": "wss://relay.nearbuilders.org",
+        "activityNostrRpcUrl": "https://nostr.nearbuilders.org/api/rpc/nostr"
       },
       "secrets": [
         "API_DATABASE_URL",
         "ACTIVITY_SIGNING_MASTER_KEYS",
         "ACTIVITY_SIGNING_ACTIVE_KEY_VERSION",
         "ACTIVITY_REDIS_URL"
+      ]
+    },
+    "auth": {
+      "secrets": [
+        "CORS_ORIGIN"
       ]
     }
   },

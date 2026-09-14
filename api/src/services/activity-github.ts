@@ -16,8 +16,8 @@ import {
 } from "../github/github-events-client";
 import type { ActivityIngestionService } from "./activity-ingestion";
 
-export const GITHUB_MERGED_PULL_REQUEST_EVENT = "github.pr.merged";
-export const GITHUB_CLOSED_ISSUE_EVENT = "github.issue.closed";
+const GITHUB_MERGED_PULL_REQUEST_EVENT = "github.pr.merged";
+const GITHUB_CLOSED_ISSUE_EVENT = "github.issue.closed";
 
 export type ActivityGithubConfiguration = {
   sourceId: string;

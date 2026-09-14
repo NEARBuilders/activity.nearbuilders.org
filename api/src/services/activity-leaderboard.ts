@@ -33,9 +33,8 @@ export type ActivityLeaderboardUpdate = {
   event: ActivityLeaderboardEvent;
 };
 
-export type ActivityLeaderboardBreakdown =
-  ActivityLeaderboardResult["data"][number]["breakdown"][number];
-export type ActivityLeaderboardEntry = ActivityLeaderboardResult["data"][number];
+type ActivityLeaderboardBreakdown = ActivityLeaderboardResult["data"][number]["breakdown"][number];
+type ActivityLeaderboardEntry = ActivityLeaderboardResult["data"][number];
 export type ActivityLeaderboardStatus = ActivityLeaderboardResult["projection"];
 
 export interface ActivityPointValueProvider {
@@ -544,7 +543,7 @@ export function ActivityLeaderboardLive(input: ActivityLeaderboardOptions) {
   );
 }
 
-export function createActivityLeaderboard(
+function createActivityLeaderboard(
   input: ActivityLeaderboardOptions,
 ): ActivityLeaderboard | Promise<ActivityLeaderboard> {
   return input.redisUrl === "memory:"

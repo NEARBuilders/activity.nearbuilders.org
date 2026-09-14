@@ -224,22 +224,13 @@ events with the same Nostr timestamp from being skipped or repeated. Each relay 
 limit fails loudly instead of returning a cursor that could silently omit same-second events.
 Relay reads have a six-second gateway deadline around the relay client's five-second wait.
 
-## Local workflow
+## Verification workflow
 
-Start the pinned relay and Redis services, run the integration proof, and stop the services with:
+Production uses the hosted relay, Nostr plugin RPC, and Redis services configured by the deployment.
+The API test suite uses in-process relay fixtures; no Nostr checkout or local relay is required.
 
-```bash
-bun run dev:activity-infra
-bun run test:activity
-bun run dev:activity-infra:down
-```
-
-Defaults are `ws://127.0.0.1:7447` for the relay and `redis://127.0.0.1:6379` for Redis. Override
-them with `ACTIVITY_RELAY_URL` and `ACTIVITY_REDIS_URL`. Docker named volumes preserve local relay
-history and Redis projection state between restarts.
-
-The integration test publishes and queries signed events, restarts the relay underneath a live
-subscription, and replays relay history twice into Redis. It does not contact a public relay.
+The integration suite publishes and queries signed events, exercises live subscriptions, and replays
+relay history into Redis fixtures. It does not contact the public relay.
 
 ## Production requirements
 

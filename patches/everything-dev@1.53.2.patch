@@ -1,0 +1,30 @@
+diff --git a/dist/infra/planner.cjs b/dist/infra/planner.cjs
+index 00e8570e9f6d291561767f7b61a734fff8904677..7a587b3d438b9cdd4bb3506cf6d23aeaa26f4f03 100644
+--- a/dist/infra/planner.cjs
++++ b/dist/infra/planner.cjs
+@@ -292,7 +292,9 @@ function planInfra(input) {
+ 			ui: uiIsLocal && resolvedPorts.ui ? {
+ 				...input.bosConfig.ui,
+ 				port: resolvedPorts.ui,
+-				url: `http://localhost:${resolvedPorts.ui}`
++				url: `http://localhost:${resolvedPorts.ui}`,
++				ssrUrl: input.cli.ssr ? `http://localhost:${resolvedPorts.uiSsr}` : void 0,
++				ssrIntegrity: void 0
+ 			} : input.bosConfig.ui,
+ 			auth: authIsLocal && resolvedPorts.auth && input.bosConfig.auth ? {
+ 				...input.bosConfig.auth,
+diff --git a/dist/infra/planner.mjs b/dist/infra/planner.mjs
+index 9a18b6fe2b3e9cabf392fa3d36e015148f1c0e85..4395d8eea7c8c0025c669c44c1b5afbbfd192838 100644
+--- a/dist/infra/planner.mjs
++++ b/dist/infra/planner.mjs
+@@ -292,7 +292,9 @@ function planInfra(input) {
+ 			ui: uiIsLocal && resolvedPorts.ui ? {
+ 				...input.bosConfig.ui,
+ 				port: resolvedPorts.ui,
+-				url: `http://localhost:${resolvedPorts.ui}`
++				url: `http://localhost:${resolvedPorts.ui}`,
++				ssrUrl: input.cli.ssr ? `http://localhost:${resolvedPorts.uiSsr}` : void 0,
++				ssrIntegrity: void 0
+ 			} : input.bosConfig.ui,
+ 			auth: authIsLocal && resolvedPorts.auth && input.bosConfig.auth ? {
+ 				...input.bosConfig.auth,

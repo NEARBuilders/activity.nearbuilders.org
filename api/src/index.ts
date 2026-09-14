@@ -12,6 +12,7 @@ import {
   ActivityRelayUnavailableError,
   NostrRelayAdapter,
 } from "./activity/activity-relay";
+import { SharedNostrRelayAdapter } from "./activity/shared-nostr-relay";
 import { type ActivityFeedEvent, contract, NEAR_ACCOUNT_ID_REGEX } from "./contract";
 import { DatabaseLive, DatabaseTag } from "./db/layer";
 import { createActivitySseStream } from "./lib/activity-sse";
@@ -88,6 +89,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
     activityNostrBindingRelay: z.string().default("wss://relay.nearbuilders.org"),
     activityNostrKvApiUrl: z.string().default("https://kv.main.fastnear.com"),
     activityRelayUrl: z.string().default("wss://relay.nearbuilders.org"),
+    activityNostrRpcUrl: z.string().optional(),
   }),
 
   secrets: z.object({
@@ -129,8 +131,13 @@ export default createPlugin.withPlugins<PluginsClient>()({
           kvApiUrl: config.variables.activityNostrKvApiUrl,
         }).pipe(Layer.provide(databaseLayer)),
       );
+      const relayUrl = resolveActivityRelayUrl(config.variables.activityRelayUrl);
+      const nostrRpcUrl =
+        process.env.ACTIVITY_NOSTR_RPC_URL?.trim() || config.variables.activityNostrRpcUrl;
       const activityRelay = new ActivityRelay(
-        new NostrRelayAdapter(resolveActivityRelayUrl(config.variables.activityRelayUrl)),
+        nostrRpcUrl
+          ? SharedNostrRelayAdapter.connect(nostrRpcUrl, relayUrl)
+          : new NostrRelayAdapter(relayUrl),
         {
           scanLimit: 1_000,
         },
@@ -189,8 +196,6 @@ export default createPlugin.withPlugins<PluginsClient>()({
         console.info("[ActivityLeaderboard] Projection rebuild completed", rebuilt);
       }
       activityGithubService.start();
-
-      console.log("[API] Services Initialized");
 
       return {
         database,
@@ -772,47 +777,6 @@ export default createPlugin.withPlugins<PluginsClient>()({
           throw new ORPCError("SERVICE_UNAVAILABLE", {
             message: "Activity leaderboard projection status is unavailable",
           });
-        }
-      }),
-
-      createThing: builder.createThing.use(requireAuth).handler(async ({ input }) => {
-        throw new ORPCError("BAD_REQUEST", {
-          message: `The template plugin is not included; cannot create ${input.thingId}`,
-        });
-      }),
-
-      getThing: builder.getThing.handler(async ({ input }) => {
-        throw new ORPCError("BAD_REQUEST", {
-          message: `The template plugin is not included; cannot read ${input.thingId}`,
-        });
-      }),
-
-      listThings: builder.listThings.handler(async () => {
-        throw new ORPCError("BAD_REQUEST", {
-          message: "The template plugin is not included in this deployment",
-        });
-      }),
-
-      deleteThing: builder.deleteThing.use(requireAuth).handler(async ({ input }) => {
-        throw new ORPCError("BAD_REQUEST", {
-          message: `The template plugin is not included; cannot delete ${input.thingId}`,
-        });
-      }),
-
-      testError: builder.testError.handler(async ({ input }) => {
-        switch (input.kind) {
-          case "unauthorized":
-            throw new ORPCError("UNAUTHORIZED", { message: "test unauthorized error" });
-          case "forbidden":
-            throw new ORPCError("FORBIDDEN", { message: "test forbidden error" });
-          case "not_found":
-            throw new ORPCError("NOT_FOUND", { message: "test not found error" });
-          case "conflict":
-            throw new ORPCError("CONFLICT", { message: "test conflict error" });
-          case "bad_request":
-            throw new ORPCError("BAD_REQUEST", { message: "test bad request error" });
-          default:
-            throw new Error("test internal server error");
         }
       }),
     };

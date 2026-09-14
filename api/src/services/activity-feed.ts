@@ -193,8 +193,8 @@ export class ActivityFeedService {
     if (options.lastEventId !== undefined && !/^[a-f0-9]{64}$/.test(options.lastEventId)) {
       throw new ActivityResumeError();
     }
-    const registeredIdentities = await this.#registeredIdentities(input.source);
-    const queued: ActivityFeedEvent[] = [];
+    const queued: Event[] = [];
+    let streamFailure: Error | undefined;
     const deliveredIds = new Set(options.lastEventId ? [options.lastEventId] : []);
     let wake: (() => void) | undefined;
     const wakeStream = () => {
@@ -204,13 +204,17 @@ export class ActivityFeedService {
     const subscription = await this.#relay.subscribe(
       input,
       (event) => {
-        const parsed = parseActivityFeedEvent(event, registeredIdentities, input);
-        if (!parsed) return;
-        if (deliveredIds.has(parsed.id)) return;
-        queued.push(parsed);
+        if (!validateEvent(event) || deliveredIds.has(event.id)) return;
+        queued.push(event);
         wakeStream();
       },
-      { since: Math.floor(Date.now() / 1_000) },
+      {
+        since: Math.floor(Date.now() / 1_000),
+        onError: (error) => {
+          streamFailure = error;
+          wakeStream();
+        },
+      },
     );
     options.signal?.addEventListener("abort", wakeStream, { once: true });
     options.onReady?.();
@@ -227,15 +231,20 @@ export class ActivityFeedService {
       }
 
       while (!options.signal?.aborted) {
-        const event = queued.shift();
-        if (event) {
-          if (
-            deliveredIds.has(event.id) ||
-            (replay.baseline !== undefined && !isAfter(event, replay.baseline))
-          ) {
+        if (streamFailure) throw streamFailure;
+        const queuedEvent = queued.shift();
+        if (queuedEvent) {
+          if (deliveredIds.has(queuedEvent.id)) continue;
+          const source = singleTagValue(queuedEvent, "s");
+          if (!source) continue;
+          const identities = await this.#registeredIdentities(input.source ?? source);
+          const event = parseActivityFeedEvent(queuedEvent, identities, input);
+          if (!event) continue;
+          if (replay.baseline !== undefined && !isAfter(event, replay.baseline)) {
             continue;
           }
           if (await this.#suppression.isHidden(event.id)) continue;
+          if (options.signal?.aborted) break;
           deliveredIds.add(event.id);
           yield event;
           continue;

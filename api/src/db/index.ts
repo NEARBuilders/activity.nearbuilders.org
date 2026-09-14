@@ -26,7 +26,7 @@ export class DatabaseError extends Data.TaggedError("DatabaseError")<{
   }
 }
 
-export function unwrapDatabaseError(error: unknown): string {
+function unwrapDatabaseError(error: unknown): string {
   if (!(error instanceof Error)) return String(error);
   const parts = [error.message];
   let cause: unknown = error.cause;
@@ -78,10 +78,6 @@ export async function createDatabaseDriver(url: string): Promise<DatabaseDriver>
       if (closed) return;
       closed = true;
       pool.removeAllListeners("error");
-      console.error(
-        "[Database] pool.end() called from:",
-        new Error("pool.end() stack trace").stack,
-      );
       await pool.end();
     },
   };

@@ -25,7 +25,7 @@ const TEST_REGISTRY = {
   },
 } as const;
 
-export const runtime = createPluginRuntime({
+const runtime = createPluginRuntime({
   registry: TEST_REGISTRY,
   secrets: {},
 });
@@ -144,17 +144,14 @@ export async function getPluginClient(
     const rpcHandler = new RPCHandler(router);
     const openApiHandler = new OpenAPIHandler(router);
 
-    // Find an available port
     server = createServer(async (req, res) => {
       const url = new URL(req.url!, baseUrl);
 
       if (url.pathname.startsWith("/rpc")) {
-        // Initialize empty context for each request to prevent closure capture
         let requestContext: Record<string, unknown> = {
           reqHeaders: new Headers(req.headers as Record<string, string>),
         };
 
-        // Allow overriding context via headers for flexibility
         if (req.headers["x-test-context"]) {
           requestContext = {
             ...requestContext,
