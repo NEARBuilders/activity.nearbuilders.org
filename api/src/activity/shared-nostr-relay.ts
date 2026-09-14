@@ -97,7 +97,7 @@ export class SharedNostrRelayAdapter implements ActivityRelayAdapter {
     try {
       const result = await this.client.queryEvents(
         {
-          filter: convertFilter({ ...filter, limit: Math.min(filter.limit ?? 500, 500) }),
+          filter: convertFilter({ ...filter, limit: Math.min(filter.limit ?? 1_000, 1_000) }),
           relays: [this.relayUrl],
         },
         { signal: AbortSignal.timeout(5_500) },

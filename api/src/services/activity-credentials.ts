@@ -404,22 +404,40 @@ export const ActivityCredentialsLive = (
                 message: "The NEAR-to-Nostr binding is not available yet",
               });
             }
-            const data = (await response.json()) as { entries?: Array<{ value?: unknown }> };
+            let data: { entries?: Array<{ value?: unknown }> };
+            try {
+              data = (await response.json()) as { entries?: Array<{ value?: unknown }> };
+            } catch {
+              throw new ORPCError("BAD_REQUEST", {
+                message: "The NEAR-to-Nostr binding response is invalid",
+              });
+            }
             const rawBinding = data.entries?.[0]?.value;
-            const binding =
-              typeof rawBinding === "string"
-                ? (JSON.parse(rawBinding) as { npub?: unknown; bound_at?: unknown })
-                : (rawBinding as { npub?: unknown; bound_at?: unknown } | undefined);
-            if (!binding || binding.npub !== result.identity.publicKey) {
+            let binding: { npub?: unknown; bound_at?: unknown } | undefined;
+            try {
+              binding =
+                typeof rawBinding === "string"
+                  ? (JSON.parse(rawBinding) as { npub?: unknown; bound_at?: unknown })
+                  : (rawBinding as { npub?: unknown; bound_at?: unknown } | undefined);
+            } catch {
+              throw new ORPCError("BAD_REQUEST", {
+                message: "The NEAR-to-Nostr binding response is invalid",
+              });
+            }
+            if (
+              !binding ||
+              typeof binding.npub !== "string" ||
+              binding.npub !== result.identity.publicKey ||
+              typeof binding.bound_at !== "number" ||
+              !Number.isSafeInteger(binding.bound_at) ||
+              binding.bound_at <= 0
+            ) {
               throw new ORPCError("BAD_REQUEST", {
                 message: "The NEAR-to-Nostr binding does not match this signing identity",
               });
             }
 
-            const boundAt =
-              typeof binding.bound_at === "number"
-                ? new Date(binding.bound_at * 1_000)
-                : new Date();
+            const boundAt = new Date(binding.bound_at * 1_000);
             const [updated] = await db
               .update(identitiesTable)
               .set({
