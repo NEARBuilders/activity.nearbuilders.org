@@ -220,18 +220,69 @@ The Activity infrastructure command starts the pinned local Nostr relay on port 
 on port `6379`; both use Docker named volumes. Run `bun run dev:activity-infra:down` to stop them.
 
 Local development uses a deterministic signing master key only when
-`ACTIVITY_SIGNING_MASTER_KEYS` is empty. Every deployed environment must provide a JSON keyring of
-base64-encoded 32-byte keys and select its current version:
+`ACTIVITY_SIGNING_MASTER_KEYS` is empty. Generated contents stay deterministic so the local
+database can be safely wiped between runs; do not reuse the dev fallback in any deployed
+environment.
+
+#### Generate a master key
+
+`ACTIVITY_SIGNING_MASTER_KEYS` is a JSON keyring; each value is a base64-encoded 32-byte AES-256
+key. The active version is selected by `ACTIVITY_SIGNING_ACTIVE_KEY_VERSION`. A 32-byte key plus
+matching version line can be produced locally with:
+
+```bash
+bun run keys:gen                         # version defaults to v1
+bun run keys:gen --version=v2            # when adding a new rotation target
+```
+
+The script prints the exact env lines to paste into `.env` or your secret store:
 
 ```dotenv
 ACTIVITY_SIGNING_MASTER_KEYS={"v1":"<base64-encoded-32-byte-key>"}
 ACTIVITY_SIGNING_ACTIVE_KEY_VERSION=v1
-ACTIVITY_GITHUB_TOKEN=
 ```
 
-To rotate the encryption master key, retain previous entries for decryption and point the active
-version at the new entry. Signing Identity rotation is separate: it retires the old public identity,
-creates a new encrypted one, and requires a new NEAR binding without modifying historical events.
+The printed base64 string **is not stored anywhere else**; copy it into a secret manager before
+closing the terminal. The dev plugin (`api/plugin.dev.ts`) only generates one when the keyring is
+empty; once you set a real value, that value is what production boot will use.
+
+#### Production environments
+
+Every deployed environment — preview, staging, mainnet — **must** provide a real keyring. The API
+runtime refuses to boot with an empty `ACTIVITY_SIGNING_MASTER_KEYS` when
+`NODE_ENV=production`, and the message points back at `bun run keys:gen`. Provisioning is the
+operator's responsibility: store the keyring in the host's secret manager, set the env var during
+deployment, and back up the keyring in a second location before the first event is published.
+
+#### Rotation
+
+To rotate the master key, add a new entry to the keyring and point the active version at it. Old
+entries must remain available because every existing Signing Identity record remembers which key
+version encrypted it:
+
+```dotenv
+ACTIVITY_SIGNING_MASTER_KEYS={"v1":"<old-base64>", "v2":"<new-base64>"}
+ACTIVITY_SIGNING_ACTIVE_KEY_VERSION=v2
+```
+
+New Signing Identities are encrypted under `v2`. Once every identity encrypted under `v1` has been
+rotated to `v2` (or retired), `v1` can be dropped from the keyring.
+
+#### Recovery
+
+Losing every copy of a master key version renders every Signing Identity encrypted under it
+**unrecoverable**. The plaintext Nostr private key cannot be reconstructed from the database
+record, the gateway's decrypt path, or any relay event. Back up the keyring before the first event
+is published; do not rely on the dev fallback locally if you plan to promote that state.
+
+#### Signing Identity rotation (separate)
+
+Master key rotation does not retire a source's Signing Identity. Signing Identity rotation retires
+the old public identity, creates a new encrypted one, and requires a new NEAR binding without
+modifying historical events. See [`docs/activity-protocol.md`](docs/activity-protocol.md#source-credentials-and-signing)
+for the per-identity signing history.
+
+#### NEAR binding variables
 
 Binding uses `contextual.near` with FastNear mainnet. The contract ID and FastNear endpoint are
 explicit API variables in `bos.config.json`; local API-only runs may override them with

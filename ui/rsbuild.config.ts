@@ -227,6 +227,7 @@ function createServerConfig() {
   if (shouldDeploy) {
     plugins.push(
       withZephyr({
+        entrypoint: "remoteEntry.server.js",
         hooks: {
           onDeployComplete: async (info) => {
             console.log("🚀 UI SSR Deployed:", info.url);

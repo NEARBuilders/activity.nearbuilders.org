@@ -2,20 +2,20 @@
   "extends": "bos://dev.everything.near/dev.everything.dev",
   "account": "nearbuilding.near",
   "domain": "activity.nearbuilders.org",
-  "title": "NEAR Builders Activity",
-  "description": "Shared activity, provenance, and reputation infrastructure for the NEAR ecosystem.",
-  "staging": {
-    "domain": "dev.everything.dev"
-  },
+  "title": "Activity | NearBuilders",
+  "description": "Shared activity and reputation layer for the NEAR ecosystem — Activity Sources submit signed events through one HTTP gateway; Nostr relays store and distribute them.",
   "repository": "https://github.com/NEARBuilders/activity.nearbuilders.org",
   "ci": {
     "railway": {
-      "service": "app"
+      "service": "activity-app"
     }
   },
   "app": {
     "ui": {
-      "development": "local:ui"
+      "development": "local:ui",
+      "production": "https://elliot-braem-7913-ui-activity-nearbuilders-org-ne-683fd4587-ze.zephyrcloud.app",
+      "integrity": "sha384-zxm5jXUCmxG+AUqyC4jcd+B+SvKjutw+iom2hJsJCKF06+8b+m3cpOuslrmF/sbK",
+      "ssr": "https://elliot-braem-7915-ui-activity-nearbuilders-org-ne-746229545-ze.zephyrcloud.app"
     },
     "api": {
       "development": "local:api",
@@ -31,13 +31,17 @@
         "ACTIVITY_SIGNING_MASTER_KEYS",
         "ACTIVITY_SIGNING_ACTIVE_KEY_VERSION",
         "ACTIVITY_REDIS_URL"
-      ]
-    },
-    "auth": {
-      "secrets": [
-        "CORS_ORIGIN"
-      ]
+      ],
+      "production": "https://elliot-braem-7914-api-activity-nearbuilders-org-n-e3512ef11-ze.zephyrcloud.app",
+      "integrity": "sha384-mn3XE+GENekYx07NQktLLys3E2yrGw5CO3kJMI4UWpzdUQx7Q2ccjFFuKtdS4TYG"
     }
   },
-  "plugins": {}
+  "plugins": {
+    "nostr": {
+      "extends": "bos://nearbuilding.near/nostr.nearbuilders.org",
+      "variables": {
+        "clientName": "activity.nearbuilders.org"
+      }
+    }
+  }
 }
