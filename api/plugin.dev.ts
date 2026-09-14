@@ -1,8 +1,3 @@
-/**
- * Dev-mode plugin configuration for the local API server.
- *
- */
-
 import "dotenv/config";
 import type { PluginConfigInput } from "every-plugin";
 import packageJson from "./package.json" with { type: "json" };
@@ -23,7 +18,9 @@ export default {
         process.env.ACTIVITY_NOSTR_BINDING_RELAY || "wss://relay.nearbuilders.org",
       activityNostrKvApiUrl:
         process.env.ACTIVITY_NOSTR_KV_API_URL || "https://kv.main.fastnear.com",
-      activityRelayUrl: process.env.ACTIVITY_RELAY_URL || "ws://127.0.0.1:7447",
+      activityRelayUrl: process.env.ACTIVITY_RELAY_URL || "wss://relay.nearbuilders.org",
+      activityNostrRpcUrl:
+        process.env.ACTIVITY_NOSTR_RPC_URL || "https://nostr.nearbuilders.org/api/rpc/nostr",
     },
     secrets: {
       API_DATABASE_URL: process.env.API_DATABASE_URL || "pglite:.bos/api/:memory:",

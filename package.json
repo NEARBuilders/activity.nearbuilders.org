@@ -147,5 +147,8 @@
     "@opentelemetry/api": "catalog:",
     "every-plugin": "catalog:",
     "everything-dev": "catalog:"
+  },
+  "patchedDependencies": {
+    "everything-dev@1.53.2": "patches/everything-dev@1.53.2.patch"
   }
 }

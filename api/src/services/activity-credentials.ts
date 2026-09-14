@@ -102,7 +102,7 @@ export interface ActivityEventWriteCredential {
   permissions: ["event:write"];
 }
 
-export interface ActivityBindingWrite {
+interface ActivityBindingWrite {
   contractId: string;
   methodName: "__fastdata_kv";
   key: string;

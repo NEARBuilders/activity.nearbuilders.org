@@ -246,11 +246,12 @@ activityDescribe("Activity Nostr boundary", () => {
 
   it("stores exact dynamic leaderboard counts and exclusions in Redis", async () => {
     let pointValue = 5;
+    const now = new Date();
     leaderboard = await createRedisActivityLeaderboard({
       redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6379",
       namespace: `activity:test:${randomUUID()}`,
       listPointValues: async () => [{ source: "feedback", type: "feedback.written", pointValue }],
-      now: () => new Date("2026-09-03T12:00:00.000Z"),
+      now: () => now,
     });
     await leaderboard.rebuild({ events: [], hiddenEvents: [] });
     const projectedEvent = {
@@ -258,7 +259,7 @@ activityDescribe("Activity Nostr boundary", () => {
       source: "feedback",
       type: "feedback.written",
       actor: "alice.near",
-      timestamp: "2026-09-02T12:00:00.000Z",
+      timestamp: now.toISOString(),
     };
 
     expect(await leaderboard.apply({ operation: "include", event: projectedEvent })).toBe(true);

@@ -1,0 +1,82 @@
+# Activity infrastructure readiness
+
+Tracks the locally verifiable portion of [issue #12](https://github.com/NEARBuilders/activity.nearbuilders.org/issues/12).
+This is an operating and acceptance guide, not evidence of a production deployment.
+
+## Current evidence
+
+The API integration suite covers signed publishing and filters, live delivery,
+retained history, pagination and provenance, replay deduplication, current point
+values, moderation, and explicit rejection of truncated history. It does not prove
+backup restoration or complete production history capacity.
+
+The production transport is the hosted Nostr plugin RPC endpoint configured in `bos.config.json`.
+Local verification uses the API's in-process relay fixtures and does not require a Nostr checkout.
+
+## Deployment contract
+
+- nearbuilders.org is the user-facing integration target. Its backend submits to Activity;
+  its readers use Activity feed, SSE and leaderboard APIs.
+- Activity owns source approval, Signing Identities, Source API Keys, submission records,
+  provenance, moderation and scoring.
+- The shared Nostr plugin publishes, queries and streams signed events. Deploying the
+  plugin does not deploy or replace the durable relay.
+- Activity's optional `ACTIVITY_NOSTR_RPC_URL` selects the shared plugin. Its configured
+  relay destination must also be allowed by that plugin. Omitting the RPC setting retains
+  the existing direct adapter; this is an explicit transport choice.
+- The streaming endpoint is the hosted Nostr plugin's `/api/rpc/nostr` route, not its
+  standalone plugin development port, which buffers streaming responses.
+- No additional Nostr API key is needed by this integration. Relay write and authentication
+  policy must match the capabilities of the selected client and relay.
+
+## Production acceptance gates
+
+| Gate | Required evidence | Current status |
+| --- | --- | --- |
+| Relay endpoint | Selected host, DNS, TLS, persistent storage and named operator | Pending |
+| Relay policy | Kind 1701, retention, write policy, connection limits and NIP-11 metadata | Pending |
+| History capacity | Complete pagination across more than 500 records, including timestamp ties | Reproduced: 501 accepted events yielded 500; shared adapter now fails explicitly |
+| Redis | Private connectivity, persistence, memory policy and monitored capacity | Local AOF only; production pending |
+| Restore | Restore relay, database and Redis backups into isolated instances and reconcile IDs, moderation and counts | Local relay/Redis drill added; full database and production recovery pending |
+| Health | Publish/read/subscribe, Redis write and projection rebuild checks on staging and production | Local integration passes; deployed checks pending |
+| Operations | Metrics, alert routing, backup schedule, recovery objectives and incident owner | Pending |
+
+Activity's domain scan limit is 1,000. The shared adapter now caps each history request
+at 500 to match the selected relay and rejects a response marked limited by the plugin.
+The regression fixture reproduced a missing event among 501 same-second events before
+this fix. At the cap, the new behavior is an explicit failure, not complete pagination.
+The direct adapter is unchanged. Relays with lower limits require separate validation.
+Complete larger-history reads remain a production gate before reader cutover.
+
+The selected relay hardcodes both its advertised and backend query limit at 500;
+its command-line flags do not expose a limit override. See the pinned version's
+[configuration](https://github.com/mattn/nostr-relay/blob/v0.0.250/main.go) and
+[limit declaration](https://github.com/mattn/nostr-relay/blob/v0.0.250/relay.go).
+
+## Failure and recovery procedure
+
+1. For a relay outage, retain submission records and retry the same action with its
+   original idempotency key after recovery. Check the intended relay's acknowledgement
+   and exact event ID before treating publication as successful.
+2. After reconnect, verify retained history and resume Activity SSE with `Last-Event-ID`.
+   Shared transport replay is bounded; reconnect alone is not proof of complete recovery.
+3. For Redis failures, inspect `/api/v1/leaderboard/status` and restore connectivity.
+   Verify projection readiness and reconcile scores with accepted submission records and
+   hidden-event tombstones. The existing startup rebuild uses the durable submission ledger;
+   see [leaderboard recovery](activity-leaderboard.md#reconnect-and-rebuild).
+4. Never clear live volumes or local source/auth databases as a recovery shortcut.
+   Restore backups into isolated instances first and compare event IDs and rankings.
+5. Before switching transport back to the direct adapter, verify that it points to the
+   same relay and passes publish, query and live-delivery checks. Transport rollback
+   does not recover a failed relay. Reader/writer rollback to legacy nearbuilders.org
+   remains work in issues #13 and #14.
+
+## Work order
+
+1. Review the portable shared-adapter integration tests and scoped local Activity changes.
+2. Resolve and test history capacity, then exercise backup restoration and outage behavior.
+3. Select production infrastructure and ownership; complete the deployed acceptance gates.
+4. Implement reversible nearbuilders.org writer integration (#13), then history and reader
+   cutover (#14). Launch and adoption evidence (#16) follow those dependencies.
+
+Keep issue #12 open until the production criteria are demonstrated.

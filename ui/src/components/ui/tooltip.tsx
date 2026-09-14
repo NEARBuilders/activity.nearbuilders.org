@@ -1,6 +1,5 @@
 import { Tooltip as TooltipPrimitive } from "radix-ui";
 import type * as React from "react";
-
 import { cn } from "@/lib/utils";
 
 function TooltipProvider({
@@ -48,27 +47,4 @@ function TooltipContent({
   );
 }
 
-function ClassicTooltipContent({
-  className,
-  sideOffset = 6,
-  children,
-  ...props
-}: React.ComponentProps<typeof TooltipPrimitive.Content>) {
-  return (
-    <TooltipPrimitive.Portal>
-      <TooltipPrimitive.Content
-        data-slot="tooltip-content"
-        sideOffset={sideOffset}
-        className={cn(
-          "z-50 w-fit rounded-none border-2 border-inset border-border bg-tooltip-classic px-2 py-1 text-xs text-foreground shadow-none",
-          className,
-        )}
-        {...props}
-      >
-        {children}
-      </TooltipPrimitive.Content>
-    </TooltipPrimitive.Portal>
-  );
-}
-
-export { ClassicTooltipContent, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger };
+export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger };

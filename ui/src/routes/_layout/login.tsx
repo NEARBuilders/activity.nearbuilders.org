@@ -3,12 +3,8 @@ import { createFileRoute, Navigate, redirect, useNavigate } from "@tanstack/reac
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { getAppName, sessionQueryOptions, useAuthClient } from "@/app";
-import builtOn from "@/assets/built_on.png";
-import builtOnRev from "@/assets/built_on_rev.png";
 import { BrandElement } from "@/components/brand-element";
 import { Button } from "@/components/ui/button";
-import { NetworkToggle } from "@/components/ui/network-toggle";
-import { UnderConstruction } from "@/components/under-construction";
 
 type SearchParams = {
   redirect?: string;
@@ -48,7 +44,6 @@ function LoginPage() {
   const appName = getAppName(runtimeConfig);
 
   const [nearPending, setNearPending] = useState(false);
-  const [anonPending, setAnonPending] = useState(false);
   const [detectedAccount, setDetectedAccount] = useState<string | null>(null);
 
   useEffect(() => {
@@ -92,41 +87,25 @@ function LoginPage() {
     });
   };
 
-  const handleAnonymous = async () => {
-    setAnonPending(true);
-    try {
-      await auth.signIn.anonymous({
-        fetchOptions: {
-          onSuccess: async () => {
-            setAnonPending(false);
-            await handleSuccess("Started anonymous session");
-          },
-          onError: (ctx: { error?: { message?: string } }) => {
-            setAnonPending(false);
-            handleError(new Error(ctx.error?.message || "Anonymous sign in failed"));
-          },
-        },
-      });
-    } catch {
-      setAnonPending(false);
-    }
-  };
-
   if (session?.user) {
     const redirectTo = redirect?.startsWith("/") ? redirect : "/home";
     return <Navigate to={redirectTo} replace search={{}} />;
   }
 
-  const isPending = nearPending || anonPending;
+  const isPending = nearPending;
 
   return (
-    <div className="min-h-full w-full flex flex-col animate-fade-in">
-      <NetworkToggle />
+    <div className="min-h-[calc(100dvh-7rem)] lg:min-h-[calc(100dvh-4rem)] w-full flex flex-col animate-fade-in">
       <div className="flex-1 flex items-center justify-center px-6">
         <div className="w-full max-w-sm flex flex-col items-center gap-5">
           <BrandElement appName={appName} size="lg" />
+          <div className="space-y-2 text-center">
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">
+              Welcome to Activity
+            </h1>
+          </div>
 
-          <div className="w-full rounded-[12px] border border-border bg-card p-6 sm:p-8 space-y-5">
+          <div className="w-full border-b border-border pb-6 sm:p-8 space-y-5">
             <div className="space-y-3">
               {detectedAccount ? (
                 <>
@@ -157,59 +136,12 @@ function LoginPage() {
                   disabled={isPending}
                   className="w-full"
                 >
-                  {nearPending ? "connecting..." : "connect to everything"}
+                  {nearPending ? "connecting..." : "Connect your wallet"}
                 </Button>
               )}
-
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-border" />
-                <span className="text-xs text-muted-foreground">or</span>
-                <div className="flex-1 h-px bg-border" />
-              </div>
-
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={handleAnonymous}
-                disabled={isPending}
-                className="w-full text-muted-foreground hover:text-foreground"
-              >
-                {anonPending ? "starting..." : "continue anonymously"}
-              </Button>
-            </div>
-
-            <div className="pt-3 border-t border-border">
-              <p className="text-xs text-muted-foreground text-center leading-relaxed">
-                Anonymous sessions don't persist after sign out
-              </p>
             </div>
           </div>
-
-          <UnderConstruction
-            sourceFile="ui/src/routes/_layout/login.tsx"
-            runtimeConfig={runtimeConfig}
-          />
         </div>
-      </div>
-
-      <div className="shrink-0 flex items-center justify-center py-3">
-        <a
-          href="https://near.dev"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="relative block h-5 w-[84px]"
-        >
-          <img
-            src={builtOn}
-            alt="Built on NEAR"
-            className="absolute inset-0 h-full w-full object-contain dark:hidden"
-          />
-          <img
-            src={builtOnRev}
-            alt="Built on NEAR"
-            className="absolute inset-0 hidden h-full w-full object-contain dark:block"
-          />
-        </a>
       </div>
     </div>
   );

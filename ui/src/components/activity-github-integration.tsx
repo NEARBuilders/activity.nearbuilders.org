@@ -1,4 +1,8 @@
-import { GitPullRequest, RefreshCw, Save } from "lucide-react";
+import {
+  GitPullRequestIcon as GitPullRequest,
+  ArrowsClockwiseIcon as RefreshCw,
+  FloppyDiskIcon as Save,
+} from "@phosphor-icons/react/ssr";
 import { useEffect, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -180,7 +184,7 @@ export function ActivityGithubIntegration({
           )}
 
           {configuration && (
-            <div className="space-y-2 rounded-lg border border-border p-3 text-xs text-muted-foreground">
+            <div className="space-y-2 border-t border-border py-3 text-xs text-muted-foreground">
               <p>{configuration.quarantineCount} unmapped events quarantined</p>
               {configuration.repositories.map((repository) => (
                 <div key={`${repository.owner}/${repository.repository}`}>

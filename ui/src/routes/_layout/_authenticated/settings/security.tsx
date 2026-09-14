@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { type SessionData, sessionQueryOptions, useAuthClient } from "@/app";
-import { Button, Card, Input } from "@/components";
+import { Button, Input } from "@/components";
 
 export const Route = createFileRoute("/_layout/_authenticated/settings/security")({
   component: SecuritySettings,
@@ -72,10 +72,8 @@ function SecurityTab({ user }: { user: { email?: string; isAnonymous?: boolean |
   return (
     <div className="space-y-4">
       {user.email ? (
-        <Card className="p-6 space-y-4">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            Change password
-          </div>
+        <section className="space-y-4 border-t border-border py-6">
+          <div className="text-sm font-medium text-muted-foreground">Change password</div>
           <div className="grid gap-4 md:grid-cols-3">
             <Field label="current">
               <Input
@@ -114,11 +112,11 @@ function SecurityTab({ user }: { user: { email?: string; isAnonymous?: boolean |
           >
             {changePasswordMutation.isPending ? "changing..." : "change password"}
           </Button>
-        </Card>
+        </section>
       ) : (
-        <Card className="p-6 text-sm text-muted-foreground">
+        <section className="text-sm text-muted-foreground border-t border-border py-6">
           Password management appears once an email-based login is attached to this account.
-        </Card>
+        </section>
       )}
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -144,9 +142,7 @@ function SecurityTab({ user }: { user: { email?: string; isAnonymous?: boolean |
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="space-y-2">
-      <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </div>
+      <div className="text-sm font-medium text-muted-foreground">{label}</div>
       {children}
     </div>
   );
@@ -166,7 +162,7 @@ function ActionCard({
   disabled: boolean;
 }) {
   return (
-    <Card className="p-6 space-y-3">
+    <section className="space-y-3 border-t border-border py-6">
       <div className="space-y-1">
         <div className="font-medium text-foreground">{title}</div>
         <p className="text-sm text-muted-foreground leading-relaxed">{body}</p>
@@ -174,6 +170,6 @@ function ActionCard({
       <Button onClick={onClick} disabled={disabled} variant="outline">
         {actionLabel}
       </Button>
-    </Card>
+    </section>
   );
 }

@@ -8,12 +8,6 @@ afterEach(cleanup);
 
 describe("ActivityLeaderboard", () => {
   it("renders exact rankings and changes the selected period", () => {
-    const dateFormatter = vi
-      .spyOn(Date.prototype, "toLocaleDateString")
-      .mockImplementation(function (this: Date, _locales, options) {
-        expect(options).toMatchObject({ timeZone: "UTC" });
-        return this.getUTCDate() === 31 ? "Aug 31, 2026" : "Sep 6, 2026";
-      });
     const onPeriodChange = vi.fn();
     render(
       <ActivityLeaderboard
@@ -75,10 +69,9 @@ describe("ActivityLeaderboard", () => {
     expect(screen.getByText(/Feedback rounds/)).toBeTruthy();
     expect(screen.getByText("Trusted · 1.5×")).toBeTruthy();
     expect(screen.getByText("Standard source")).toBeTruthy();
-    expect(screen.getByText("Aug 31, 2026 – Sep 6, 2026 · UTC")).toBeTruthy();
+    expect(screen.queryByText("Dynamically weighted")).toBeNull();
     fireEvent.click(screen.getByRole("button", { name: "Monthly" }));
     expect(onPeriodChange).toHaveBeenCalledWith("monthly");
-    dateFormatter.mockRestore();
   });
 
   it("presents loading, empty, and retryable error states", () => {

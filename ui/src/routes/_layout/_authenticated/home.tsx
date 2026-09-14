@@ -1,168 +1,197 @@
+import { ArrowRightIcon, BroadcastIcon, BuildingsIcon, GearIcon } from "@phosphor-icons/react/ssr";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Home as HomeIcon, Settings } from "lucide-react";
-import { useMemo } from "react";
-import { type Passkey, type SessionData, sessionQueryOptions, useAuthClient } from "@/app";
-import { Card } from "@/components";
+import { sessionQueryOptions, useApiClient, useAuthClient } from "@/app";
 import { PageContainer } from "@/components/layout/page-container";
-import { InfoRow } from "@/components/ui/info-row";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
+import { activityFeedOptions, activityLeaderboardOptions } from "@/lib/activity-queries";
+import { getInitials } from "@/lib/utils";
 
 export const Route = createFileRoute("/_layout/_authenticated/home")({
-  head: () => ({
-    meta: [{ title: "Workspace | app" }, { name: "description", content: "Your workspace." }],
-  }),
+  head: () => ({ meta: [{ title: "Overview | NEAR Builders Activity" }] }),
+  loader: async ({ context }) => {
+    await Promise.all([
+      context.queryClient.prefetchQuery(activityFeedOptions(context.apiClient, {})),
+      context.queryClient.prefetchQuery(activityLeaderboardOptions(context.apiClient, {})),
+    ]);
+  },
   component: Home,
 });
 
 function Home() {
   const auth = useAuthClient();
-  const { tenant } = Route.useRouteContext();
-  const { data: session } = useQuery<SessionData | null>(sessionQueryOptions(auth, undefined));
-  const { data: passkeys = [] } = useQuery({
-    queryKey: ["passkeys"],
+  const api = useApiClient();
+  const { data: session } = useQuery(sessionQueryOptions(auth));
+  const feed = useQuery(activityFeedOptions(api, {}));
+  const leaderboard = useQuery(activityLeaderboardOptions(api, {}));
+  const organizations = useQuery({
+    queryKey: ["organizations"],
     queryFn: async () => {
-      const { data } = await auth.passkey.listUserPasskeys();
-      return (data || []) as Passkey[];
+      const { data, error } = await auth.organization.list();
+      if (error) throw new Error(error.message);
+      return data ?? [];
     },
-    staleTime: 60 * 1000,
   });
-  const user = session?.user;
-  const nearAccountId = auth.near.getAccountId();
-
-  const profile = useMemo(() => {
-    if (!user)
-      return {
-        isAnonymous: false,
-        hasEmail: false,
-        hasNear: false,
-        hasPasskeys: false,
-        isAdmin: false,
-      };
-    return {
-      isAnonymous: user.isAnonymous || false,
-      hasEmail: Boolean(user.email),
-      hasNear: Boolean(nearAccountId),
-      hasPasskeys: passkeys.length > 0,
-      isAdmin: user.role === "admin",
-    };
-  }, [user, nearAccountId, passkeys.length]);
-
-  const activeOrgId = session?.session?.activeOrganizationId ?? null;
-  const isTenantMember = !!tenant && !!activeOrgId && activeOrgId === tenant.orgId;
-
+  const activeOrg = organizations.data?.find(
+    (org) => org.id === session?.session.activeOrganizationId,
+  );
   return (
     <PageContainer variant="wide">
-      <div className="space-y-8">
-        <header className="space-y-2">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            <HomeIcon className="h-3 w-3" />
-            Workspace
-          </div>
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-                {user?.name || user?.email || "You"}
-              </h1>
-            </div>
+      <header className="mb-8 flex items-center justify-between gap-4">
+        <h1 className="text-xl font-semibold tracking-tight">Overview</h1>
+        <span className="text-sm text-muted-foreground">{session?.user.name}</span>
+      </header>
+      <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_18rem]">
+        <section className="min-w-0" aria-labelledby="recent-activity">
+          <div className="flex items-center justify-between gap-4 border-b pb-3">
+            <h2 id="recent-activity" className="text-sm font-medium">
+              Recent activity
+            </h2>
             <Link
-              to="/settings"
-              preload="intent"
-              className="h-10 px-4 inline-flex items-center gap-1.5 text-sm font-medium border-2 border-outset border-border-strong bg-card text-foreground shadow-sm hover:shadow-md active:border-inset active:shadow-none transition-all duration-200 ease-out rounded-[12px]"
+              to="/activity"
+              className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
             >
-              <Settings className="h-4 w-4" />
-              settings
+              View feed <ArrowRightIcon aria-hidden="true" />
             </Link>
           </div>
-        </header>
-
-        {!user ? (
-          <div className="text-muted-foreground text-center py-12 text-sm">Loading…</div>
-        ) : (
-          <>
-            <Card className="p-6 space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <Chip>workspace</Chip>
-                {profile.isAnonymous && <Chip>anonymous</Chip>}
-                {profile.isAdmin && <Chip accent>admin</Chip>}
-                {isTenantMember && <Chip accent>tenant member</Chip>}
-              </div>
-              <h2 className="text-foreground text-xl font-semibold">
-                {user.name || user.email || user.id.slice(0, 8)}
-              </h2>
-              <p className="text-muted-foreground text-sm leading-relaxed">
-                Manage your identity and connected accounts.
-              </p>
-            </Card>
-
-            <Card className="p-6 space-y-4">
-              <div className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider">
-                Identity Status
-              </div>
-              <div className="flex flex-col gap-2">
-                <InfoRow
-                  label="email"
-                  value={profile.hasEmail ? (user.email ?? "linked") : "not linked"}
-                />
-                <InfoRow
-                  label="near"
-                  value={profile.hasNear ? (nearAccountId ?? "linked") : "not linked"}
-                  mono
-                />
-                <InfoRow
-                  label="passkeys"
-                  value={profile.hasPasskeys ? `${passkeys.length} registered` : "not linked"}
-                />
-                <InfoRow
-                  label="profile"
-                  value={profile.isAnonymous ? "anonymous session" : "persistent account"}
-                />
-              </div>
-
-              {profile.isAnonymous && (
-                <div className="mt-2 rounded-[10px] bg-brand-accent-light border border-brand-accent-border text-foreground text-[13px] leading-relaxed px-4 py-3">
-                  Link an email or NEAR wallet before signing out to keep your data.
+          {feed.isPending ? (
+            <div role="status" aria-live="polite" className="space-y-4 py-4">
+              <span className="sr-only">Loading activity…</span>
+              {[0, 1, 2].map((i) => (
+                <div key={i} className="flex gap-3 py-3">
+                  <Skeleton className="size-8 shrink-0 rounded-full" />
+                  <div className="flex-1 space-y-1.5">
+                    <Skeleton className="h-3.5 w-40" />
+                    <Skeleton className="h-3 w-56" />
+                  </div>
                 </div>
-              )}
-            </Card>
-          </>
-        )}
-
-        {tenant && (
-          <Card className="p-6 space-y-4">
-            <div className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider">
-              Tenant
+              ))}
             </div>
-            <div className="flex flex-col gap-2">
-              <InfoRow label="name" value={tenant.name} />
-              <InfoRow label="subdomain" value={tenant.subdomain} mono />
-              <InfoRow label="account" value={tenant.accountId} mono />
-              <InfoRow
-                label="created"
-                value={tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString() : "—"}
-              />
-            </div>
-            <div className="flex gap-2 pt-1">
-              <Link
-                to="/admin"
-                preload="intent"
-                className="h-9 px-3 inline-flex items-center gap-1.5 text-xs font-medium border-2 border-outset border-border-strong bg-card text-foreground shadow-sm hover:shadow-md active:border-inset active:shadow-none transition-all duration-200 ease-out rounded-[10px]"
+          ) : feed.isError ? (
+            <div className="py-6" role="alert">
+              <p className="text-sm text-muted-foreground">Activity could not be loaded.</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-3"
+                onClick={() => void feed.refetch()}
               >
-                manage tenant
-              </Link>
+                Try again
+              </Button>
             </div>
+          ) : !feed.data?.data.length ? (
+            <p className="py-6 text-sm text-muted-foreground">
+              No activity yet. Connect a source to start publishing.
+            </p>
+          ) : (
+            <ol className="divide-y">
+              {feed.data.data.slice(0, 6).map((event) => (
+                <li key={event.id} className="flex gap-3 py-4">
+                  <Avatar className="mt-0.5">
+                    <AvatarFallback>{getInitials(event.actor)}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span className="text-sm font-medium break-all">{event.actor}</span>
+                      <time className="text-xs text-muted-foreground" dateTime={event.timestamp}>
+                        {new Date(event.timestamp).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          timeZone: "UTC",
+                        })}
+                      </time>
+                    </div>
+                    <p className="text-sm">{eventTitle(event.payload, event.type)}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {event.provenance.sourceDisplayName}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+        </section>
+        <aside className="space-y-6">
+          <Card className="gap-4 p-5">
+            <h2 className="text-sm font-medium">{activeOrg?.name ?? "Your workspace"}</h2>
+            <nav className="flex flex-col gap-1 -mx-2" aria-label="Workspace actions">
+              <Button asChild variant="ghost" className="justify-start">
+                <Link to="/activity-sources">
+                  <BroadcastIcon aria-hidden="true" />
+                  Manage sources
+                  <ArrowRightIcon aria-hidden="true" className="ml-auto" />
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" className="justify-start">
+                <Link to="/organizations">
+                  <BuildingsIcon aria-hidden="true" />
+                  Workspaces
+                  <ArrowRightIcon aria-hidden="true" className="ml-auto" />
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" className="justify-start">
+                <Link to="/settings">
+                  <GearIcon aria-hidden="true" />
+                  Account settings
+                  <ArrowRightIcon aria-hidden="true" className="ml-auto" />
+                </Link>
+              </Button>
+            </nav>
           </Card>
-        )}
+          <section aria-labelledby="weekly-builders">
+            <h2 id="weekly-builders" className="border-b pb-3 text-sm font-medium">
+              Leading this week
+            </h2>
+            {leaderboard.isPending ? (
+              <div role="status" aria-live="polite" className="space-y-3 py-4">
+                <span className="sr-only">Loading rankings…</span>
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex items-center gap-3">
+                    <Skeleton className="h-3.5 flex-1" />
+                    <Skeleton className="h-3 w-10" />
+                  </div>
+                ))}
+              </div>
+            ) : leaderboard.isError ? (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="mt-3"
+                onClick={() => void leaderboard.refetch()}
+              >
+                Retry rankings
+              </Button>
+            ) : !leaderboard.data?.data.length ? (
+              <p className="py-4 text-xs text-muted-foreground">No contributions this week.</p>
+            ) : (
+              <ol className="divide-y">
+                {leaderboard.data.data.slice(0, 3).map((entry) => (
+                  <li key={entry.actor} className="flex items-center gap-3 py-3 text-sm">
+                    <span className="min-w-0 flex-1 truncate">{entry.actor}</span>
+                    <span className="tabular-nums text-xs text-muted-foreground">
+                      {entry.score} pts
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+        </aside>
       </div>
     </PageContainer>
   );
 }
 
-function Chip({ children, accent }: { children: React.ReactNode; accent?: boolean }) {
-  return (
-    <span
-      className={`inline-flex items-center rounded-[6px] px-2.5 py-0.5 text-[11px] font-semibold border ${accent ? "bg-brand-accent-light border-brand-accent-border" : "bg-secondary border-border"} text-foreground`}
-    >
-      {children}
-    </span>
-  );
+function eventTitle(payload: unknown, type: string) {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "title" in payload &&
+    typeof payload.title === "string"
+  )
+    return payload.title;
+  return type.replaceAll(/[._]/g, " ");
 }

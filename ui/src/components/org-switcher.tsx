@@ -1,8 +1,12 @@
+import {
+  BuildingsIcon as Building2,
+  CheckIcon as Check,
+  CaretUpDownIcon as ChevronsUpDown,
+  PlusIcon as Plus,
+} from "@phosphor-icons/react/ssr";
 import { Link } from "@tanstack/react-router";
-import { Building2, Check, Plus } from "lucide-react";
 import { toast } from "sonner";
 import type { Organization } from "@/app";
-import { useAuthClient } from "@/app";
 import { Button } from "./ui/button";
 import {
   DropdownMenu,
@@ -16,22 +20,16 @@ import {
 interface OrgSwitcherProps {
   organizations: Organization[];
   activeOrgId?: string | null;
-  onSwitch?: (orgId: string) => void | Promise<void>;
+  onSwitch: (orgId: string) => void | Promise<void>;
 }
 
 export function OrgSwitcher({ organizations, activeOrgId, onSwitch }: OrgSwitcherProps) {
-  const auth = useAuthClient();
   const activeOrg = organizations.find((o) => o.id === activeOrgId);
 
   const handleSwitch = async (orgId: string) => {
     if (orgId === activeOrgId) return;
-    const { error } = await auth.organization.setActive({ organizationId: orgId });
-    if (error) {
-      toast.error(error.message || "Failed to switch organization");
-      return;
-    }
     try {
-      await onSwitch?.(orgId);
+      await onSwitch(orgId);
     } catch (switchError) {
       toast.error(
         switchError instanceof Error
@@ -44,18 +42,17 @@ export function OrgSwitcher({ organizations, activeOrgId, onSwitch }: OrgSwitche
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="hidden sm:flex items-center gap-2 text-xs text-muted-foreground max-w-[180px]"
-        >
+        <Button variant="outline" size="sm" className="w-32 justify-start gap-2 sm:w-44">
           <Building2 className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate min-w-0">{activeOrg?.name ?? "workspace"}</span>
+          <span className="truncate min-w-0 flex-1 text-left">
+            {activeOrg?.name ?? "Workspace"}
+          </span>
+          <ChevronsUpDown className="size-4 shrink-0 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel className="text-xs text-muted-foreground">
-          organizations
+          Organizations
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         {organizations.map((org) => (
@@ -65,19 +62,19 @@ export function OrgSwitcher({ organizations, activeOrgId, onSwitch }: OrgSwitche
             onClick={() => handleSwitch(org.id)}
           >
             <span className="truncate min-w-0 flex-1">{org.name}</span>
-            {org.id === activeOrgId && <Check className="h-3.5 w-3.5 text-muted-foreground" />}
+            {org.id === activeOrgId && <Check className="h-3.5 w-3.5 text-brand-accent" />}
           </DropdownMenuItem>
         ))}
         {organizations.length === 0 && (
           <DropdownMenuItem disabled className="text-muted-foreground">
-            no organizations
+            No organizations
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
           <Link to="/organizations/new" className="flex items-center gap-2 cursor-pointer">
             <Plus className="h-3.5 w-3.5" />
-            new organization
+            New organization
           </Link>
         </DropdownMenuItem>
       </DropdownMenuContent>

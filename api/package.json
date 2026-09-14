@@ -19,6 +19,7 @@
     "typescript": "catalog:"
   },
   "dependencies": {
+    "@orpc/client": "catalog:",
     "@electric-sql/pglite": "catalog:",
     "@orpc/contract": "catalog:",
     "@orpc/server": "catalog:",
@@ -35,6 +36,7 @@
   "devDependencies": {
     "@effect/language-service": "^0.85.1",
     "@module-federation/node": "catalog:",
+    "@orpc/openapi": "catalog:",
     "@proj-airi/unplugin-drizzle-orm-migrations": "^0.1.4",
     "@rspack/cli": "catalog:",
     "@rspack/core": "catalog:",
@@ -43,7 +45,6 @@
     "@types/ws": "8.18.1",
     "dotenv": "^17.2.3",
     "everything-dev": "catalog:",
-    "vite-tsconfig-paths": "^5.1.4",
     "vitest": "catalog:",
     "zephyr-rspack-plugin": "catalog:"
   },

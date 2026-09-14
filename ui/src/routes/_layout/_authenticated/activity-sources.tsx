@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { useApiClient, useAuthClient } from "@/app";
+import { sessionQueryOptions, useApiClient, useAuthClient } from "@/app";
 import {
   type ActivityGithubConfigurationInput,
   ActivityGithubIntegration,
@@ -16,6 +16,7 @@ import {
   type UpdateActivitySourceTrustInput,
 } from "@/components/activity-sources-dashboard";
 import { PageContainer } from "@/components/layout/page-container";
+import { useIsClient } from "@/hooks/use-client";
 import {
   createActivityBindingWallet,
   submitActivityBindingTransaction,
@@ -44,7 +45,11 @@ export const Route = createFileRoute("/_layout/_authenticated/activity-sources")
   loader: async ({ context }) => {
     if (context.auth.activeOrganizationId) {
       await context.queryClient.ensureQueryData({
-        queryKey: activitySourcesQueryKey,
+        queryKey: [
+          ...activitySourcesQueryKey,
+          context.auth.user?.id,
+          context.auth.activeOrganizationId,
+        ],
         queryFn: () => context.apiClient.listActivitySources(),
         staleTime: 30_000,
       });
@@ -63,13 +68,37 @@ export const Route = createFileRoute("/_layout/_authenticated/activity-sources")
 
 function ActivitySourcesPage() {
   const apiClient = useApiClient();
+  const authClient = useAuthClient();
   const queryClient = useQueryClient();
   const { auth } = Route.useRouteContext();
+  const nearState = authClient.useNearState();
+  const isClient = useIsClient();
+  const hasNearAccount = isClient ? Boolean(nearState?.accountId) : auth.hasNearAccount;
+
+  const { data: liveSession } = useQuery(sessionQueryOptions(authClient));
+  const activeOrganizationId =
+    !isClient || liveSession === undefined
+      ? auth.activeOrganizationId
+      : (liveSession?.session?.activeOrganizationId ?? null);
+  const activeOrganizationIdStale = activeOrganizationId !== auth.activeOrganizationId;
+
+  const { data: liveActiveMember } = useQuery({
+    queryKey: ["active-organization-member", activeOrganizationId],
+    queryFn: async () => {
+      const { data, error } = await authClient.organization.getActiveMember();
+      if (error) throw new Error(error.message || "Failed to read the active workspace role");
+      return data;
+    },
+    enabled: activeOrganizationIdStale && Boolean(activeOrganizationId),
+  });
+  const activeOrganizationRole = activeOrganizationIdStale
+    ? (liveActiveMember?.role ?? null)
+    : auth.activeOrganizationRole;
 
   const { data: sources = [] } = useQuery({
-    queryKey: activitySourcesQueryKey,
+    queryKey: [...activitySourcesQueryKey, auth.user?.id, activeOrganizationId],
     queryFn: () => apiClient.listActivitySources(),
-    enabled: Boolean(auth.activeOrganizationId),
+    enabled: Boolean(activeOrganizationId),
     staleTime: 30_000,
   });
 
@@ -135,9 +164,9 @@ function ActivitySourcesPage() {
         adminSources={adminSources}
         isAdmin={auth.isAdmin}
         registrationAccess={getActivitySourceRegistrationAccess({
-          activeOrganizationId: auth.activeOrganizationId,
-          organizationRole: auth.activeOrganizationRole,
-          hasNearAccount: auth.hasNearAccount,
+          activeOrganizationId,
+          organizationRole: activeOrganizationRole,
+          hasNearAccount,
         })}
         isSubmitting={createSource.isPending || reviewSource.isPending || updateTrust.isPending}
         onCreate={async (input) => {
@@ -150,7 +179,7 @@ function ActivitySourcesPage() {
           await updateTrust.mutateAsync(input);
         }}
         renderCredentials={(source) =>
-          source.approvalStatus === "approved" && auth.activeOrganizationRole === "owner" ? (
+          source.approvalStatus === "approved" && activeOrganizationRole === "owner" ? (
             <>
               <ActivityCredentialsManager source={source} />
               <ActivityGithubManager sourceId={source.sourceId} />

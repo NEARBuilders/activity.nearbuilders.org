@@ -6,6 +6,7 @@ import {
   ActivityFeedService,
   type ActivityIdentityStore,
   type ActivitySuppressionStore,
+  type BoundActivityIdentity,
 } from "@/services/activity-feed";
 
 function signedActivityEvent(
@@ -36,6 +37,131 @@ function signedActivityEvent(
 }
 
 describe("ActivityFeedService", () => {
+  it.each(["abort", "failure"])("closes live delivery on identity lookup %s", async (outcome) => {
+    const key = generateSecretKey();
+    const event = signedActivityEvent(key, {
+      source: "identity-lookup-source",
+      eventType: "lookup.event",
+      actor: "alice.near",
+      idempotencyKey: "lookup:pending",
+      payload: {},
+      createdAt: 1_788_400_000,
+    });
+    const lookup = Promise.withResolvers<BoundActivityIdentity[]>();
+    const listBound = vi.fn(() => lookup.promise);
+    const ready = Promise.withResolvers<void>();
+    const controller = new AbortController();
+    let emit: (event: Event) => void = () => {};
+    const close = vi.fn();
+    const adapter: ActivityRelayAdapter = {
+      publish: async () => "",
+      query: async () => [],
+      subscribe: (_filter, onEvent) => {
+        emit = onEvent;
+        return { close };
+      },
+      close: () => {},
+    };
+    const feed = new ActivityFeedService(new ActivityRelay(adapter, { scanLimit: 100 }), {
+      listBound,
+    });
+    const stream = feed.stream({}, { signal: controller.signal, onReady: ready.resolve });
+    const next = stream.next();
+    await ready.promise;
+    emit(event);
+    await vi.waitFor(() => expect(listBound).toHaveBeenCalled());
+    if (outcome === "abort") {
+      controller.abort();
+      lookup.resolve([{ sourceId: "identity-lookup-source", publicKey: getPublicKey(key) }]);
+      await expect(next).resolves.toEqual({ done: true, value: undefined });
+    } else {
+      const assertion = expect(next).rejects.toThrow("identity store unavailable");
+      lookup.reject(new Error("identity store unavailable"));
+      await assertion;
+    }
+    expect(close).toHaveBeenCalledOnce();
+  });
+
+  it("revalidates queued live events after Signing Identity rotation", async () => {
+    const oldKey = generateSecretKey();
+    const newKey = generateSecretKey();
+    const createEvent = (key: Uint8Array, id: string, createdAt: number) =>
+      signedActivityEvent(key, {
+        source: "rotating-live-source",
+        eventType: "rotation.event",
+        actor: "alice.near",
+        idempotencyKey: id,
+        payload: {},
+        createdAt,
+      });
+    const beforeRotation = createEvent(oldKey, "before", 1_788_400_000);
+    const afterRetirement = createEvent(oldKey, "retired", 1_788_400_002);
+    const afterRotation = createEvent(newKey, "current", 1_788_400_002);
+    const oldIdentity: BoundActivityIdentity = {
+      sourceId: "rotating-live-source",
+      publicKey: getPublicKey(oldKey),
+      activeFrom: new Date(1_788_399_000_000).toISOString(),
+      retiredAt: null,
+    };
+    let identities: BoundActivityIdentity[] = [oldIdentity];
+    let emit: (event: Event) => void = () => {};
+    const close = vi.fn();
+    const adapter: ActivityRelayAdapter = {
+      publish: async () => "",
+      query: async () => [],
+      subscribe: (_filter, onEvent) => {
+        emit = onEvent;
+        return { close };
+      },
+      close: () => {},
+    };
+    const feed = new ActivityFeedService(new ActivityRelay(adapter, { scanLimit: 100 }), {
+      listBound: async () => identities,
+    });
+    const ready = Promise.withResolvers<void>();
+    const stream = feed.stream({}, { onReady: ready.resolve });
+    const first = stream.next();
+    try {
+      await ready.promise;
+      emit(beforeRotation);
+      await expect(first).resolves.toMatchObject({ value: { id: beforeRotation.id } });
+      emit(afterRetirement);
+      emit(afterRotation);
+      identities = [
+        { ...oldIdentity, retiredAt: new Date(1_788_400_001_000).toISOString() },
+        {
+          sourceId: "rotating-live-source",
+          publicKey: getPublicKey(newKey),
+          activeFrom: new Date(1_788_400_001_000).toISOString(),
+          retiredAt: null,
+          trustStatus: "trusted",
+          scoreMultiplier: 2,
+        },
+      ];
+      await expect(stream.next()).resolves.toMatchObject({
+        value: {
+          id: afterRotation.id,
+          provenance: {
+            publicKey: getPublicKey(newKey),
+            trustStatus: "trusted",
+            scoreMultiplier: 2,
+          },
+        },
+      });
+      const historical = createEvent(oldKey, "delayed-history", 1_788_400_000);
+      emit(historical);
+      await expect(stream.next()).resolves.toMatchObject({
+        value: {
+          id: historical.id,
+          provenance: { publicKey: getPublicKey(oldKey), signingIdentityStatus: "retired" },
+        },
+      });
+    } finally {
+      await stream.return(undefined);
+    }
+    expect(close).toHaveBeenCalledOnce();
+  });
+
   it("reports signature provenance and validates events against the key active when signed", async () => {
     const retiredKey = generateSecretKey();
     const activeKey = generateSecretKey();

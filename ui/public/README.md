@@ -1,53 +1,36 @@
-# everything.dev
+# NEAR Builders Activity
 
-everything.dev is an open runtime for apps on NEAR.
+`activity.nearbuilders.org` is a shared activity and reputation layer for the NEAR ecosystem.
+Organizations register Activity Sources, define valid event types, and submit idempotent events to a
+common HTTP gateway. Accepted events are signed with source-specific Nostr identities and exposed
+through a verified feed, live updates, and dynamically weighted leaderboards.
 
-The bootstrap root is published from `dev.everything.near/everything.dev` and composed at runtime from public configuration rather than a single fixed bundle.
+## Core flow
 
-## What it is
+1. A NEAR-authenticated organization registers an Activity Source.
+2. A platform administrator reviews the source.
+3. The source owner creates a signing identity, authorizes its NEAR binding, and creates an API key.
+4. The source submits events to `POST /api/v1/events`.
+5. The gateway validates, signs, and publishes the event to the configured Nostr relay.
+6. Consumers query `/api/v1/events`, subscribe to `/api/v1/events/stream`, or view `/activity`.
 
-- A site for browsing and inspecting published runtimes
-- A product surface built from a host, remote UI, and remote API
-- A public reference for runtime composition on NEAR
+## Properties
 
-## How it works
+- Source-specific signatures make event provenance independently verifiable.
+- Idempotency keys prevent duplicate submissions.
+- Events stay immutable; moderation only suppresses them from service-controlled views.
+- Current event weights and source trust multipliers are applied when leaderboards are read.
+- Integrators use the HTTP API and do not need to operate Nostr directly.
 
-1. A published `bos.config.json` record defines the runtime.
-2. The bootstrap root is published first, without `extends`.
-3. Other configs can extend that root record once it exists.
-3. The UI loads through Module Federation.
-4. The API loads through `every-plugin`.
-5. Public metadata can be layered on without replacing the canonical runtime record.
+## Public entry points
 
-## Why it matters
+- `/activity` — verified activity feed and leaderboard
+- `/activity-sources` — authenticated Activity Source management
+- `/organizations` — authenticated workspace management
+- `/README.md` — this overview
+- `/skill.md` — integration guidance for agents
+- `/llms.txt` — concise machine-readable context
 
-- Runtime configuration stays public and inspectable.
-- Sites can share the same host while changing composition through config.
-- UI and API can evolve independently.
-- The system can keep being built over time because composition is externalized.
-- Integrity hashes prove what runs matches what was published.
-- Agents compose from verified primitives instead of building insecure bundles from scratch.
-
-## Public files
-
-- `/README.md` - human-readable overview
-- `/skill.md` - agent-oriented usage notes
-- `/llms.txt` - concise machine-ingestible summary
-- `/site.webmanifest` - install and browser metadata
-
-## Related ideas
-
-- BOS — composable on-chain frontends
-- web4 — verifiable on-chain hosting
-- NEAR Intents — cross-chain settlement
-- near-dns — blockchain-backed DNS
-- NameSky — composable identity
-- OutLayer — verifiable off-chain computation
-- `every-plugin` — typed plugin contracts
-- better-near-auth — cryptographic identity + gasless relay
-
-## Canonical context
-
-- Bootstrap runtime: `dev.everything.near/everything.dev`
-- Stable host URLs can be reused across multiple sites
-- Composition happens through published config, not rebuild-only deployment
+The runtime extends `bos://dev.everything.near/dev.everything.dev` with local UI and API overrides.
+The canonical implementation and operational documentation live in the repository root README and
+`docs/` directory.

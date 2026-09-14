@@ -1,9 +1,9 @@
+import { CheckCircleIcon as CheckCircle, XCircleIcon as XCircle } from "@phosphor-icons/react/ssr";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { getAppName, useAuthClient } from "@/app";
-import { Badge, Button, Card, CardContent } from "@/components";
+import { Badge, Button } from "@/components";
 
 export const Route = createFileRoute("/_layout/_authenticated/accept-invitation/$id")({
   head: () => ({
@@ -93,8 +93,8 @@ function AcceptInvitation() {
 
   if (!invitation) {
     return (
-      <Card className="max-w-md mx-auto mt-12">
-        <CardContent className="p-8 text-center space-y-4">
+      <section className="max-w-md mx-auto mt-12 border-t border-border py-6">
+        <div className="p-8 text-center space-y-4">
           <XCircle className="h-8 w-8 mx-auto text-muted-foreground" />
           <p className="text-sm">
             This invitation does not exist, has expired, or is not addressed to your account.
@@ -102,8 +102,8 @@ function AcceptInvitation() {
           <Button asChild variant="outline" size="sm">
             <Link to="/organizations">go to organizations</Link>
           </Button>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
     );
   }
 
@@ -111,13 +111,15 @@ function AcceptInvitation() {
 
   return (
     <div className="max-w-lg mx-auto mt-12 space-y-6">
-      <Card>
-        <CardContent className="p-8 space-y-6">
+      <section className="border-t border-border py-6">
+        <div className="p-8 space-y-6">
           <div className="space-y-2 text-center">
             <div className="flex justify-center">
               <CheckCircle className="h-8 w-8 text-muted-foreground" />
             </div>
-            <h1 className="text-xl font-semibold tracking-tight">You've been invited</h1>
+            <h1 className="text-xl font-semibold tracking-tight text-foreground">
+              You've been invited
+            </h1>
             <p className="text-sm text-muted-foreground">
               You have been invited to join{" "}
               <span className="font-medium text-foreground">
@@ -127,7 +129,7 @@ function AcceptInvitation() {
             </p>
           </div>
 
-          <div className="border-2 border-outset border-border bg-muted/10 p-4 space-y-2 text-xs font-mono">
+          <div className="rounded-lg border border-border bg-muted/10 p-4 space-y-2 text-xs font-mono">
             <div className="flex justify-between gap-4">
               <span className="text-muted-foreground">organization</span>
               <span className="text-right break-all">
@@ -161,8 +163,8 @@ function AcceptInvitation() {
               {rejectMutation.isPending ? "declining..." : "decline"}
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
       <div className="text-center">
         <Button asChild variant="ghost" size="sm">

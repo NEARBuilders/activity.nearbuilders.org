@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
 import { sessionQueryOptions, useAuthClient } from "@/app";
-import { Button, Card, Input } from "@/components";
+import { Button, Input } from "@/components";
 
 export const Route = createFileRoute("/_layout/_authenticated/settings/profile")({
   component: ProfileSettings,
@@ -20,10 +20,10 @@ function ProfileSettings() {
     <div className="space-y-4">
       <IdentityCard user={user} />
       {user.isAnonymous && (
-        <Card className="p-4 text-sm text-muted-foreground leading-relaxed">
+        <section className="text-sm text-muted-foreground leading-relaxed border-t border-border py-6">
           This session is temporary. Link an email or NEAR wallet before signing out if you want the
           account to remain recoverable.
-        </Card>
+        </section>
       )}
     </div>
   );
@@ -47,19 +47,15 @@ function IdentityCard({
   });
 
   return (
-    <Card className="p-6 space-y-4">
-      <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-        Identity
-      </div>
+    <section className="space-y-4 border-t border-border py-6">
+      <div className="text-sm font-medium text-muted-foreground">Identity</div>
       <div className="flex flex-col gap-2">
         <InfoRow label="user id" value={user.id} mono />
         <InfoRow label="email" value={user.email ?? "not linked"} />
         <InfoRow label="account type" value={user.isAnonymous ? "anonymous" : "standard"} />
       </div>
       <div className="space-y-2">
-        <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-          Display name
-        </div>
+        <div className="text-sm font-medium text-muted-foreground">Display name</div>
         <div className="flex gap-2">
           <Input
             type="text"
@@ -77,16 +73,14 @@ function IdentityCard({
           </Button>
         </div>
       </div>
-    </Card>
+    </section>
   );
 }
 
 function InfoRow({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="grid grid-cols-[100px_1fr] gap-4 rounded-[8px] border border-border bg-muted px-3.5 py-2.5 items-center">
-      <span className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider">
-        {label}
-      </span>
+    <div className="grid grid-cols-[100px_1fr] gap-4 border-b border-border py-3 items-center">
+      <span className="text-muted-foreground text-sm font-medium">{label}</span>
       <span className={`text-foreground text-[13px] break-all ${mono ? "font-mono text-xs" : ""}`}>
         {value}
       </span>

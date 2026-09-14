@@ -1,6 +1,11 @@
+import {
+  BuildingsIcon as Building2,
+  EnvelopeIcon as Mail,
+  PlusIcon as Plus,
+  ArrowsClockwiseIcon as RefreshCw,
+} from "@phosphor-icons/react/ssr";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { Building2, Mail, Plus, RefreshCw, Users } from "lucide-react";
 import { toast } from "sonner";
 import {
   type Organization,
@@ -9,8 +14,9 @@ import {
   useApiClient,
   useAuthClient,
 } from "@/app";
-import { Button, Card } from "@/components";
+import { Button } from "@/components";
 import { PageContainer } from "@/components/layout/page-container";
+import { synchronizeActiveOrganization } from "@/lib/active-organization";
 
 type AuthClientType = import("@/app").AuthClient;
 type UserInvitationsResponse = Awaited<
@@ -20,7 +26,7 @@ type UserInvitationItem = NonNullable<UserInvitationsResponse["data"]>[number];
 
 export const Route = createFileRoute("/_layout/_authenticated/organizations/")({
   head: () => ({
-    title: "Organizations | auth.everything.dev",
+    title: "Organizations | NEAR Builders Activity",
     meta: [{ name: "description", content: "Manage your organizations and teams." }],
   }),
   loader: async ({ context }) => {
@@ -138,13 +144,25 @@ function OrganizationsList() {
   const activeOrgId = session?.session?.activeOrganizationId;
 
   const switchOrgMutation = useMutation({
-    mutationFn: async (orgId: string) => {
-      const { error } = await auth.organization.setActive({ organizationId: orgId });
-      if (error) throw new Error(error.message);
-    },
+    mutationFn: async (orgId: string) =>
+      synchronizeActiveOrganization({
+        organizationId: orgId,
+        queryClient,
+        setActiveOrganization: async () => {
+          const { error } = await auth.organization.setActive({ organizationId: orgId });
+          if (error) throw new Error(error.message);
+        },
+        confirmActiveOrganization: async () => {
+          const { data, error } = await auth.getSession({
+            query: { disableCookieCache: true },
+          });
+          if (error) throw new Error(error.message);
+          return data?.session.activeOrganizationId ?? null;
+        },
+        invalidateRouter: () => router.invalidate(),
+      }),
     onSuccess: async () => {
       toast.success("Switched organization");
-      await queryClient.invalidateQueries({ queryKey: ["session"] });
     },
     onError: (error: Error) => toast.error(error.message || "Failed to switch organization"),
   });
@@ -153,19 +171,15 @@ function OrganizationsList() {
     <PageContainer variant="wide">
       <div className="space-y-8">
         <header className="space-y-2">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            <Users className="h-3 w-3" />
-            Teams
-          </div>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              <h1 className="text-xl font-semibold tracking-tight text-foreground">
                 Organizations
               </h1>
             </div>
             <Link
               to="/organizations/new"
-              className="h-10 px-4 inline-flex items-center gap-1.5 text-sm font-semibold border-2 border-outset border-border-strong bg-foreground text-background shadow-sm hover:shadow-md active:border-inset active:shadow-none transition-all duration-200 ease-out rounded-[12px]"
+              className="h-10 px-4 inline-flex items-center gap-1.5 text-sm font-semibold rounded-lg border border-border bg-foreground text-background transition-colors rounded-[12px]"
             >
               <Plus size={14} />
               new
@@ -176,12 +190,12 @@ function OrganizationsList() {
         <div className="space-y-6">
           {pendingInvitations.length > 0 && (
             <section className="space-y-3">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              <div className="text-sm font-medium text-muted-foreground">
                 Pending Invitations ({pendingInvitations.length})
               </div>
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="flex flex-col">
                 {pendingInvitations.map((invitation) => (
-                  <Card key={invitation.id} className="p-6 space-y-4 hover:shadow-md">
+                  <section key={invitation.id} className="space-y-4 border-t border-border py-6">
                     <div className="flex items-start gap-4">
                       <div className="w-12 h-12 rounded-[10px] border border-border bg-muted flex items-center justify-center shrink-0">
                         <Mail className="h-5 w-5 text-muted-foreground" />
@@ -223,16 +237,16 @@ function OrganizationsList() {
                           : "decline"}
                       </Button>
                     </div>
-                  </Card>
+                  </section>
                 ))}
               </div>
             </section>
           )}
 
           {isLoading ? (
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="flex flex-col">
               {[1, 2].map((n) => (
-                <Card key={n} className="p-6 space-y-5">
+                <section key={n} className="space-y-5 border-t border-border py-6">
                   <div className="flex items-start gap-4">
                     <div className="h-14 w-14 rounded-[10px] animate-pulse bg-muted shrink-0" />
                     <div className="space-y-2 flex-1 pt-1">
@@ -245,22 +259,22 @@ function OrganizationsList() {
                     <div className="h-10 w-24 rounded-[12px] animate-pulse bg-muted" />
                     <div className="h-10 w-24 rounded-[12px] animate-pulse bg-muted" />
                   </div>
-                </Card>
+                </section>
               ))}
             </div>
           ) : orgs.length === 0 ? (
-            <Card className="p-10 text-center space-y-4 items-center">
+            <section className="text-center space-y-4 items-center border-t border-border py-6">
               <Building2 className="h-10 w-10 mx-auto text-muted-foreground" />
               <p className="text-base font-semibold text-foreground">No organizations yet.</p>
               <Link
                 to="/organizations/new"
-                className="h-10 px-4 inline-flex items-center gap-1.5 text-sm font-semibold border-2 border-outset border-border-strong bg-foreground text-background shadow-sm hover:shadow-md active:border-inset active:shadow-none transition-all duration-200 ease-out rounded-[12px]"
+                className="h-10 px-4 inline-flex items-center gap-1.5 text-sm font-semibold rounded-lg border border-border bg-foreground text-background transition-colors rounded-[12px]"
               >
                 create your first org
               </Link>
-            </Card>
+            </section>
           ) : (
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="flex flex-col">
               {orgs.map((org: Organization) => {
                 const isActive = org.id === activeOrgId;
                 const isPersonal = user
@@ -269,7 +283,7 @@ function OrganizationsList() {
                 const hasTenant = tenantOrgIds.has(org.id);
 
                 return (
-                  <Card key={org.id} className="p-6 space-y-5 hover:shadow-md">
+                  <section key={org.id} className="space-y-5 border-t border-border py-6">
                     <div className="flex items-start gap-4">
                       {org.logo ? (
                         <img
@@ -295,7 +309,7 @@ function OrganizationsList() {
                       </div>
                     </div>
 
-                    <div className="rounded-[8px] border border-border bg-muted px-3.5 py-2.5 text-sm text-muted-foreground">
+                    <div className="border-b border-border py-3 text-sm text-muted-foreground">
                       {org.createdAt
                         ? `created ${new Date(org.createdAt).toLocaleDateString()}`
                         : "organization record"}
@@ -318,16 +332,16 @@ function OrganizationsList() {
                         </Button>
                       )}
                     </div>
-                  </Card>
+                  </section>
                 );
               })}
             </div>
           )}
 
-          <Card className="p-5 text-sm text-muted-foreground leading-relaxed">
+          <section className="text-sm text-muted-foreground leading-relaxed border-t border-border py-6">
             Each user gets a personal organization automatically. Additional organizations give
             teams their own members, invitations, and API key scope.
-          </Card>
+          </section>
         </div>
       </div>
     </PageContainer>
