@@ -4,7 +4,8 @@
   "workspaces": {
     "packages": [
       "api",
-      "ui"
+      "ui",
+      "plugins/*"
     ],
     "catalog": {
       "react": "19.2.4",
@@ -65,19 +66,24 @@
     }
   },
   "scripts": {
+    "predev": "bun run compose:doctor",
     "dev": "bos dev",
     "dev:ui": "bos dev --ui local --api remote",
     "dev:api": "bos dev --ui remote --api local",
     "dev:proxy": "bos dev --proxy",
     "dev:activity-infra": "docker compose -f compose.activity.yml up -d --wait",
     "dev:activity-infra:down": "docker compose -f compose.activity.yml down",
+    "first-run": "bun run scripts/first-run.ts",
+    "setup:check": "bun run scripts/setup-check.ts",
+    "compose:doctor": "bun run scripts/compose-doctor.ts",
+    "seed:demo": "bun run scripts/seed-demo-data.ts",
     "keys:gen": "bun run scripts/keys-gen.ts",
     "build": "bos build",
     "deploy": "bos build --deploy",
     "publish": "bos publish",
     "bos": "bos",
     "types:gen": "node node_modules/.bin/bos types gen",
-    "typecheck": "bun run types:gen && if [ -d ui ]; then bun run --cwd ui typecheck; fi && if [ -d api ]; then bun run --cwd api typecheck; fi && bun run typecheck:examples",
+    "typecheck": "bun run types:gen && if [ -d ui ]; then bun run --cwd ui typecheck; fi && if [ -d api ]; then bun run --cwd api typecheck; fi && if [ -d plugins ]; then for dir in plugins/*; do if [ -f \"$dir/package.json\" ]; then bun run --cwd \"$dir\" typecheck; fi; done; fi",
     "typecheck:examples": "tsc --noEmit -p examples/tsconfig.json",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
@@ -92,9 +98,9 @@
     "db:studio": "bos db:studio",
     "db:generate": "bun run --cwd api drizzle-kit generate",
     "db:migrate": "bun run --cwd api drizzle-kit migrate",
-    "test": "bun run --cwd api test && bun run --cwd ui test",
-    "test:api": "bun run --cwd api test",
-    "test:integration": "bun run --cwd api test tests/integration/",
+    "test": "bun run --if-present --cwd api test && bun run --if-present --cwd ui test && if [ -d plugins ]; then for d in plugins/*; do if [ -f \"$d/package.json\" ]; then bun run --if-present --cwd \"$d\" test; fi; done; fi",
+    "test:api": "bun run --if-present --cwd api test",
+    "test:integration": "bun run --if-present --cwd api test tests/integration/",
     "test:integration-guide": "bun run --cwd api test tests/integration/activity-client-example.test.ts",
     "test:activity": "bun run dev:activity-infra && ACTIVITY_INTEGRATION=1 bun run --cwd api test tests/integration/activity-boundary.test.ts",
     "benchmark:leaderboard": "bun run dev:activity-infra && bun api/benchmarks/activity-leaderboard.ts",

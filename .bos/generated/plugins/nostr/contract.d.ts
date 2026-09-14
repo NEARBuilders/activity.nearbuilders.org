@@ -267,7 +267,77 @@ export declare const contract: {
             content: z.ZodString;
             sig: z.ZodString;
         }, z.core.$strip>>;
+        meta: z.ZodObject<{
+            limited: z.ZodBoolean;
+        }, z.core.$strip>;
     }, z.core.$strip>, import("@orpc/contract").MergedErrorMap<Record<never, never>, import("@orpc/contract").MergedErrorMap<Record<never, never>, {
+        RELAY_UNAVAILABLE: {
+            readonly status: 503;
+            readonly message: "Relay unavailable";
+        };
+        RELAY_TIMEOUT: {
+            readonly status: 504;
+            readonly message: "Relay response timed out";
+        };
+        RELAY_LIMIT: {
+            readonly status: 503;
+            readonly message: "Relay replay or consumer buffer limit reached";
+        };
+        BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: z.ZodObject<{
+                invalidFields: z.ZodOptional<z.ZodArray<z.ZodString>>;
+                validationErrors: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                    field: z.ZodString;
+                    message: z.ZodString;
+                    code: z.ZodOptional<z.ZodString>;
+                }, z.core.$strip>>>;
+            }, z.core.$strip>;
+        };
+    }>>, Record<never, never>>;
+    subscribeEvents: import("@orpc/contract").ContractProcedure<z.ZodObject<{
+        filter: z.ZodObject<{
+            kinds: z.ZodOptional<z.ZodArray<z.ZodNumber>>;
+            authors: z.ZodOptional<z.ZodArray<z.ZodString>>;
+            ids: z.ZodOptional<z.ZodArray<z.ZodString>>;
+            since: z.ZodOptional<z.ZodNumber>;
+            until: z.ZodOptional<z.ZodNumber>;
+            limit: z.ZodOptional<z.ZodNumber>;
+            tags: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                tag: z.ZodString;
+                values: z.ZodArray<z.ZodString>;
+            }, z.core.$strip>>>;
+        }, z.core.$strip>;
+        relays: z.ZodOptional<z.ZodArray<z.ZodString>>;
+    }, z.core.$strip>, import("@orpc/contract").Schema<AsyncIteratorObject<{
+        id: string;
+        pubkey: string;
+        created_at: number;
+        kind: number;
+        tags: string[][];
+        content: string;
+        sig: string;
+    }, unknown, void>, import("@orpc/shared").AsyncIteratorClass<{
+        id: string;
+        pubkey: string;
+        created_at: number;
+        kind: number;
+        tags: string[][];
+        content: string;
+        sig: string;
+    }, unknown, void>>, import("@orpc/contract").MergedErrorMap<Record<never, never>, import("@orpc/contract").MergedErrorMap<Record<never, never>, {
+        RELAY_UNAVAILABLE: {
+            readonly status: 503;
+            readonly message: "Relay unavailable";
+        };
+        RELAY_TIMEOUT: {
+            readonly status: 504;
+            readonly message: "Relay response timed out";
+        };
+        RELAY_LIMIT: {
+            readonly status: 503;
+            readonly message: "Relay replay or consumer buffer limit reached";
+        };
         BAD_REQUEST: {
             readonly status: 400;
             readonly data: z.ZodObject<{
@@ -298,6 +368,18 @@ export declare const contract: {
             success: z.ZodBoolean;
         }, z.core.$strip>>;
     }, z.core.$strip>, import("@orpc/contract").MergedErrorMap<Record<never, never>, import("@orpc/contract").MergedErrorMap<Record<never, never>, {
+        RELAY_UNAVAILABLE: {
+            readonly status: 503;
+            readonly message: "Relay unavailable";
+        };
+        RELAY_TIMEOUT: {
+            readonly status: 504;
+            readonly message: "Relay response timed out";
+        };
+        RELAY_LIMIT: {
+            readonly status: 503;
+            readonly message: "Relay replay or consumer buffer limit reached";
+        };
         BAD_REQUEST: {
             readonly status: 400;
             readonly data: z.ZodObject<{

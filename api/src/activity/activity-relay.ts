@@ -117,7 +117,8 @@ export class NostrRelayAdapter implements ActivityRelayAdapter {
   async query(filter: Filter): Promise<Event[]> {
     const relay = await this.#pool
       .ensureRelay(this.#relayUrl, { connectionTimeout: 5_000 })
-      .catch(() => {
+      .catch((cause) => {
+        console.error(`Activity relay unavailable at ${this.#relayUrl}:`, cause);
         throw new ActivityRelayUnavailableError();
       });
 
@@ -143,10 +144,14 @@ export class NostrRelayAdapter implements ActivityRelayAdapter {
         subscription = relay.subscribe([filter], {
           onevent: (event) => events.push(event),
           oneose: () => settle(() => resolve(events)),
-          onclose: () => settle(() => reject(new ActivityRelayUnavailableError())),
+          onclose: (reason) => {
+            console.error(`Activity relay subscription closed at ${this.#relayUrl}: ${reason}`);
+            settle(() => reject(new ActivityRelayUnavailableError()));
+          },
           eoseTimeout: NOSTR_CLIENT_EOSE_TIMEOUT_MS,
         });
-      } catch {
+      } catch (cause) {
+        console.error(`Activity relay subscribe threw at ${this.#relayUrl}:`, cause);
         settle(() => reject(new ActivityRelayUnavailableError()));
       }
     });

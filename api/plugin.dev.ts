@@ -1,5 +1,11 @@
-import "dotenv/config";
+import { fileURLToPath } from "node:url";
+import { config } from "dotenv";
 import type { PluginConfigInput } from "every-plugin";
+
+// bos dev runs this with cwd=api/, so plain `dotenv/config` (cwd-relative)
+// silently misses the repo-root .env every local override depends on.
+config({ path: fileURLToPath(new URL("../.env", import.meta.url)) });
+
 import packageJson from "./package.json" with { type: "json" };
 import type Plugin from "./src/index";
 

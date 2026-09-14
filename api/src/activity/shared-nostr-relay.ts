@@ -50,6 +50,7 @@ function convertFilter(filter: Filter): SharedNostrFilter {
 }
 
 function relayFailure(error: unknown): Error {
+  console.error("[Activity relay] shared transport call failed:", error);
   const code = error && typeof error === "object" && "code" in error ? error.code : undefined;
   if (code === "RELAY_LIMIT") return new ActivityRelayScanLimitError();
   if (code === "RELAY_TIMEOUT" || (error instanceof Error && error.name === "TimeoutError")) {

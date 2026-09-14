@@ -137,8 +137,14 @@ export default createPlugin.withPlugins<PluginsClient>()({
         }).pipe(Layer.provide(databaseLayer)),
       );
       const relayUrl = resolveActivityRelayUrl(config.variables.activityRelayUrl);
-      const nostrRpcUrl =
-        process.env.ACTIVITY_NOSTR_RPC_URL?.trim() || config.variables.activityNostrRpcUrl;
+      // ACTIVITY_LOCAL_RELAY_ONLY bypasses the shared-plugin RPC transport entirely and
+      // connects `relayUrl` directly over WebSocket. `nostrRpcUrl ||` alone can't express
+      // "explicitly disabled" for local dev, since an empty override string is falsy and
+      // silently falls back to the baked-in bos.config.json production RPC URL.
+      const localRelayOnly = process.env.ACTIVITY_LOCAL_RELAY_ONLY === "1";
+      const nostrRpcUrl = localRelayOnly
+        ? undefined
+        : process.env.ACTIVITY_NOSTR_RPC_URL?.trim() || config.variables.activityNostrRpcUrl;
       const activityRelay = new ActivityRelay(
         nostrRpcUrl
           ? SharedNostrRelayAdapter.connect(nostrRpcUrl, relayUrl)
