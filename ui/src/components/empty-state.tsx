@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from "react";
+import { cn } from "@/lib/utils";
 
 interface EmptyStateProps {
   icon?: ComponentType<{ size?: number; className?: string }>;
@@ -6,6 +7,7 @@ interface EmptyStateProps {
   description?: ReactNode;
   action?: ReactNode;
   className?: string;
+  compact?: boolean;
 }
 
 export function EmptyState({
@@ -13,19 +15,26 @@ export function EmptyState({
   title,
   description,
   action,
-  className = "",
+  className,
+  compact = false,
 }: EmptyStateProps) {
   return (
-    <div className={`min-h-[55vh] flex flex-col items-center justify-center ${className}`}>
-      <div className="max-w-md text-center space-y-6">
+    <div
+      className={cn(
+        "flex flex-col items-center justify-center rounded-lg",
+        compact ? "border border-dashed border-border px-6 py-10" : "min-h-[55vh] py-16",
+        className,
+      )}
+    >
+      <div className="max-w-md text-center space-y-3">
         {Icon && (
-          <div className="min-h-[40px] flex items-center justify-center">
-            <Icon size={40} className="text-muted-foreground" />
+          <div className="flex min-h-[40px] items-center justify-center">
+            <Icon size={compact ? 28 : 40} className="text-muted-foreground" />
           </div>
         )}
-        {title && <h2 className="text-base font-semibold text-foreground">{title}</h2>}
+        {title && <h2 className="text-sm font-semibold text-foreground">{title}</h2>}
         {description && (
-          <div className="text-sm text-muted-foreground leading-relaxed min-h-[1.25rem]">
+          <div className="min-h-[1.25rem] text-sm leading-relaxed text-muted-foreground">
             {description}
           </div>
         )}

@@ -1,7 +1,7 @@
 {
-  "name": "everything.dev",
-  "short_name": "everything.dev",
-  "description": "Open runtime for apps on NEAR, composed from published config and loaded at runtime.",
+  "name": "NEAR Builders Activity",
+  "short_name": "Activity",
+  "description": "Shared activity, provenance, and reputation infrastructure for the NEAR ecosystem.",
   "icons": [
     {
       "src": "/web-app-manifest-192x192.png",
@@ -25,24 +25,12 @@
       "sizes": "180x180",
       "type": "image/png",
       "purpose": "any maskable"
-    },
-    {
-      "src": "/near.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any"
-    },
-    {
-      "src": "/logo.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
     }
   ],
   "start_url": ".",
   "display": "standalone",
   "theme_color": "#ffffff",
   "background_color": "#fafafa",
-  "categories": ["developer tools", "productivity", "web development"],
+  "categories": ["social", "productivity", "developer tools"],
   "orientation": "portrait-primary"
 }

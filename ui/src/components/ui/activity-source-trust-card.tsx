@@ -7,6 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
 export function ActivitySourceTrustCard({
@@ -40,7 +47,7 @@ export function ActivitySourceTrustCard({
   };
 
   return (
-    <Card className="p-5">
+    <Card className="gap-5 p-5">
       <div className="grid gap-5 lg:grid-cols-[1fr_1fr]">
         <div className="space-y-2">
           <div>
@@ -60,19 +67,21 @@ export function ActivitySourceTrustCard({
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor={designationId}>Trust designation for {source.sourceId}</Label>
-              <select
-                id={designationId}
-                className="h-9 w-full rounded-[8px] border border-input bg-background px-3 text-sm text-foreground"
+              <Select
                 value={trustStatus}
-                onChange={(event) => {
-                  const next = event.target.value as UpdateActivitySourceTrustInput["trustStatus"];
+                onValueChange={(next: UpdateActivitySourceTrustInput["trustStatus"]) => {
                   setTrustStatus(next);
                   if (next === "standard") setScoreMultiplier("1");
                 }}
               >
-                <option value="standard">Standard</option>
-                <option value="trusted">Trusted</option>
-              </select>
+                <SelectTrigger id={designationId} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="standard">Standard</SelectItem>
+                  <SelectItem value="trusted">Trusted</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1.5">
               <Label htmlFor={multiplierId}>Score multiplier for {source.sourceId}</Label>

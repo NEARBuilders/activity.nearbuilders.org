@@ -1,4 +1,4 @@
-import { RadioTower } from "lucide-react";
+import { BroadcastIcon, GavelIcon, ShieldCheckIcon } from "@phosphor-icons/react/ssr";
 import type { ReactNode } from "react";
 import { ActivitySourceCard, ActivitySourceReviewCard } from "@/components/activity-source-cards";
 import { ActivitySourceRegistration } from "@/components/activity-source-registration";
@@ -8,8 +8,8 @@ import type {
   ReviewActivitySourceInput,
   UpdateActivitySourceTrustInput,
 } from "@/components/activity-sources-model";
+import { EmptyState } from "@/components/empty-state";
 import { ActivitySourceTrustCard } from "@/components/ui/activity-source-trust-card";
-import { Card } from "@/components/ui/card";
 import type { ActivitySourceRegistrationAccess } from "@/lib/activity-source-permissions";
 
 export type {
@@ -48,17 +48,7 @@ export function ActivitySourcesDashboard({
   return (
     <div className="space-y-8">
       <header className="space-y-2">
-        <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-          <RadioTower className="h-3 w-3" />
-          Activity protocol
-        </div>
-        <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-          Activity Sources
-        </h1>
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          Register the NEAR accounts and event types that may publish activity for your
-          organization.
-        </p>
+        <h1 className="text-xl font-semibold tracking-tight text-foreground">Activity Sources</h1>
       </header>
 
       <ActivitySourceRegistration
@@ -73,11 +63,14 @@ export function ActivitySourcesDashboard({
           <span className="text-xs text-muted-foreground">{sources.length} registered</span>
         </div>
         {sources.length === 0 ? (
-          <Card className="p-8 text-center text-sm text-muted-foreground">
-            No Activity Sources are registered for this organization.
-          </Card>
+          <EmptyState
+            compact
+            icon={BroadcastIcon}
+            title="No Activity Sources yet"
+            description="Register a source above to start publishing events for this organization."
+          />
         ) : (
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="flex flex-col gap-4">
             {sources.map((source) => (
               <ActivitySourceCard
                 key={source.sourceId}
@@ -96,9 +89,12 @@ export function ActivitySourcesDashboard({
             <span className="text-xs text-muted-foreground">{reviewQueue.length} pending</span>
           </div>
           {reviewQueue.length === 0 ? (
-            <Card className="p-8 text-center text-sm text-muted-foreground">
-              No sources are awaiting review.
-            </Card>
+            <EmptyState
+              compact
+              icon={GavelIcon}
+              title="Nothing to review"
+              description="No sources are awaiting review."
+            />
           ) : (
             <div className="space-y-4">
               {reviewQueue.map((source) => (
@@ -121,9 +117,12 @@ export function ActivitySourcesDashboard({
             <span className="text-xs text-muted-foreground">{adminSources.length} sources</span>
           </div>
           {adminSources.length === 0 ? (
-            <Card className="p-8 text-center text-sm text-muted-foreground">
-              No sources are available for trust configuration.
-            </Card>
+            <EmptyState
+              compact
+              icon={ShieldCheckIcon}
+              title="Nothing to configure"
+              description="No sources are available for trust configuration."
+            />
           ) : (
             <div className="space-y-4">
               {adminSources.map((source) => (

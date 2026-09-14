@@ -1,15 +1,14 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { Users } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useAuthClient } from "@/app";
-import { Button, Card, CardContent, Input } from "@/components";
+import { Button, Input } from "@/components";
 import { PageContainer } from "@/components/layout/page-container";
 
 export const Route = createFileRoute("/_layout/_authenticated/organizations/new")({
   head: () => ({
-    title: "New Organization | auth.everything.dev",
+    title: "New Organization | NEAR Builders Activity",
     meta: [{ name: "description", content: "Create a new organization." }],
   }),
   component: NewOrganization,
@@ -65,13 +64,9 @@ function NewOrganization() {
     <PageContainer variant="narrow">
       <div className="space-y-6">
         <header className="space-y-2">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            <Users className="h-3 w-3" />
-            Teams
-          </div>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              <h1 className="text-xl font-semibold tracking-tight text-foreground">
                 New Organization
               </h1>
             </div>
@@ -88,8 +83,8 @@ function NewOrganization() {
           }}
           className="space-y-6"
         >
-          <Card>
-            <CardContent className="p-6 space-y-4">
+          <section className="border-t border-border py-6">
+            <div className=" space-y-4">
               <Field label="name" htmlFor="organization-name">
                 <Input
                   id="organization-name"
@@ -117,8 +112,8 @@ function NewOrganization() {
                   Only lowercase letters, numbers, and hyphens.
                 </p>
               </Field>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
 
           <div className="flex gap-2">
             <Button asChild variant="outline">
@@ -135,19 +130,17 @@ function NewOrganization() {
         </form>
 
         <section className="space-y-4">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground">
-            What Happens Next
-          </h2>
-          <Card>
-            <CardContent className="p-4">
+          <h2 className="text-sm font-medium  text-muted-foreground">What Happens Next</h2>
+          <section className="border-t border-border py-6">
+            <div className="p-4">
               <ul className="space-y-2 text-xs text-muted-foreground">
                 <li>• Your organization will be created immediately</li>
                 <li>• You'll be the owner with full permissions</li>
                 <li>• You can invite team members from the organization settings</li>
                 <li>• You can switch between organizations anytime</li>
               </ul>
-            </CardContent>
-          </Card>
+            </div>
+          </section>
         </section>
       </div>
     </PageContainer>
@@ -165,7 +158,7 @@ function Field({
 }) {
   return (
     <div className="space-y-2">
-      <label htmlFor={htmlFor} className="text-xs uppercase tracking-wide text-muted-foreground">
+      <label htmlFor={htmlFor} className="text-xs  text-muted-foreground">
         {label}
       </label>
       {children}

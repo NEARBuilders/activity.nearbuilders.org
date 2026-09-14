@@ -1,5 +1,11 @@
+import {
+  BookOpenIcon as BookOpen,
+  ArrowSquareOutIcon as ExternalLink,
+  FileTextIcon as FileText,
+  GitForkIcon as GitFork,
+  SparkleIcon as Sparkles,
+} from "@phosphor-icons/react/ssr";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { BookOpen, ExternalLink, FileText, GitFork, Sparkles } from "lucide-react";
 import { getAccount, getActiveRuntime, getAppName, getRepository } from "@/app";
 import { PageContainer } from "@/components";
 import { Markdown } from "@/components/ui/markdown";
@@ -54,7 +60,7 @@ export const Route = createFileRoute("/_layout/about")({
   },
   head: () => ({
     meta: [
-      { title: "About | app" },
+      { title: "About | NEAR Builders Activity" },
       { name: "description", content: "About this runtime-composed app on NEAR." },
     ],
   }),
@@ -91,7 +97,7 @@ function About() {
   return (
     <PageContainer variant="default">
       <div className="space-y-4">
-        <div className="rounded-[12px] border border-border bg-card p-6 space-y-4">
+        <div className="border-b border-border pb-6 space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-center gap-3 min-w-0">
               <div className="w-10 h-10 rounded-[10px] bg-foreground flex items-center justify-center shrink-0">
@@ -151,8 +157,8 @@ function About() {
           )}
 
           {repository && (
-            <div className="rounded-[8px] border border-border bg-muted px-3.5 py-2.5 flex items-center gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground shrink-0 min-w-[64px]">
+            <div className="border-b border-border py-3 flex items-center gap-2">
+              <span className="text-sm font-medium text-muted-foreground shrink-0 min-w-[64px]">
                 repo
               </span>
               <a
@@ -166,9 +172,9 @@ function About() {
             </div>
           )}
 
-          <div className="rounded-[8px] border border-border bg-muted px-3.5 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="border-t border-border py-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <div className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
+              <div className="text-sm font-medium text-muted-foreground">
                 for agents and builders
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -199,11 +205,11 @@ function About() {
         </div>
 
         {readme ? (
-          <div className="rounded-[12px] border border-border bg-card p-8">
+          <div className="py-6">
             <Markdown content={readme} />
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center gap-3 px-8 py-16 rounded-[12px] border border-border bg-card text-muted-foreground">
+          <div className="flex flex-col items-center justify-center gap-3 px-8 py-16  text-muted-foreground">
             <FileText size={32} className="text-border" />
             <p className="text-sm text-muted-foreground">No README available.</p>
           </div>

@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from "lucide-react";
+import { PlusIcon as Plus, TrashIcon as Trash2 } from "@phosphor-icons/react/ssr";
 import { useState } from "react";
 import type {
   ActivityEventTypeView,
@@ -6,6 +6,7 @@ import type {
 } from "@/components/activity-sources-model";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ActivitySourceRegistrationAccess } from "@/lib/activity-source-permissions";
@@ -52,11 +53,9 @@ export function ActivitySourceRegistration({
 
   if (access !== "allowed") {
     return (
-      <Card className="p-6">
+      <Card className="gap-1.5 p-5">
         <h2 className="font-semibold text-foreground">{registrationBlocker[access].title}</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {registrationBlocker[access].description}
-        </p>
+        <p className="text-sm text-muted-foreground">{registrationBlocker[access].description}</p>
       </Card>
     );
   }
@@ -85,7 +84,7 @@ export function ActivitySourceRegistration({
   return (
     <section className="space-y-3">
       <h2 className="text-lg font-semibold text-foreground">Register Activity Source</h2>
-      <Card className="p-5 sm:p-6">
+      <Card className="p-5">
         <form className="space-y-6" onSubmit={handleSubmit}>
           <div className="grid gap-4 md:grid-cols-3">
             <FormField label="Source ID" htmlFor="source-id">
@@ -143,7 +142,7 @@ export function ActivitySourceRegistration({
               {eventTypes.map((eventType, index) => (
                 <div
                   key={`event-type-${index.toString()}`}
-                  className="grid gap-3 rounded-[10px] border border-border bg-muted/30 p-4 md:grid-cols-[1fr_1.5fr_8rem_auto_auto] md:items-end"
+                  className="grid gap-3 border-t border-border py-4 md:grid-cols-[1fr_1.5fr_8rem_auto_auto] md:items-end"
                 >
                   <FormField label="Name" htmlFor={`event-type-name-${index.toString()}`}>
                     <Input
@@ -181,16 +180,19 @@ export function ActivitySourceRegistration({
                       required
                     />
                   </FormField>
-                  <label className="flex h-10 items-center gap-2 text-sm text-foreground">
-                    <input
-                      type="checkbox"
+                  <Label
+                    htmlFor={`event-type-enabled-${index.toString()}`}
+                    className="flex h-10 items-center gap-2 font-normal"
+                  >
+                    <Checkbox
+                      id={`event-type-enabled-${index.toString()}`}
                       checked={eventType.enabled}
-                      onChange={(event) =>
-                        updateEventType(index, { enabled: event.target.checked })
+                      onCheckedChange={(checked) =>
+                        updateEventType(index, { enabled: checked === true })
                       }
                     />
                     Enabled
-                  </label>
+                  </Label>
                   <Button
                     type="button"
                     variant="ghost"

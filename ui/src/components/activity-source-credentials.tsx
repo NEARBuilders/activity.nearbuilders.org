@@ -1,4 +1,11 @@
-import { Copy, KeyRound, Link2, RefreshCw, RotateCw, ShieldCheck } from "lucide-react";
+import {
+  CopyIcon as Copy,
+  KeyIcon as KeyRound,
+  LinkIcon as Link2,
+  ArrowsClockwiseIcon as RefreshCw,
+  ArrowClockwiseIcon as RotateCw,
+  ShieldCheckIcon as ShieldCheck,
+} from "@phosphor-icons/react/ssr";
 import { useState } from "react";
 import { toast } from "sonner";
 import type {
@@ -164,7 +171,7 @@ export function ActivitySourceCredentials({
                   apiKeys.map((apiKey) => (
                     <div
                       key={apiKey.id}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-border p-3 text-xs"
+                      className="flex flex-wrap items-center justify-between gap-2 border-t border-border py-3 text-xs"
                     >
                       <div className="space-y-1">
                         <div className="font-medium text-foreground">{apiKey.name}</div>

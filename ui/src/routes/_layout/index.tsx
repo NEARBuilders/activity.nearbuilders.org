@@ -1,8 +1,12 @@
+import {
+  BuildingsIcon as Building2,
+  PlusIcon as Plus,
+  ShieldIcon as Shield,
+} from "@phosphor-icons/react/ssr";
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { Building2, Plus, Shield } from "lucide-react";
 import { sessionQueryOptions, useApiClient, useAuthClient } from "@/app";
-import { Button, Card } from "@/components";
+import { Button } from "@/components";
 import { PageContainer } from "@/components/layout/page-container";
 
 export const Route = createFileRoute("/_layout/")({
@@ -33,13 +37,9 @@ function TenantListPage() {
     <PageContainer variant="wide">
       <div className="space-y-8">
         <header className="space-y-2">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            <Building2 className="h-3 w-3" />
-            Tenants
-          </div>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              <h1 className="text-xl font-semibold tracking-tight text-foreground">
                 {session?.user?.name || session?.user?.email || "Your"} Tenants
               </h1>
             </div>
@@ -53,17 +53,17 @@ function TenantListPage() {
         </header>
 
         {isLoading ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="flex flex-col">
             {[1, 2, 3].map((n) => (
-              <Card key={n} className="p-6 space-y-4">
+              <section key={n} className="space-y-4 border-t border-border py-6">
                 <div className="h-5 w-3/4 rounded-[4px] animate-pulse bg-muted" />
                 <div className="h-4 w-1/2 rounded-[4px] animate-pulse bg-muted" />
                 <div className="h-10 w-full rounded-[12px] animate-pulse bg-muted" />
-              </Card>
+              </section>
             ))}
           </div>
         ) : tenants.length === 0 ? (
-          <Card className="p-10 text-center space-y-4 items-center">
+          <section className="text-center space-y-4 items-center border-t border-border py-6">
             <Building2 className="h-10 w-10 mx-auto text-muted-foreground" />
             <p className="text-base font-semibold text-foreground">No tenants yet.</p>
             <p className="text-sm text-muted-foreground">
@@ -75,11 +75,11 @@ function TenantListPage() {
                 create your first tenant
               </Link>
             </Button>
-          </Card>
+          </section>
         ) : (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          <div className="flex flex-col">
             {tenants.map((tenant) => (
-              <Card key={tenant.id} className="p-6 space-y-4 hover:shadow-md">
+              <section key={tenant.id} className="space-y-4 border-t border-border py-6">
                 <div className="space-y-1">
                   <div className="text-lg font-semibold text-foreground">{tenant.name}</div>
                   <div className="text-[11px] font-mono text-muted-foreground">
@@ -101,7 +101,7 @@ function TenantListPage() {
                     </Link>
                   </Button>
                 </div>
-              </Card>
+              </section>
             ))}
           </div>
         )}
@@ -113,7 +113,7 @@ function TenantListPage() {
 function TenantMeta({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex items-center gap-2 text-xs">
-      <span className="text-muted-foreground uppercase tracking-wide shrink-0">{label}</span>
+      <span className="text-muted-foreground  shrink-0">{label}</span>
       <span className={`text-foreground truncate ${mono ? "font-mono text-[11px]" : ""}`}>
         {value}
       </span>

@@ -21,6 +21,9 @@ describe("synchronizeActiveOrganization", () => {
     await synchronizeActiveOrganization({
       organizationId: "org-saad",
       queryClient,
+      setActiveOrganization: async () => {
+        events.push("organization switched");
+      },
       confirmActiveOrganization: async () => {
         events.push("session confirmed");
         return "org-saad";
@@ -28,7 +31,7 @@ describe("synchronizeActiveOrganization", () => {
       invalidateRouter,
     });
 
-    expect(events).toEqual(["session confirmed", "router refreshed"]);
+    expect(events).toEqual(["organization switched", "session confirmed", "router refreshed"]);
     expect(observedDuringRouterRefresh).toEqual(["org-saad"]);
     expect(
       queryClient.getQueryData<{
@@ -48,6 +51,7 @@ describe("synchronizeActiveOrganization", () => {
       synchronizeActiveOrganization({
         organizationId: "org-saad",
         queryClient,
+        setActiveOrganization: async () => undefined,
         confirmActiveOrganization: async () => null,
         invalidateRouter,
       }),
@@ -60,4 +64,75 @@ describe("synchronizeActiveOrganization", () => {
       }>(["session"])?.session.activeOrganizationId,
     ).toBeNull();
   });
+
+  it("restores the previous session when switching the organization fails", async () => {
+    const queryClient = new QueryClient();
+    queryClient.setQueryData(["session"], {
+      session: { activeOrganizationId: "org-before" },
+    });
+    const confirmActiveOrganization = vi.fn();
+    const invalidateRouter = vi.fn();
+
+    await expect(
+      synchronizeActiveOrganization({
+        organizationId: "org-after",
+        queryClient,
+        setActiveOrganization: async () => {
+          throw new Error("Switch failed");
+        },
+        confirmActiveOrganization,
+        invalidateRouter,
+      }),
+    ).rejects.toThrow("Switch failed");
+
+    expect(confirmActiveOrganization).not.toHaveBeenCalled();
+    expect(invalidateRouter).not.toHaveBeenCalled();
+    expect(
+      queryClient.getQueryData<{
+        session: { activeOrganizationId: string | null };
+      }>(["session"])?.session.activeOrganizationId,
+    ).toBe("org-before");
+  });
+});
+
+it("does not expose an unconfirmed workspace to mounted query consumers", async () => {
+  const queryClient = new QueryClient();
+  queryClient.setQueryData(["session"], { session: { activeOrganizationId: null } });
+  const observed: unknown[] = [];
+  const observe = () =>
+    observed.push(
+      queryClient.getQueryData<{ session: { activeOrganizationId: string | null } }>(["session"])
+        ?.session.activeOrganizationId,
+    );
+  await synchronizeActiveOrganization({
+    organizationId: "org-next",
+    queryClient,
+    setActiveOrganization: async () => {
+      observe();
+    },
+    confirmActiveOrganization: async () => {
+      observe();
+      return "org-next";
+    },
+    invalidateRouter: async () => {},
+  });
+  expect(observed).toEqual([null, null]);
+});
+
+it("does not restore a session invalidated by an unauthorized response", async () => {
+  const queryClient = new QueryClient();
+  queryClient.setQueryData(["session"], { session: { activeOrganizationId: "org-before" } });
+  await expect(
+    synchronizeActiveOrganization({
+      organizationId: "org-after",
+      queryClient,
+      setActiveOrganization: async () => {
+        queryClient.setQueryData(["session"], null);
+        throw new Error("Unauthorized");
+      },
+      confirmActiveOrganization: async () => null,
+      invalidateRouter: async () => {},
+    }),
+  ).rejects.toThrow("Unauthorized");
+  expect(queryClient.getQueryData(["session"])).toBeNull();
 });

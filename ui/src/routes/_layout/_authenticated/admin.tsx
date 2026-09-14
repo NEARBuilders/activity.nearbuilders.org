@@ -1,14 +1,13 @@
+import { ShieldIcon as Shield, UsersIcon as Users } from "@phosphor-icons/react/ssr";
 import { createFileRoute, Link, redirect } from "@tanstack/react-router";
-import { Shield, Users } from "lucide-react";
 import { getAccount } from "@/app";
-import { Card } from "@/components";
 import { EmptyState } from "@/components/empty-state";
 import { PageContainer } from "@/components/layout/page-container";
 import { InfoRow } from "@/components/ui/info-row";
 
 export const Route = createFileRoute("/_layout/_authenticated/admin")({
   head: () => ({
-    meta: [{ title: "Admin | app" }],
+    meta: [{ title: "Admin | NEAR Builders Activity" }],
   }),
   beforeLoad: async ({ context }) => {
     const { apiClient, runtimeConfig } = context;
@@ -52,13 +51,13 @@ function AdminPage() {
           <div className="flex justify-center gap-2">
             <Link
               to="/"
-              className="h-10 px-4 inline-flex items-center gap-1.5 text-sm font-medium border-2 border-outset border-border-strong bg-card text-foreground shadow-sm hover:shadow-md active:border-inset active:shadow-none transition-all duration-200 ease-out rounded-[12px]"
+              className="h-10 px-4 inline-flex items-center gap-1.5 text-sm font-medium rounded-lg border border-border bg-card text-foreground transition-colors rounded-[12px]"
             >
               home
             </Link>
             <Link
               to="/organizations"
-              className="h-10 px-4 inline-flex items-center gap-1.5 text-sm font-medium border-2 border-outset border-border-strong bg-card text-foreground shadow-sm hover:shadow-md active:border-inset active:shadow-none transition-all duration-200 ease-out rounded-[12px]"
+              className="h-10 px-4 inline-flex items-center gap-1.5 text-sm font-medium rounded-lg border border-border bg-card text-foreground transition-colors rounded-[12px]"
             >
               organizations
             </Link>
@@ -72,18 +71,11 @@ function AdminPage() {
     <PageContainer variant="wide">
       <div className="space-y-8">
         <header className="space-y-3">
-          <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-            <Shield className="h-3 w-3" />
-            Admin
-          </div>
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div className="space-y-1">
-              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+              <h1 className="text-xl font-semibold tracking-tight text-foreground">
                 {tenant.name}
               </h1>
-              <p className="text-[11px] font-mono text-muted-foreground">
-                {tenant.subdomain} · {tenant.accountId}
-              </p>
             </div>
           </div>
         </header>
@@ -111,10 +103,8 @@ function AdminPage() {
 
         <section className="space-y-3">
           <SectionHeader title="Tenant details" />
-          <Card className="p-6 space-y-4">
-            <div className="text-muted-foreground text-[11px] font-bold uppercase tracking-wider">
-              Configuration
-            </div>
+          <section className="space-y-4 border-t border-border py-6">
+            <div className="text-muted-foreground text-sm font-medium">Configuration</div>
             <div className="flex flex-col gap-2">
               <InfoRow label="name" value={tenant.name} />
               <InfoRow label="subdomain" value={tenant.subdomain} mono />
@@ -125,12 +115,12 @@ function AdminPage() {
                 value={tenant.createdAt ? new Date(tenant.createdAt).toLocaleDateString() : "—"}
               />
             </div>
-          </Card>
+          </section>
         </section>
 
         <section className="space-y-3">
           <SectionHeader title="Members & permissions" />
-          <Card className="p-4 space-y-3">
+          <section className="space-y-3 border-t border-border py-6">
             <p className="text-sm text-muted-foreground">
               This tenant is backed by an organization. Manage members, roles, and invitations
               there.
@@ -138,12 +128,12 @@ function AdminPage() {
             <Link
               to="/organizations/$slug"
               params={{ slug: tenant.subdomain }}
-              className="h-9 px-3 inline-flex items-center gap-1.5 text-xs font-medium border-2 border-outset border-border-strong bg-card text-foreground shadow-sm hover:shadow-md active:border-inset active:shadow-none transition-all duration-200 ease-out rounded-[10px]"
+              className="h-9 px-3 inline-flex items-center gap-1.5 text-xs font-medium rounded-lg border border-border bg-card text-foreground transition-colors rounded-[10px]"
             >
               <Users className="h-3.5 w-3.5" />
               open organization
             </Link>
-          </Card>
+          </section>
         </section>
       </div>
     </PageContainer>
@@ -160,10 +150,8 @@ function StatCard({
   mono?: boolean;
 }) {
   return (
-    <div className="border-2 border-outset border-border-strong bg-card p-4 rounded-[12px] shadow-sm space-y-1">
-      <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">
-        {label}
-      </div>
+    <div className="border-t border-border py-4 space-y-1">
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
       <div
         className={`text-sm text-foreground break-all ${mono ? "font-mono text-xs" : "font-semibold"}`}
       >

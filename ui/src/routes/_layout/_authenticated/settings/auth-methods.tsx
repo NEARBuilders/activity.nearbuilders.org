@@ -1,10 +1,14 @@
+import {
+  KeyIcon as KeyRound,
+  EnvelopeIcon as Mail,
+  WalletIcon as Wallet,
+} from "@phosphor-icons/react/ssr";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { KeyRound, Mail, Wallet } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { type SessionData, sessionQueryOptions, useAuthClient } from "@/app";
-import { Button, Card, ConfirmDialog, Input } from "@/components";
+import { Button, ConfirmDialog, Input } from "@/components";
 
 export const Route = createFileRoute("/_layout/_authenticated/settings/auth-methods")({
   component: AuthMethodsSettings,
@@ -29,9 +33,9 @@ function AuthMethodsSettings() {
 
 function EmailMethod({ user }: { user: { email?: string; isAnonymous?: boolean | null } }) {
   return (
-    <Card className="p-6 space-y-4">
+    <section className="space-y-4 border-t border-border py-6">
       <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-[10px] border-2 border-outset border-border-strong bg-muted flex items-center justify-center shrink-0">
+        <div className="w-10 h-10 rounded-[10px] rounded-lg border border-border bg-muted flex items-center justify-center shrink-0">
           <Mail className="h-4 w-4 text-muted-foreground" />
         </div>
         <div className="min-w-0 flex-1 space-y-1">
@@ -44,7 +48,7 @@ function EmailMethod({ user }: { user: { email?: string; isAnonymous?: boolean |
           </p>
         </div>
       </div>
-    </Card>
+    </section>
   );
 }
 
@@ -73,9 +77,9 @@ function NearMethod({ nearAccountId }: { nearAccountId: string | null }) {
   });
 
   return (
-    <Card className="p-6 space-y-4">
+    <section className="space-y-4 border-t border-border py-6">
       <div className="flex items-start gap-4">
-        <div className="w-10 h-10 rounded-[10px] border-2 border-outset border-border-strong bg-muted flex items-center justify-center shrink-0">
+        <div className="w-10 h-10 rounded-[10px] rounded-lg border border-border bg-muted flex items-center justify-center shrink-0">
           <Wallet className="h-4 w-4 text-muted-foreground" />
         </div>
         <div className="min-w-0 flex-1 space-y-1">
@@ -100,7 +104,7 @@ function NearMethod({ nearAccountId }: { nearAccountId: string | null }) {
           )}
         </div>
       </div>
-    </Card>
+    </section>
   );
 }
 
@@ -154,9 +158,9 @@ function PasskeysMethod() {
 
   return (
     <>
-      <Card className="p-6 space-y-4">
+      <section className="space-y-4 border-t border-border py-6">
         <div className="flex items-start gap-4">
-          <div className="w-10 h-10 rounded-[10px] border-2 border-outset border-border-strong bg-muted flex items-center justify-center shrink-0">
+          <div className="w-10 h-10 rounded-[10px] rounded-lg border border-border bg-muted flex items-center justify-center shrink-0">
             <KeyRound className="h-4 w-4 text-muted-foreground" />
           </div>
           <div className="min-w-0 flex-1 space-y-3">
@@ -173,7 +177,7 @@ function PasskeysMethod() {
                 {passkeys.map((passkey) => (
                   <div
                     key={passkey.id}
-                    className="flex items-center justify-between gap-3 rounded-[8px] border border-border bg-muted px-3.5 py-2.5"
+                    className="flex items-center justify-between gap-3 border-b border-border py-3"
                   >
                     <span className="text-sm text-foreground truncate min-w-0 flex-1">
                       {passkey.name || "Passkey"}
@@ -208,7 +212,7 @@ function PasskeysMethod() {
             </div>
           </div>
         </div>
-      </Card>
+      </section>
 
       <ConfirmDialog
         open={!!passkeyToDelete}
