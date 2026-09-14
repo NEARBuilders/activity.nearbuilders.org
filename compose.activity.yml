@@ -1,3 +1,9 @@
+# This file is the Activity service's only commit-worthy infra source.
+# docker-compose.yml (also in this directory) is bos-template-owned: it is
+# gitignored and regenerated from upstream everything-dev on every
+# `bos sync`/`bos upgrade`, so it cannot be hand-edited to avoid a port
+# collision with this file. Run `bun run compose:doctor` (scripts/compose-doctor.ts)
+# after any sync to catch one before `bun run dev` starts. See issue #29.
 services:
   activity-relay:
     image: ghcr.io/mattn/nostr-relay:v0.0.250

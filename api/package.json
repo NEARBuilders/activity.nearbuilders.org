@@ -46,7 +46,8 @@
     "dotenv": "^17.2.3",
     "everything-dev": "catalog:",
     "vitest": "catalog:",
-    "zephyr-rspack-plugin": "catalog:"
+    "zephyr-rspack-plugin": "catalog:",
+    "vite-tsconfig-paths": "^5.1.4"
   },
   "scripts": {
     "build": "bun run build:types && rspack build",

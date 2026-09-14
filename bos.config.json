@@ -30,7 +30,8 @@
         "API_DATABASE_URL",
         "ACTIVITY_SIGNING_MASTER_KEYS",
         "ACTIVITY_SIGNING_ACTIVE_KEY_VERSION",
-        "ACTIVITY_REDIS_URL"
+        "ACTIVITY_REDIS_URL",
+        "ACTIVITY_RELAY_URL"
       ],
       "production": "https://elliot-braem-7914-api-activity-nearbuilders-org-n-e3512ef11-ze.zephyrcloud.app",
       "integrity": "sha384-mn3XE+GENekYx07NQktLLys3E2yrGw5CO3kJMI4UWpzdUQx7Q2ccjFFuKtdS4TYG"
