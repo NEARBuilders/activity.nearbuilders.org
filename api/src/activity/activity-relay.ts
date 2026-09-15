@@ -26,6 +26,11 @@ export type ActivityQueryResult = {
 };
 
 export interface ActivityRelayAdapter {
+  /**
+   * Most events one query can return, when the transport caps below the requested limit.
+   * `ActivityRelay` scans at most this many so it can tell a full scan from a complete one.
+   */
+  readonly maxQueryLimit?: number;
   publish(event: Event): Promise<string>;
   query(filter: Filter): Promise<Event[]>;
   subscribe(
@@ -69,10 +74,27 @@ export class ActivityRelayScanLimitError extends Error {
   }
 }
 
-function encodeCursor(event: Event): string {
-  return Buffer.from(JSON.stringify({ createdAt: event.created_at, id: event.id })).toString(
-    "base64url",
-  );
+// Sorts after every real event ID, so a cursor at this ID resumes with the whole second.
+const SECOND_START_ID = "f".repeat(64);
+
+function encodeCursor(cursor: ActivityCursor): string {
+  return Buffer.from(JSON.stringify(cursor)).toString("base64url");
+}
+
+/**
+ * A relay returns the newest `limit` matches, so a full scan may hold only part of its oldest
+ * second. Drop that second: the next page starts from it and reads it whole. Throws only when a
+ * single second fills the scan, which no page size can split.
+ */
+function completeSeconds(
+  events: Event[],
+  scanLimit: number,
+): { events: Event[]; resumeAt: ActivityCursor | null } {
+  if (events.length < scanLimit) return { events, resumeAt: null };
+  const oldestSecond = Math.min(...events.map((event) => event.created_at));
+  const complete = events.filter((event) => event.created_at > oldestSecond);
+  if (complete.length === 0) throw new ActivityRelayScanLimitError();
+  return { events: complete, resumeAt: { createdAt: oldestSecond, id: SECOND_START_ID } };
 }
 
 function decodeCursor(cursor: string): ActivityCursor {
@@ -99,14 +121,19 @@ function activityFilter(input: ActivityQuery): Filter {
   return filter;
 }
 
+// The pinned relay (mattn/nostr-relay) answers at most 500 events per query.
+const DIRECT_QUERY_LIMIT = 500;
+
 export class NostrRelayAdapter implements ActivityRelayAdapter {
+  readonly maxQueryLimit: number;
   readonly #relayUrl: string;
   readonly #pool = new SimplePool({ enablePing: true, enableReconnect: false });
   readonly #subscriptionClosers = new Set<() => void>();
   #destroyed = false;
 
-  constructor(relayUrl: string) {
+  constructor(relayUrl: string, options: { maxQueryLimit?: number } = {}) {
     this.#relayUrl = relayUrl;
+    this.maxQueryLimit = options.maxQueryLimit ?? DIRECT_QUERY_LIMIT;
   }
 
   async publish(event: Event): Promise<string> {
@@ -145,6 +172,8 @@ export class NostrRelayAdapter implements ActivityRelayAdapter {
           onevent: (event) => events.push(event),
           oneose: () => settle(() => resolve(events)),
           onclose: (reason) => {
+            // Settling closes the subscription itself; only an unexpected close is a failure.
+            if (settled) return;
             console.error(`Activity relay subscription closed at ${this.#relayUrl}: ${reason}`);
             settle(() => reject(new ActivityRelayUnavailableError()));
           },
@@ -255,14 +284,15 @@ export class ActivityRelay {
   ): Promise<ActivityQueryResult> {
     const limit = Math.min(Math.max(input.limit ?? 100, 1), 100);
     const cursor = input.cursor ? decodeCursor(input.cursor) : null;
+    const scanLimit = Math.min(this.#scanLimit, this.#adapter.maxQueryLimit ?? this.#scanLimit);
     const filter = activityFilter(input);
-    filter.limit = this.#scanLimit;
+    filter.limit = scanLimit;
     if (cursor) filter.until = cursor.createdAt;
 
-    const events = await withTimeout(this.#adapter.query(filter), this.#queryTimeoutMs);
-    if (events.length >= this.#scanLimit) {
-      throw new ActivityRelayScanLimitError();
-    }
+    const { events, resumeAt } = completeSeconds(
+      await withTimeout(this.#adapter.query(filter), this.#queryTimeoutMs),
+      scanLimit,
+    );
     const validEvents = events.filter(isValid);
     const includedEvents = await selectVisible(validEvents);
     const pageCandidates = includedEvents.sort(compareEvents).filter((event) => {
@@ -274,9 +304,16 @@ export class ActivityRelay {
     });
     const page = pageCandidates.slice(0, limit);
     const lastEvent = page.at(-1);
+    let nextCursor: string | null = null;
+    if (pageCandidates.length > limit && lastEvent) {
+      nextCursor = encodeCursor({ createdAt: lastEvent.created_at, id: lastEvent.id });
+    } else if (resumeAt) {
+      // Everything newer than the dropped second is consumed; older history remains.
+      nextCursor = encodeCursor(resumeAt);
+    }
     return {
       events: page,
-      nextCursor: pageCandidates.length > limit && lastEvent ? encodeCursor(lastEvent) : null,
+      nextCursor,
       skippedInvalid: events.length - validEvents.length,
     };
   }

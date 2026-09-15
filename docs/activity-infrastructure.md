@@ -41,12 +41,15 @@ Local verification uses the API's in-process relay fixtures and does not require
 | Health | Publish/read/subscribe, Redis write and projection rebuild checks on staging and production | Local integration passes; deployed checks pending |
 | Operations | Metrics, alert routing, backup schedule, recovery objectives and incident owner | Pending |
 
-Activity's domain scan limit is 1,000. The shared adapter now caps each history request
-at 500 to match the selected relay and rejects a response marked limited by the plugin.
-The regression fixture reproduced a missing event among 501 same-second events before
-this fix. At the cap, the new behavior is an explicit failure, not complete pagination.
-The direct adapter is unchanged. Relays with lower limits require separate validation.
-Complete larger-history reads remain a production gate before reader cutover.
+Activity's domain scan limit is 1,000. Each adapter declares its transport's per-query cap
+(500 for both the shared and direct adapters, matching the selected relay), and a scan
+requests the smaller of the two. A scan that returns a full cap may hold only part of its
+oldest second, so Activity drops that second and the next page starts from it. History of
+any length therefore pages completely; only a single second holding a full cap of matching
+events fails explicitly, because NIP-01 filters cannot split one second. A cap declared above
+the relay's real limit would hide truncation, so change it together with the relay. Verified
+against a local `mattn/nostr-relay` with 1,100 events at five per second: 11 pages, every
+event once, in feed order.
 
 The selected relay hardcodes both its advertised and backend query limit at 500;
 its command-line flags do not expose a limit override. See the pinned version's

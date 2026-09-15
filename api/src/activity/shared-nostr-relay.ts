@@ -59,7 +59,11 @@ function relayFailure(error: unknown): Error {
   return new ActivityRelayUnavailableError();
 }
 
+// The production relay (mattn/nostr-relay) answers at most 500 events per query.
+const SHARED_QUERY_LIMIT = 500;
+
 export class SharedNostrRelayAdapter implements ActivityRelayAdapter {
+  readonly maxQueryLimit = SHARED_QUERY_LIMIT;
   readonly #controllers = new Set<AbortController>();
   #closed = false;
 
@@ -95,15 +99,17 @@ export class SharedNostrRelayAdapter implements ActivityRelayAdapter {
 
   async query(filter: Filter): Promise<Event[]> {
     if (this.#closed) throw new ActivityRelayUnavailableError();
+    const limit = Math.min(filter.limit ?? SHARED_QUERY_LIMIT, SHARED_QUERY_LIMIT);
     try {
       const result = await this.client.queryEvents(
-        {
-          filter: convertFilter({ ...filter, limit: Math.min(filter.limit ?? 500, 500) }),
-          relays: [this.relayUrl],
-        },
+        { filter: convertFilter({ ...filter, limit }), relays: [this.relayUrl] },
         { signal: AbortSignal.timeout(5_500) },
       );
-      if (result.meta.limited) throw new ActivityRelayScanLimitError();
+      // A full page is expected: ActivityRelay pages past it. A limited page shorter than the
+      // request means a lower cap somewhere in the chain, which would hide truncation.
+      if (result.meta.limited && result.events.length < limit) {
+        throw new ActivityRelayScanLimitError();
+      }
       return result.events;
     } catch (error) {
       if (error instanceof ActivityRelayScanLimitError) throw error;

@@ -21,6 +21,45 @@ function eventWithId(id: string, createdAt: number): Event {
   };
 }
 
+function newestFirst(left: Event, right: Event): number {
+  return right.created_at - left.created_at || right.id.localeCompare(left.id);
+}
+
+/**
+ * Behaves like a real relay: newest first, honouring `until` and a hard result cap. Ties within a
+ * second come back in the opposite ID order to Activity's, so a partial second is a real subset.
+ */
+function limitedRelay(events: Event[], options: { maxQueryLimit: number }) {
+  const requestedLimits: number[] = [];
+  const adapter: ActivityRelayAdapter = {
+    maxQueryLimit: options.maxQueryLimit,
+    publish: async () => "",
+    query: async (filter: Filter) => {
+      requestedLimits.push(filter.limit ?? Number.POSITIVE_INFINITY);
+      return events
+        .filter((event) => filter.until === undefined || event.created_at <= filter.until)
+        .sort(
+          (left, right) => right.created_at - left.created_at || left.id.localeCompare(right.id),
+        )
+        .slice(0, Math.min(filter.limit ?? options.maxQueryLimit, options.maxQueryLimit));
+    },
+    subscribe: () => ({ close: () => {} }),
+    close: () => {},
+  };
+  return { adapter, requestedLimits };
+}
+
+async function readAll(relay: ActivityRelay, limit: number): Promise<string[]> {
+  const ids: string[] = [];
+  let cursor: string | null = null;
+  do {
+    const page = await relay.query({ limit, cursor });
+    ids.push(...page.events.map(({ id }) => id));
+    cursor = page.nextCursor;
+  } while (cursor);
+  return ids;
+}
+
 describe("ActivityRelay", () => {
   it("rejects when the relay connection cannot be established", async () => {
     const adapter = new NostrRelayAdapter("ws://127.0.0.1:1");
@@ -64,7 +103,7 @@ describe("ActivityRelay", () => {
     );
   });
 
-  it("fails loudly when a relay response reaches the configured scan limit", async () => {
+  it("fails loudly when a single second fills the scan", async () => {
     const events = Array.from({ length: 1_000 }, (_, index) =>
       eventWithId(index.toString(16).padStart(64, "0"), 1_788_307_200),
     );
@@ -78,6 +117,62 @@ describe("ActivityRelay", () => {
     await expect(
       new ActivityRelay(adapter, { scanLimit: 1_000 }).query({ source: "cursor-source" }),
     ).rejects.toThrow("Activity relay query reached its scan limit");
+  });
+
+  it("pages through history far larger than the scan limit without omission", async () => {
+    // 1,250 events, five per second, so every full scan ends inside a partial second.
+    const events = Array.from({ length: 1_250 }, (_, index) =>
+      eventWithId(index.toString(16).padStart(64, "0"), 1_788_300_000 + Math.floor(index / 5)),
+    );
+    const { adapter, requestedLimits } = limitedRelay(events, { maxQueryLimit: 102 });
+    const relay = new ActivityRelay(adapter, { scanLimit: 1_000 });
+
+    const receivedIds = await readAll(relay, 100);
+
+    expect(requestedLimits.every((limit) => limit === 102)).toBe(true);
+    expect(receivedIds).toEqual([...events].sort(newestFirst).map(({ id }) => id));
+  });
+
+  it("continues past a scan whose complete events are all invalid", async () => {
+    const valid = eventWithId("a".repeat(64), 1_788_300_000);
+    const invalid = Array.from({ length: 12 }, (_, index) =>
+      eventWithId(index.toString(16).padStart(64, "0"), 1_788_300_010 + index),
+    );
+    const { adapter } = limitedRelay([valid, ...invalid], { maxQueryLimit: 5 });
+    const relay = new ActivityRelay(adapter, { scanLimit: 1_000 });
+    const isValid = (event: Event) => event.id === valid.id;
+
+    const first = await relay.query({ limit: 10 }, isValid);
+    expect(first.events).toEqual([]);
+    expect(first.nextCursor).not.toBeNull();
+
+    const received: string[] = [];
+    let cursor: string | null = first.nextCursor;
+    while (cursor) {
+      const page = await relay.query({ limit: 10, cursor }, isValid);
+      received.push(...page.events.map(({ id }) => id));
+      cursor = page.nextCursor;
+    }
+    expect(received).toEqual([valid.id]);
+  });
+
+  it("fails loudly only on reaching a second that alone fills the scan", async () => {
+    const crowded = Array.from({ length: 6 }, (_, index) =>
+      eventWithId(`c${index}`.padEnd(64, "0"), 1_788_300_000),
+    );
+    const newer = Array.from({ length: 8 }, (_, index) =>
+      eventWithId(`d${index}`.padEnd(64, "0"), 1_788_300_001 + index),
+    );
+    const { adapter } = limitedRelay([...crowded, ...newer], { maxQueryLimit: 5 });
+    const relay = new ActivityRelay(adapter, { scanLimit: 1_000 });
+
+    const first = await relay.query({ limit: 100 });
+    expect(first.events).toHaveLength(4);
+    const second = await relay.query({ limit: 100, cursor: first.nextCursor });
+    expect(second.events).toHaveLength(4);
+    await expect(relay.query({ limit: 100, cursor: second.nextCursor })).rejects.toThrow(
+      "Activity relay query reached its scan limit",
+    );
   });
 
   it("rejects malformed cursors before querying the relay", async () => {
