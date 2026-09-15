@@ -233,9 +233,12 @@ the administrator, old and new values, reason, and timestamp in an append-only a
 Queries order events by `(created_at DESC, id DESC)`. The opaque cursor contains both values. Relay
 queries include the cursor second, then discard IDs at or ahead of the cursor locally, preventing
 events with the same Nostr timestamp from being skipped or repeated. Each relay scan requests up to
-1,000 matching records and exposes pages of at most 100 records. A response that reaches the scan
-limit fails loudly instead of returning a cursor that could silently omit same-second events.
-Relay reads have a six-second gateway deadline around the relay client's five-second wait.
+1,000 matching records, or the transport's lower per-query cap, and exposes pages of at most 100
+records. A scan that fills the cap may contain only part of its oldest second, so that second is
+dropped and the next cursor resumes at its start; later pages read it whole. Only a single second
+that alone fills the cap fails loudly, instead of returning a cursor that could silently omit
+same-second events. Relay reads have a six-second gateway deadline around the relay client's
+five-second wait.
 
 ## Verification workflow
 
@@ -251,8 +254,8 @@ The deployment ticket must provide:
 
 - a WSS relay endpoint with durable storage, backups, health checks, payload limits, connection and
   publish rate limits, and indexing enabled for kind `1701` plus the four tag filters;
-- a relay query cap above 1,000 matching events and an operational alert before a single filter
-  can exceed that many events in one timestamp second;
+- a known relay query cap, declared as the adapter's `maxQueryLimit`, and an operational alert
+  before a single filter can match that many events in one timestamp second;
 - Redis with authentication, TLS, persistence, backups, high availability, memory limits, and an
   explicit eviction policy that cannot discard projection keys;
 - secret-managed relay and Redis URLs, network access restricted to the service, and separate
