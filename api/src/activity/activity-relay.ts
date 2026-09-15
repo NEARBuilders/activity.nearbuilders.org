@@ -291,6 +291,14 @@ export class ActivityRelay {
     return this.#adapter.subscribe(filter, onEvent, options.onError);
   }
 
+  /** Round-trips a minimal query through the configured transport to prove the relay answers. */
+  async ping(): Promise<void> {
+    await withTimeout(
+      this.#adapter.query({ kinds: [ACTIVITY_EVENT_KIND], limit: 1 }),
+      this.#queryTimeoutMs,
+    );
+  }
+
   close(): void {
     this.#adapter.close();
   }

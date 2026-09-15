@@ -98,6 +98,7 @@ interface ActivityLeaderboardProjection {
   reset(): Promise<void>;
   getStatus(): Promise<ActivityLeaderboardStatus>;
   setStatus(status: ActivityLeaderboardStatus): Promise<void>;
+  checkWrite(): Promise<void>;
   close(): Promise<void>;
 }
 
@@ -168,6 +169,8 @@ class InMemoryActivityLeaderboardProjection implements ActivityLeaderboardProjec
   async setStatus(status: ActivityLeaderboardStatus): Promise<void> {
     this.#status = status;
   }
+
+  async checkWrite(): Promise<void> {}
 
   #adjust(event: ActivityLeaderboardEvent, buckets: ActivityBucket[], change: number): void {
     const dimension = dimensionKey(event.source, event.type);
@@ -347,6 +350,15 @@ class RedisActivityLeaderboardProjection implements ActivityLeaderboardProjectio
     });
   }
 
+  async checkWrite(): Promise<void> {
+    const key = `${this.#namespace}:health`;
+    const value = randomUUID();
+    await this.#redis.set(key, value, { EX: 60 });
+    if ((await this.#redis.get(key)) !== value) {
+      throw new Error("Redis health write was not read back");
+    }
+  }
+
   #countKey(bucket: string, dimension: string): string {
     return `${this.#namespace}:counts:${bucket}:${Buffer.from(dimension).toString("base64url")}`;
   }
@@ -440,6 +452,12 @@ export class ActivityLeaderboard {
   }
 
   getStatus(): Promise<ActivityLeaderboardStatus> {
+    return this.#projection.getStatus();
+  }
+
+  /** Proves the projection store accepts writes, then reports projection readiness. */
+  async checkHealth(): Promise<ActivityLeaderboardStatus> {
+    await this.#projection.checkWrite();
     return this.#projection.getStatus();
   }
 
