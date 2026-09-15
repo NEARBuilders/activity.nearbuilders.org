@@ -227,7 +227,11 @@ function createServerConfig() {
   if (shouldDeploy) {
     plugins.push(
       withZephyr({
-        entrypoint: "remoteEntry.server.js",
+        // The host downloads remoteEntry.server.js and runs it itself, so Zephyr must host
+        // it as a static file. An async-node target is otherwise inferred as an "ssr"
+        // snapshot, which makes Zephyr execute the CommonJS entry ("module is not defined")
+        // and stop serving it (404).
+        snapshotType: "csr",
         hooks: {
           onDeployComplete: async (info) => {
             console.log("🚀 UI SSR Deployed:", info.url);
