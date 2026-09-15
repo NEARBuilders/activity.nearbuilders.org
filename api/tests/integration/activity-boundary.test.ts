@@ -48,8 +48,8 @@ activityDescribe("Activity Nostr boundary", () => {
 
   it("publishes and queries a signed Activity event by relay-indexed fields", async () => {
     boundary = await ActivityBoundary.connect({
-      relayUrl: process.env.ACTIVITY_RELAY_URL ?? "ws://127.0.0.1:7447",
-      redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6379",
+      relayUrl: process.env.ACTIVITY_RELAY_URL || "ws://127.0.0.1:7447",
+      redisUrl: process.env.ACTIVITY_REDIS_URL || "redis://127.0.0.1:6379",
     });
     const idempotencyKey = `github:pr:${randomUUID()}`;
     const event = signActivityEvent(
@@ -84,8 +84,8 @@ activityDescribe("Activity Nostr boundary", () => {
 
   it("paginates equal-timestamp events deterministically by descending event id", async () => {
     boundary = await ActivityBoundary.connect({
-      relayUrl: process.env.ACTIVITY_RELAY_URL ?? "ws://127.0.0.1:7447",
-      redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6379",
+      relayUrl: process.env.ACTIVITY_RELAY_URL || "ws://127.0.0.1:7447",
+      redisUrl: process.env.ACTIVITY_REDIS_URL || "redis://127.0.0.1:6379",
     });
     const source = `cursor-test:${randomUUID()}`;
     const createdAt = Math.floor(Date.now() / 1_000);
@@ -118,8 +118,8 @@ activityDescribe("Activity Nostr boundary", () => {
 
   it("resubscribes after the local relay restarts", async () => {
     boundary = await ActivityBoundary.connect({
-      relayUrl: process.env.ACTIVITY_RELAY_URL ?? "ws://127.0.0.1:7447",
-      redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6379",
+      relayUrl: process.env.ACTIVITY_RELAY_URL || "ws://127.0.0.1:7447",
+      redisUrl: process.env.ACTIVITY_REDIS_URL || "redis://127.0.0.1:6379",
     });
     const source = `subscription-test:${randomUUID()}`;
     const received: NostrEvent[] = [];
@@ -165,8 +165,8 @@ activityDescribe("Activity Nostr boundary", () => {
       SECRET_KEY,
     );
     const publisher = await ActivityBoundary.connect({
-      relayUrl: process.env.ACTIVITY_RELAY_URL ?? "ws://127.0.0.1:7447",
-      redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6379",
+      relayUrl: process.env.ACTIVITY_RELAY_URL || "ws://127.0.0.1:7447",
+      redisUrl: process.env.ACTIVITY_REDIS_URL || "redis://127.0.0.1:6379",
     });
     const secondReceived = new Promise<void>((resolveEvent) => {
       receiveNext = resolveEvent;
@@ -187,8 +187,8 @@ activityDescribe("Activity Nostr boundary", () => {
 
   it("replays relay history into Redis without double counting", async () => {
     boundary = await ActivityBoundary.connect({
-      relayUrl: process.env.ACTIVITY_RELAY_URL ?? "ws://127.0.0.1:7447",
-      redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6379",
+      relayUrl: process.env.ACTIVITY_RELAY_URL || "ws://127.0.0.1:7447",
+      redisUrl: process.env.ACTIVITY_REDIS_URL || "redis://127.0.0.1:6379",
     });
     const source = `replay-test:${randomUUID()}`;
     const actor = `${randomUUID()}.near`;
@@ -248,7 +248,7 @@ activityDescribe("Activity Nostr boundary", () => {
     let pointValue = 5;
     const now = new Date();
     leaderboard = await createRedisActivityLeaderboard({
-      redisUrl: process.env.ACTIVITY_REDIS_URL ?? "redis://127.0.0.1:6379",
+      redisUrl: process.env.ACTIVITY_REDIS_URL || "redis://127.0.0.1:6379",
       namespace: `activity:test:${randomUUID()}`,
       listPointValues: async () => [{ source: "feedback", type: "feedback.written", pointValue }],
       now: () => now,
