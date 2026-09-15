@@ -790,6 +790,31 @@ export const contract = oc.router({
       CONFLICT: { status: 409 },
     }),
 
+  retractActivityEvent: oc
+    .route({
+      method: "POST",
+      path: "/v1/events/{eventId}/retract",
+      summary: "Retract an event your source published",
+      description:
+        "Hides an event of the authenticated Source API Key's own source, for compensation and revocation. Uses the same suppression as administrator moderation; the audit records the source as the requester.",
+      tags: ["Activity"],
+    })
+    .input(
+      z.object({
+        eventId: z.string().regex(/^[a-f0-9]{64}$/),
+        reason: z.string().trim().min(1).max(1_000),
+        idempotencyKey: z.string().trim().min(1).max(200),
+      }),
+    )
+    .output(HideActivityEventResultSchema)
+    .errors({
+      UNAUTHORIZED,
+      FORBIDDEN,
+      NOT_FOUND,
+      SERVICE_UNAVAILABLE,
+      CONFLICT: { status: 409 },
+    }),
+
   listHiddenActivityEvents: oc
     .route({
       method: "GET",

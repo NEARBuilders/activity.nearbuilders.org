@@ -38,6 +38,7 @@ The service is intended to become shared plumbing for reputation, loyalty points
 | `GET` | `/api/v1/events` | Available | Query signature-verified events by source, type, actor, limit, and opaque cursor. |
 | `GET` | `/api/v1/events/stream` | Available | Subscribe to new events over resumable SSE, optionally filtered by source, type, or actor. |
 | `POST` | `/api/activity/events/{eventId}/hide` | Available (admin) | Hide an immutable event from service-controlled public views. |
+| `POST` | `/api/v1/events/{eventId}/retract` | Available (Source API Key) | Hide an event your own source published, for compensation and revocation. |
 | `GET` | `/api/activity/hidden-events` | Available (admin) | Inspect hidden events and their moderation history. |
 | `POST` | `/api/activity/sources/{sourceId}/trust` | Available (admin) | Set an auditable source trust designation and score multiplier. |
 | `PUT` | `/api/activity/sources/{sourceId}/github` | Available (owner) | Configure public repositories, event types, and GitHub-to-NEAR actor mappings. |

@@ -26,6 +26,11 @@ function iso(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : String(value);
 }
 
+/** Moderation requester recorded when a source retracts its own event. */
+export function sourceRequesterId(sourceId: string): string {
+  return `source:${sourceId}`;
+}
+
 function requestHash(eventId: string, reason: string): string {
   return createHash("sha256").update(JSON.stringify({ eventId, reason })).digest("hex");
 }
@@ -221,6 +226,32 @@ export class ActivityModerationService {
 
     const recorded = await this.#store.recordHide({ ...input, event, requestHash: hash });
     return this.#resultWithProjection(recorded.request, recorded.requestReplayed);
+  }
+
+  /** Hides an event on behalf of the source that published it, and only that source. */
+  async retract(input: {
+    eventId: string;
+    sourceId: string;
+    idempotencyKey: string;
+    reason: string;
+  }): Promise<HideActivityEventResult> {
+    const event =
+      (await this.#store.getHidden(input.eventId))?.event ??
+      (await this.#events.findVerifiedEventById(input.eventId));
+    if (!event) {
+      throw new ORPCError("NOT_FOUND", { message: "Activity event not found" });
+    }
+    if (event.source !== input.sourceId) {
+      throw new ORPCError("FORBIDDEN", {
+        message: "A source can only retract its own Activity events",
+      });
+    }
+    return this.hide({
+      eventId: input.eventId,
+      administratorId: sourceRequesterId(input.sourceId),
+      idempotencyKey: input.idempotencyKey,
+      reason: input.reason,
+    });
   }
 
   listHidden(): Promise<HiddenActivityEvent[]> {

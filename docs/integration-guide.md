@@ -117,6 +117,25 @@ durably on the producer side and retry. During a Redis outage, ingestion fails c
 rather than accepting an event without its score projection. The production failure and rollback
 procedures are completed by infrastructure ticket #12.
 
+### Retract an event you published
+
+Events are immutable, but a source can hide one of its own events when the action behind it is
+undone, such as a revoked approval or a rolled-back claim. Send the same Source API Key:
+
+```http
+POST /api/v1/events/<event-id>/retract
+Authorization: Bearer act_<source-api-key>
+Content-Type: application/json
+
+{ "reason": "Approval revoked", "idempotencyKey": "retract:approval:42" }
+```
+
+The event leaves the public feed, SSE replay, and leaderboard exactly as an administrator hide
+would; the signed relay record is unchanged. Retracting another source's event returns `403`.
+Repeating the request with the same idempotency key and reason is safe; reusing the key with a
+different reason returns `409`. A retracted event cannot be restored, and re-submitting its
+idempotency key returns the same hidden event, so a later re-approval needs a new key.
+
 ## 7. Rotate or revoke credentials
 
 To replace a Source API Key, create a second key, install it in the producer, verify successful
