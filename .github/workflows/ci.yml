@@ -71,6 +71,9 @@ jobs:
       - name: Run tests
         run: bun run test
 
+      - name: Test relay write policy
+        run: node --test infra/relay/write-policy.test.mjs
+
       - name: Run clean-room integration guide smoke test
         run: bun run test:integration-guide
 
