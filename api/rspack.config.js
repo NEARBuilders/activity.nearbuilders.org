@@ -39,7 +39,16 @@ function readBosConfig() {
 const _bosConfig = readBosConfig();
 
 const baseConfig = {
-  externals: ["pg", "@electric-sql/pglite", "redis"],
+  externals: ["pg", "@electric-sql/pglite"],
+  module: {
+    rules: [
+      // The drizzle migrations unplugin has no loadInclude, so it forces every module to
+      // "javascript/auto" — including JSON. Keep JSON as JSON so bundled deps that
+      // require their package.json (e.g. redis) build. The production host doesn't ship
+      // redis, so it has to be bundled rather than external.
+      { test: /\.json$/i, type: "json" },
+    ],
+  },
   devtool: shouldDeploy ? false : "source-map",
   plugins: [
     new EmitPluginManifest(),
