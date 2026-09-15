@@ -1,10 +1,23 @@
-import { BroadcastIcon, HouseIcon, PulseIcon, ShieldIcon } from "@phosphor-icons/react/ssr";
+import {
+  BroadcastIcon,
+  HouseIcon,
+  ListIcon,
+  PulseIcon,
+  ShieldIcon,
+} from "@phosphor-icons/react/ssr";
 import { useQuery } from "@tanstack/react-query";
 import { ClientOnly, createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { getAccount, sessionQueryOptions, useAuthClient } from "@/app";
 import { BetaBanner } from "@/components/beta-banner";
 import { BrandElement } from "@/components/brand-element";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { NetworkToggle } from "@/components/ui/network-toggle";
 import { UserNav } from "@/components/user-nav";
 import { cn } from "@/lib/utils";
@@ -64,7 +77,7 @@ function AppHeader() {
   ];
   return (
     <header className="sticky top-0 z-20 border-b bg-background/95 shadow-elevation-sm backdrop-blur">
-      <div className="mx-auto flex h-16 max-w-screen-2xl flex-wrap items-center gap-x-4 px-4 sm:px-6">
+      <div className="mx-auto flex h-16 max-w-screen-2xl items-center gap-x-4 px-4 sm:px-6">
         <Link
           to="/activity"
           aria-label="NEAR Builders Activity home"
@@ -73,10 +86,7 @@ function AppHeader() {
           <BrandElement appName="NEAR Builders" size="sm" />
           <span className="hidden text-sm font-semibold sm:inline">NEAR Builders</span>
         </Link>
-        <nav
-          aria-label="Main navigation"
-          className="order-last flex w-full gap-1 overflow-x-auto pb-2 lg:order-none lg:w-auto lg:pb-0"
-        >
+        <nav aria-label="Main navigation" className="hidden gap-1 lg:flex">
           {items.map(({ icon: Icon, label, to }) => {
             const active = pathname === to || pathname.startsWith(`${to}/`);
             return (
@@ -96,7 +106,7 @@ function AppHeader() {
                 {active && (
                   <span
                     aria-hidden="true"
-                    className="absolute inset-x-3 -bottom-[9px] h-0.5 rounded-full bg-brand-accent lg:inset-x-2"
+                    className="absolute inset-x-2 -bottom-[9px] h-0.5 rounded-full bg-brand-accent"
                   />
                 )}
               </Link>
@@ -104,6 +114,38 @@ function AppHeader() {
           })}
         </nav>
         <div className="ml-auto flex min-w-0 items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden"
+                aria-label="Open navigation menu"
+              >
+                <ListIcon className="size-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              {items.map(({ icon: Icon, label, to }) => {
+                const active = pathname === to || pathname.startsWith(`${to}/`);
+                return (
+                  <DropdownMenuItem key={to} asChild>
+                    <Link
+                      to={to}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "flex items-center gap-2",
+                        active && "font-medium text-foreground",
+                      )}
+                    >
+                      <Icon className="size-4" />
+                      <span>{label}</span>
+                    </Link>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
           {isLogin && <NetworkToggle />}
           <ThemeToggle />
           {!isLogin && <UserNav />}
