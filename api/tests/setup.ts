@@ -18,6 +18,24 @@ import pluginDevConfig from "../plugin.dev";
 const TEST_PLUGIN_ID = pluginDevConfig.pluginId;
 const TEST_CONFIG = pluginDevConfig.config;
 
+// The runtime keys plugin instances by config, so every helper must use this one config or it
+// silently starts a second instance. The dev config's relay and Nostr RPC default to production.
+let testConfig: typeof TEST_CONFIG | null = null;
+
+async function getTestConfig(): Promise<typeof TEST_CONFIG> {
+  if (!testConfig) {
+    testConfig = {
+      ...TEST_CONFIG,
+      variables: {
+        ...TEST_CONFIG.variables,
+        activityRelayUrl: await ensureTestRelay(),
+        activityNostrRpcUrl: "",
+      },
+    } as typeof TEST_CONFIG;
+  }
+  return testConfig;
+}
+
 const TEST_REGISTRY = {
   [TEST_PLUGIN_ID]: {
     module: Plugin,
@@ -133,16 +151,7 @@ export async function getPluginClient(
   headers: Record<string, string> = {},
 ) {
   if (!server) {
-    const activityRelayUrl = await ensureTestRelay();
-    const config = {
-      ...TEST_CONFIG,
-      variables: {
-        ...TEST_CONFIG.variables,
-        activityRelayUrl,
-        activityNostrRpcUrl: "",
-      },
-    } as typeof TEST_CONFIG;
-    const { router, initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, config);
+    const { router, initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, await getTestConfig());
     activityCredentialsService = initialized.context.activityCredentials;
     activityLeaderboardService = initialized.context.activityLeaderboard;
     const rpcHandler = new RPCHandler(router);
@@ -213,7 +222,7 @@ export async function getPluginBaseUrl(): Promise<string> {
 }
 
 export async function getActivitySourcesService() {
-  const { initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, TEST_CONFIG);
+  const { initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, await getTestConfig());
   return initialized.context.activitySources;
 }
 
@@ -231,7 +240,7 @@ export async function getActivityLeaderboardService() {
 
 export async function restartActivityGithubService() {
   await getPluginClient();
-  const { initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, TEST_CONFIG);
+  const { initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, await getTestConfig());
   initialized.context.activityGithub.stop();
   const restarted = new ActivityGithubService({
     db: initialized.context.database,
@@ -355,5 +364,6 @@ export async function teardown() {
   if (relayServer) {
     await new Promise<void>((resolve) => relayServer?.close(() => resolve()));
     relayServer = null;
+    testConfig = null;
   }
 }
