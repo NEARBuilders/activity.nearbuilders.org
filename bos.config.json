@@ -23,7 +23,7 @@
         "activityNostrBindingContract": "contextual.near",
         "activityNostrBindingRelay": "wss://relay.nearbuilders.org",
         "activityNostrKvApiUrl": "https://kv.main.fastnear.com",
-        "activityRelayUrl": "wss://relay.nearbuilders.org",
+        "activityRelayUrl": "wss://relay.damus.io",
         "activityNostrRpcUrl": "https://nostr.nearbuilders.org/api/rpc/nostr"
       },
       "secrets": [
