@@ -339,6 +339,27 @@ export const ActivityLeaderboardSchema = z.object({
 
 export type ActivityLeaderboardResult = z.infer<typeof ActivityLeaderboardSchema>;
 
+export const ActivityHealthCheckSchema = z.object({
+  ok: z.boolean(),
+  latencyMs: z.number().int().nonnegative(),
+  error: z.string().optional(),
+});
+
+export const ActivityHealthSchema = z.object({
+  status: z.enum(["ok", "degraded"]),
+  checkedAt: z.iso.datetime(),
+  checks: z.object({
+    database: ActivityHealthCheckSchema,
+    redis: ActivityHealthCheckSchema.extend({
+      projection: ActivityLeaderboardProjectionStatusSchema.shape.state.optional(),
+    }),
+    relay: ActivityHealthCheckSchema,
+  }),
+});
+
+export type ActivityHealthCheck = z.infer<typeof ActivityHealthCheckSchema>;
+export type ActivityHealth = z.infer<typeof ActivityHealthSchema>;
+
 const ActivityEventTypesInputSchema = z
   .array(ActivityEventTypeSchema)
   .min(1)
@@ -809,6 +830,18 @@ export const contract = oc.router({
     })
     .output(ActivityLeaderboardProjectionStatusSchema)
     .errors({ SERVICE_UNAVAILABLE }),
+
+  getActivityHealth: oc
+    .route({
+      method: "GET",
+      path: "/v1/health",
+      summary: "Check Activity dependencies",
+      description:
+        "Checks the database, a Redis projection write, and a relay query. Returns 503 with the same report when any check fails, so deploy and uptime checks can gate on it.",
+      tags: ["Activity"],
+    })
+    .output(ActivityHealthSchema)
+    .errors({ SERVICE_UNAVAILABLE: { status: 503, data: ActivityHealthSchema } }),
 });
 
 export type ContractType = typeof contract;

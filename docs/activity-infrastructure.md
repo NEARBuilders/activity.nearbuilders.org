@@ -33,13 +33,13 @@ Local verification uses the API's in-process relay fixtures and does not require
 
 | Gate | Required evidence | Current status |
 | --- | --- | --- |
-| Relay endpoint | Selected host, DNS, TLS, persistent storage and named operator | Pending |
-| Relay policy | Kind 1701, retention, write policy, connection limits and NIP-11 metadata | Pending |
+| Relay endpoint | Selected host, DNS, TLS, persistent storage and named operator | Deployed: `wss://relay.nearbuilders.org` on Railway (`ghcr.io/mattn/nostr-relay:v0.0.266`), Let's Encrypt TLS, SQLite on a persistent `/data` volume. Named operator pending |
+| Relay policy | Kind 1701, retention, write policy, connection limits and NIP-11 metadata | Not met: the relay hardcodes its NIP-11 document (upstream author's contact, `JP`) and accepts any kind from any pubkey (`restricted_writes: false`); it only offers a pubkey allow/block list. Needs a configurable relay |
 | History capacity | Complete pagination across more than 500 records, including timestamp ties | Reproduced: 501 accepted events yielded 500; shared adapter now fails explicitly |
-| Redis | Private connectivity, persistence, memory policy and monitored capacity | Local AOF only; production pending |
+| Redis | Private connectivity, persistence, memory policy and monitored capacity | Deployed: Railway `redis:8.2` reachable only on private networking (`redis.railway.internal`) with a persistent volume. Persistence settings, memory policy and monitoring pending |
 | Restore | Restore relay, database and Redis backups into isolated instances and reconcile IDs, moderation and counts | Local relay/Redis drill added; full database and production recovery pending |
-| Health | Publish/read/subscribe, Redis write and projection rebuild checks on staging and production | Local integration passes; deployed checks pending |
-| Operations | Metrics, alert routing, backup schedule, recovery objectives and incident owner | Pending |
+| Health | Publish/read/subscribe, Redis write and projection rebuild checks on staging and production | `GET /api/v1/health` checks the database, a Redis write with projection readiness, and a relay query; the scheduled `Production health` workflow calls it every 15 minutes. A production publish, retry, SSE and leaderboard round trip passed with `examples/run-activity-example.ts` on 2026-09-16, run manually. No staging environment exists |
+| Operations | Metrics, alert routing, backup schedule, recovery objectives and incident owner | Pending. The only alert is the failed-workflow notification from `Production health` |
 
 Activity's domain scan limit is 1,000. The shared adapter now caps each history request
 at 500 to match the selected relay and rejects a response marked limited by the plugin.
@@ -52,6 +52,24 @@ The selected relay hardcodes both its advertised and backend query limit at 500;
 its command-line flags do not expose a limit override. See the pinned version's
 [configuration](https://github.com/mattn/nostr-relay/blob/v0.0.250/main.go) and
 [limit declaration](https://github.com/mattn/nostr-relay/blob/v0.0.250/relay.go).
+
+## Health check
+
+`GET /api/v1/health` is public and returns `200` with `status: "ok"` only when every check
+passes. Otherwise it returns `503` with the same report, so a deploy gate or uptime monitor
+can use the status code alone. Each failed check carries a fixed message; the cause is in the
+`activity-app` logs under `[ActivityHealth]`.
+
+| Failed check | Meaning | First response |
+| --- | --- | --- |
+| `database` | `select 1` against `API_DATABASE_URL` failed or took over 8s | Check the Postgres service and the `activity-app` connection secret |
+| `redis` | A write/read-back to the projection namespace failed, or the projection is `failed`/`uninitialized` | Check the Redis service and `ACTIVITY_REDIS_URL`; then follow step 3 below |
+| `relay` | A one-event kind 1701 query through the configured transport failed or timed out | Check the relay service and the shared Nostr RPC; then follow step 1 below |
+
+The scheduled check deliberately does not publish events. Every published test event stays in
+relay history, counts toward the history-capacity limit above, and scores for its actor.
+Run the example round trip manually against a dedicated test source when a change affects
+publishing, SSE or scoring.
 
 ## Failure and recovery procedure
 

@@ -30,6 +30,7 @@ import {
   DatabaseActivityIdentityStore,
 } from "./services/activity-feed";
 import { ActivityGithubService } from "./services/activity-github";
+import { ActivityHealthService } from "./services/activity-health";
 import { ActivityIngestionService } from "./services/activity-ingestion";
 import {
   ActivityLeaderboardLive,
@@ -207,6 +208,11 @@ export default createPlugin.withPlugins<PluginsClient>()({
         console.info("[ActivityLeaderboard] Projection rebuild completed", rebuilt);
       }
       activityGithubService.start();
+      const activityHealthService = new ActivityHealthService({
+        database,
+        leaderboard: activityLeaderboard,
+        relay: activityRelay,
+      });
 
       return {
         database,
@@ -220,6 +226,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityModeration: activityModerationService,
         activityLeaderboard,
         activityRelay,
+        activityHealth: activityHealthService,
       };
     }),
 
@@ -789,6 +796,17 @@ export default createPlugin.withPlugins<PluginsClient>()({
             message: "Activity leaderboard projection status is unavailable",
           });
         }
+      }),
+
+      getActivityHealth: builder.getActivityHealth.handler(async ({ errors }) => {
+        const health = await services.activityHealth.check();
+        if (health.status !== "ok") {
+          throw errors.SERVICE_UNAVAILABLE({
+            message: "One or more Activity dependencies are unavailable",
+            data: health,
+          });
+        }
+        return health;
       }),
     };
   },

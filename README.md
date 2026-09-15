@@ -43,6 +43,7 @@ The service is intended to become shared plumbing for reputation, loyalty points
 | `PUT` | `/api/activity/sources/{sourceId}/github` | Available (owner) | Configure public repositories, event types, and GitHub-to-NEAR actor mappings. |
 | `POST` | `/api/activity/sources/{sourceId}/github/poll` | Available (owner) | Run the configured GitHub poller immediately. |
 | `GET` | `/api/v1/leaderboard` | Available | Read exact weekly, monthly, or all-time rankings with optional source and Event Type filters. |
+| `GET` | `/api/v1/health` | Available | Check the database, a Redis write, and a relay query; `503` with the same report when any fails. |
 
 ### Event shape
 
