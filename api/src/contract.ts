@@ -199,6 +199,11 @@ export const ActivityEventSubmissionSchema = z.object({
   actor: NearAccountIdSchema,
   idempotencyKey: z.string().trim().min(1).max(200),
   payload: z.json(),
+  /**
+   * When the activity actually happened, for importing history. Must be in the past and within the
+   * relay's accepted age. Omitted means "now", which is what live producers should send.
+   */
+  occurredAt: z.iso.datetime().optional(),
 });
 
 export const ActivityEventProvenanceSchema = z.object({

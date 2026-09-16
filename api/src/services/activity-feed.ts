@@ -1,4 +1,4 @@
-import { and, eq, isNotNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull } from "drizzle-orm";
 import { type Event, getEventHash, validateEvent, verifyEvent } from "nostr-tools/pure";
 import {
   ACTIVITY_EVENT_KIND,
@@ -16,6 +16,7 @@ import {
   activityGithubIntegrations as githubIntegrationsTable,
   activitySigningIdentities as identitiesTable,
   activitySources as sourcesTable,
+  activityEventSubmissions as submissionsTable,
 } from "../db/schema";
 import { ACTIVITY_EVENT_PAYLOAD_MAX_BYTES, parseStoredActivityEvent } from "./activity-ingestion";
 
@@ -34,6 +35,19 @@ export interface ActivityIdentityStore {
   listBound(source?: string): Promise<BoundActivityIdentity[]>;
 }
 
+/**
+ * Events dated before their Signing Identity was bound are only trusted when this service
+ * published them itself, which is how imported history is told apart from a relay record
+ * claiming to predate the identity.
+ */
+export interface ActivityPublishedEventStore {
+  findPublishedEventIds(eventIds: readonly string[]): Promise<Set<string>>;
+}
+
+const NO_PUBLISHED_EVENTS: ActivityPublishedEventStore = {
+  findPublishedEventIds: async () => new Set(),
+};
+
 export interface ActivitySuppressionStore {
   findHiddenEventIds(eventIds: readonly string[]): Promise<Set<string>>;
   isHidden(eventId: string): Promise<boolean>;
@@ -43,6 +57,28 @@ const NO_HIDDEN_EVENTS: ActivitySuppressionStore = {
   findHiddenEventIds: async () => new Set(),
   isHidden: async () => false,
 };
+
+export class DatabaseActivityPublishedEventStore implements ActivityPublishedEventStore {
+  readonly #db: Database;
+
+  constructor(db: Database) {
+    this.#db = db;
+  }
+
+  async findPublishedEventIds(eventIds: readonly string[]): Promise<Set<string>> {
+    if (eventIds.length === 0) return new Set();
+    const rows = await this.#db
+      .select({ eventId: submissionsTable.eventId })
+      .from(submissionsTable)
+      .where(
+        and(
+          inArray(submissionsTable.eventId, [...eventIds]),
+          isNotNull(submissionsTable.publishedAt),
+        ),
+      );
+    return new Set(rows.flatMap(({ eventId }) => (eventId ? [eventId] : [])));
+  }
+}
 
 export class DatabaseActivityIdentityStore implements ActivityIdentityStore {
   readonly #db: Database;
@@ -117,15 +153,18 @@ export class ActivityFeedService {
   readonly #relay: ActivityRelay;
   readonly #identities: ActivityIdentityStore;
   readonly #suppression: ActivitySuppressionStore;
+  readonly #published: ActivityPublishedEventStore;
 
   constructor(
     relay: ActivityRelay,
     identities: ActivityIdentityStore,
     suppression: ActivitySuppressionStore = NO_HIDDEN_EVENTS,
+    published: ActivityPublishedEventStore = NO_PUBLISHED_EVENTS,
   ) {
     this.#relay = relay;
     this.#identities = identities;
     this.#suppression = suppression;
+    this.#published = published;
   }
 
   async list(input: ActivityQuery): Promise<ActivityFeedResult> {
@@ -146,7 +185,15 @@ export class ActivityFeedService {
     return records.flatMap(({ eventId, eventJson }) => {
       try {
         const event = parseStoredActivityEvent(eventJson, eventId);
-        const parsed = parseActivityFeedEvent(event, registeredIdentities, {});
+        // These records come from the submission ledger, so this service published them.
+        const parsed = parseActivityFeedEvent(
+          event,
+          registeredIdentities,
+          {},
+          {
+            allowBeforeIdentityBinding: true,
+          },
+        );
         return parsed ? [parsed] : [];
       } catch {
         return [];
@@ -157,20 +204,35 @@ export class ActivityFeedService {
   async #listRelayEvents(input: ActivityQuery, excludeHidden = false): Promise<ActivityFeedResult> {
     const registeredIdentities = await this.#registeredIdentities(input.source);
     const parsedEvents = new Map<string, ActivityFeedEvent>();
+    // Events dated before their identity's binding are accepted here and confirmed against the
+    // submission ledger below, which needs one query rather than one per event.
+    const backdated = new Set<string>();
     const result = await this.#relay.query(
       input,
       (event) => {
-        const parsed = parseActivityFeedEvent(event, registeredIdentities, input);
+        const parsed = parseActivityFeedEvent(event, registeredIdentities, input, {
+          allowBeforeIdentityBinding: true,
+        });
         if (!parsed) return false;
+        const identity = registeredIdentities.get(parsed.source)?.get(event.pubkey);
+        if (isBeforeIdentityBinding(identity, event.created_at)) backdated.add(event.id);
         parsedEvents.set(event.id, parsed);
         return true;
       },
-      excludeHidden
-        ? async (events) => {
-            const hidden = await this.#suppression.findHiddenEventIds(events.map(({ id }) => id));
-            return events.filter(({ id }) => !hidden.has(id));
-          }
-        : undefined,
+      async (events) => {
+        const candidates = events.filter(({ id }) => backdated.has(id)).map(({ id }) => id);
+        const published =
+          candidates.length > 0
+            ? await this.#published.findPublishedEventIds(candidates)
+            : new Set<string>();
+        const visible = events.filter(({ id }) => !backdated.has(id) || published.has(id));
+        for (const { id } of events) {
+          if (backdated.has(id) && !published.has(id)) parsedEvents.delete(id);
+        }
+        if (!excludeHidden) return visible;
+        const hidden = await this.#suppression.findHiddenEventIds(visible.map(({ id }) => id));
+        return visible.filter(({ id }) => !hidden.has(id));
+      },
     );
 
     return {
@@ -305,6 +367,7 @@ function parseActivityFeedEvent(
   event: Event,
   registeredIdentities: ReadonlyMap<string, ReadonlyMap<string, BoundActivityIdentity>>,
   query: ActivityQuery,
+  options: { allowBeforeIdentityBinding?: boolean } = {},
 ): ActivityFeedEvent | null {
   if (
     !validateEvent(event) ||
@@ -338,7 +401,7 @@ function parseActivityFeedEvent(
     !idempotencyKey ||
     idempotencyKey.length > 200 ||
     !identity ||
-    !isIdentityActiveAt(identity, event.created_at) ||
+    !isIdentityActiveAt(identity, event.created_at, options.allowBeforeIdentityBinding) ||
     (query.eventId !== undefined && event.id !== query.eventId) ||
     (query.source !== undefined && source !== query.source) ||
     (query.eventType !== undefined && type !== query.eventType) ||
@@ -376,14 +439,27 @@ function parseActivityFeedEvent(
   };
 }
 
-function isIdentityActiveAt(identity: BoundActivityIdentity, createdAt: number): boolean {
+function isIdentityActiveAt(
+  identity: BoundActivityIdentity,
+  createdAt: number,
+  allowBeforeBinding = false,
+): boolean {
   const activeFrom = identity.activeFrom ? Date.parse(identity.activeFrom) / 1_000 : 0;
   const retiredAt = identity.retiredAt ? Date.parse(identity.retiredAt) / 1_000 : null;
   return (
     Number.isFinite(activeFrom) &&
-    createdAt >= Math.floor(activeFrom) &&
+    (allowBeforeBinding || createdAt >= Math.floor(activeFrom)) &&
     (retiredAt === null || (Number.isFinite(retiredAt) && createdAt < retiredAt))
   );
+}
+
+function isBeforeIdentityBinding(
+  identity: BoundActivityIdentity | undefined,
+  createdAt: number,
+): boolean {
+  if (!identity?.activeFrom) return false;
+  const activeFrom = Date.parse(identity.activeFrom) / 1_000;
+  return Number.isFinite(activeFrom) && createdAt < Math.floor(activeFrom);
 }
 
 function toIso(value: Date | string): string {
