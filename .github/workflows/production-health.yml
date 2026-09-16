@@ -21,8 +21,18 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2 (Node 24)
+
       - name: Check dependencies
         run: |
           curl --fail-with-body --silent --show-error \
             --retry 2 --retry-delay 20 --retry-all-errors --max-time 30 \
             https://activity.nearbuilders.org/api/v1/health
+
+      - name: Alert on failure
+        if: failure()
+        uses: ./.github/actions/alert
+        with:
+          text: "activity.nearbuilders.org health check failed: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          webhook-url: ${{ secrets.ALERT_WEBHOOK_URL }}

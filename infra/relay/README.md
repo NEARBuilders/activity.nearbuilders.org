@@ -91,8 +91,18 @@ only in strfry; export them with `export-relay.mjs` and republish them with `pub
 
 ## Backups and restore
 
+The `Relay backup` workflow runs daily at 03:17 UTC and on demand. It exports the relay, restores
+that export into a fresh strfry container built from this directory, fails if any event is missing,
+and keeps the file as a build artifact for **90 days**. A failed run notifies GitHub, and posts to
+the `ALERT_WEBHOOK_URL` secret when one is set. Artifacts are downloadable from the run page.
+
+Recovery objective: at most one day of relay history is lost, and restoring a 1,349-event backup
+took about 90 seconds through a normal connection.
+
+By hand, from any machine:
+
 ```bash
-# Back up from any machine (events of the accepted kinds):
+# Back up (events of the accepted kinds):
 node infra/relay/export-relay.mjs wss://relay.nearbuilders.org --cap=1000 > relay-$(date +%F).jsonl
 # Restore into a running relay:
 node infra/relay/publish-events.mjs wss://relay.nearbuilders.org < relay-YYYY-MM-DD.jsonl
@@ -106,4 +116,18 @@ restored into an empty strfry with identical event IDs; 2,500 events paged compl
 Activity's relay client at 500- and 1,000-event caps; data survived a restart; and the write
 policy rejected disallowed kinds and rate-limited each client address separately.
 
-Scheduling backups and choosing where they are kept is still open in issue #12.
+## Retention
+
+The relay keeps every accepted event: Activity's feed, pagination, and leaderboard rebuild all read
+history from it, and events are immutable. Hidden events stay on the relay too; suppression is
+Activity's own projection.
+
+Watch the volume in Railway (50 GB). Roughly 1 KB per Activity event means millions of events
+before capacity matters, but if it ever does, strfry can drop old events:
+
+```bash
+strfry delete --age=<seconds> --dry-run   # always dry-run first
+```
+
+Deleting relay history breaks pagination for that window and removes events the leaderboard
+rebuild reads, so back up first and treat it as a migration, not routine maintenance.

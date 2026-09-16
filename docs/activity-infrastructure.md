@@ -36,10 +36,10 @@ Local verification uses the API's in-process relay fixtures and does not require
 | Relay endpoint | Selected host, DNS, TLS, persistent storage and named operator | Deployed: `wss://relay.nearbuilders.org` on Railway running strfry from [`infra/relay`](../infra/relay/README.md), Let's Encrypt TLS, LMDB on a persistent `/data` volume. Named operator pending |
 | Relay policy | Kind 1701, retention, write policy, connection limits and NIP-11 metadata | Met: accepts only kinds `0,1,1111,1701`, rate-limits writes per client address (20/s, burst 300), NEAR Builders NIP-11 document, `maxFilterLimit` 1,000, four tag filters, 128 KiB frames, 200 subscriptions per connection. Retention is unlimited; no expiry policy is defined yet |
 | History capacity | Complete pagination across more than 500 records, including timestamp ties | Met: a full scan drops its partial oldest second and resumes there. Verified against strfry with 2,500 events at five per second (25 pages, every event once, in feed order) and against the previous relay with 1,100 |
-| Redis | Private connectivity, persistence, memory policy and monitored capacity | Deployed: Railway `redis:8.2` reachable only on private networking (`redis.railway.internal`) with a persistent volume. Persistence settings, memory policy and monitoring pending |
-| Restore | Restore relay, database and Redis backups into isolated instances and reconcile IDs, moderation and counts | Local relay/Redis drill added; full database and production recovery pending |
+| Redis | Private connectivity, persistence, memory policy and monitored capacity | Deployed: Railway `redis:8.2`, private networking only (no TCP proxy), RDB snapshots (`--save 60 1`) onto a persistent volume. **No `maxmemory` and no explicit eviction policy** (Redis defaults to `noeviction`, which does not discard projection keys but also has no bound); no AOF, so a crash can lose up to 60s of writes. See "Redis settings" below |
+| Restore | Restore relay, database and Redis backups into isolated instances and reconcile IDs, moderation and counts | Relay: the daily `Relay backup` workflow restores each export into a fresh strfry and fails on any missing event. Postgres: Railway's own backups, untested here. Redis needs no backup: the projection rebuilds from the submission ledger |
 | Health | Publish/read/subscribe, Redis write and projection rebuild checks on staging and production | `GET /api/v1/health` checks the database, a Redis write with projection readiness, and a relay query; the scheduled `Production health` workflow calls it every 15 minutes. A production publish, retry, SSE and leaderboard round trip passed with `examples/run-activity-example.ts` on 2026-09-16, run manually. No staging environment exists |
-| Operations | Metrics, alert routing, backup schedule, recovery objectives and incident owner | Pending. The only alert is the failed-workflow notification from `Production health` |
+| Operations | Metrics, alert routing, backup schedule, recovery objectives and incident owner | Backups run daily with a restore test and 90-day artifacts; the recovery objective is at most one day of relay history. Alerts: `Production health` every 15 minutes and `Relay backup` daily both notify GitHub, and post to an `ALERT_WEBHOOK_URL` secret when one is configured. **Incident owner and metrics dashboards are still unassigned** |
 
 Activity's domain scan limit is 1,000. Each adapter declares its transport's per-query cap
 (500 for both the shared and direct adapters, matching the selected relay), and a scan
@@ -73,6 +73,25 @@ The scheduled check deliberately does not publish events. Every published test e
 relay history, counts toward the history-capacity limit above, and scores for its actor.
 Run the example round trip manually against a dedicated test source when a change affects
 publishing, SSE or scoring.
+
+## Redis settings
+
+The production Redis starts as:
+
+```
+redis-server --requirepass *** --save 60 1 --dir $RAILWAY_VOLUME_MOUNT_PATH
+```
+
+That gives snapshot persistence on the volume and no public listener. Two gaps remain, both
+changed by editing the service's start command, which restarts Redis (during a restart Activity's
+leaderboard is unavailable and ingestion fails closed with `503`):
+
+- **No memory bound.** Add `--maxmemory <bytes>` at roughly 80% of the plan's RAM, with
+  `--maxmemory-policy noeviction` stated explicitly, so the limit is deliberate and projection
+  keys can never be evicted.
+- **No AOF.** `--appendonly yes` narrows a crash's loss from 60 seconds of writes to about one
+  second. Even without it, a total Redis loss is recoverable: the projection is rebuilt from the
+  durable submission ledger at startup, and the rebuild is what `/api/v1/health` reports.
 
 ## Failure and recovery procedure
 
