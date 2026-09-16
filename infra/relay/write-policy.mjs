@@ -58,12 +58,17 @@ export function createPolicy({
     }
   }
 
-  return function decide(request) {
+  return function decide(request, log = () => {}) {
     const id = request?.event?.id;
     if (request?.type !== "new" || typeof id !== "string") {
       return { id: id ?? "", action: "reject", msg: "error: unexpected write-policy request" };
     }
+    // The address strfry reports comes from realIpHeader behind a proxy. Logging it shows who is
+    // being blocked, and confirms the header is set: a private address means every client shares
+    // one rate-limit bucket.
+    const address = String(request.sourceInfo ?? "unknown");
     if (!allowedKinds.has(request.event.kind)) {
+      log(`rejected kind ${request.event.kind} from ${request.sourceType} ${address}`);
       return {
         id,
         action: "reject",
@@ -72,7 +77,8 @@ export function createPolicy({
     }
     if (request.sourceType === "IP4" || request.sourceType === "IP6") {
       pruneFullBuckets();
-      if (!takeToken(String(request.sourceInfo ?? "unknown"))) {
+      if (!takeToken(address)) {
+        log(`rate-limited ${address}`);
         return { id, action: "reject", msg: "rate-limited: slow down" };
       }
     }
@@ -103,6 +109,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
       console.error("write-policy: could not parse request"); // appears in strfry logs
       return;
     }
-    process.stdout.write(`${JSON.stringify(decide(request))}\n`);
+    const decision = decide(request, (message) => console.error(`write-policy: ${message}`));
+    process.stdout.write(`${JSON.stringify(decision)}\n`);
   });
 }

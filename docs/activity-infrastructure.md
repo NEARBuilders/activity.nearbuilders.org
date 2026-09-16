@@ -33,9 +33,9 @@ Local verification uses the API's in-process relay fixtures and does not require
 
 | Gate | Required evidence | Current status |
 | --- | --- | --- |
-| Relay endpoint | Selected host, DNS, TLS, persistent storage and named operator | Deployed: `wss://relay.nearbuilders.org` on Railway (`ghcr.io/mattn/nostr-relay:v0.0.266`), Let's Encrypt TLS, SQLite on a persistent `/data` volume. Named operator pending |
-| Relay policy | Kind 1701, retention, write policy, connection limits and NIP-11 metadata | Not met: the relay hardcodes its NIP-11 document (upstream author's contact, `JP`) and accepts any kind from any pubkey (`restricted_writes: false`); it only offers a pubkey allow/block list. Needs a configurable relay |
-| History capacity | Complete pagination across more than 500 records, including timestamp ties | Reproduced: 501 accepted events yielded 500; shared adapter now fails explicitly |
+| Relay endpoint | Selected host, DNS, TLS, persistent storage and named operator | Deployed: `wss://relay.nearbuilders.org` on Railway running strfry from [`infra/relay`](../infra/relay/README.md), Let's Encrypt TLS, LMDB on a persistent `/data` volume. Named operator pending |
+| Relay policy | Kind 1701, retention, write policy, connection limits and NIP-11 metadata | Met: accepts only kinds `0,1,1111,1701`, rate-limits writes per client address (20/s, burst 300), NEAR Builders NIP-11 document, `maxFilterLimit` 1,000, four tag filters, 128 KiB frames, 200 subscriptions per connection. Retention is unlimited; no expiry policy is defined yet |
+| History capacity | Complete pagination across more than 500 records, including timestamp ties | Met: a full scan drops its partial oldest second and resumes there. Verified against strfry with 2,500 events at five per second (25 pages, every event once, in feed order) and against the previous relay with 1,100 |
 | Redis | Private connectivity, persistence, memory policy and monitored capacity | Deployed: Railway `redis:8.2` reachable only on private networking (`redis.railway.internal`) with a persistent volume. Persistence settings, memory policy and monitoring pending |
 | Restore | Restore relay, database and Redis backups into isolated instances and reconcile IDs, moderation and counts | Local relay/Redis drill added; full database and production recovery pending |
 | Health | Publish/read/subscribe, Redis write and projection rebuild checks on staging and production | `GET /api/v1/health` checks the database, a Redis write with projection readiness, and a relay query; the scheduled `Production health` workflow calls it every 15 minutes. A production publish, retry, SSE and leaderboard round trip passed with `examples/run-activity-example.ts` on 2026-09-16, run manually. No staging environment exists |
@@ -51,10 +51,10 @@ the relay's real limit would hide truncation, so change it together with the rel
 against a local `mattn/nostr-relay` with 1,100 events at five per second: 11 pages, every
 event once, in feed order.
 
-The selected relay hardcodes both its advertised and backend query limit at 500;
-its command-line flags do not expose a limit override. See the pinned version's
-[configuration](https://github.com/mattn/nostr-relay/blob/v0.0.250/main.go) and
-[limit declaration](https://github.com/mattn/nostr-relay/blob/v0.0.250/relay.go).
+Both adapters still declare 500, which is below the deployed relay's `maxFilterLimit` of 1,000
+and therefore safe; raising them only reduces the number of round trips. The previous relay
+(`mattn/nostr-relay`) hardcoded 500 with no override, which is one of the reasons it was
+replaced by strfry; see [`infra/relay`](../infra/relay/README.md).
 
 ## Health check
 
