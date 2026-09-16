@@ -774,6 +774,30 @@ export default createPlugin.withPlugins<PluginsClient>()({
           }
         }),
 
+      retractActivityEvent: builder.retractActivityEvent.handler(async ({ input, context }) => {
+        const authorization = context.reqHeaders?.get("authorization");
+        const apiKey = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+        if (!apiKey) {
+          throw new ORPCError("UNAUTHORIZED", { message: "Source API Key required" });
+        }
+        const credential = await services.activityCredentials.authenticateEventWriteKey(apiKey);
+        try {
+          return await services.activityModeration.retract({
+            ...input,
+            sourceId: credential.sourceId,
+          });
+        } catch (error) {
+          if (
+            error instanceof ActivityRelayQueryTimeoutError ||
+            error instanceof ActivityRelayScanLimitError ||
+            error instanceof ActivityRelayUnavailableError
+          ) {
+            throw new ORPCError("SERVICE_UNAVAILABLE", { message: error.message });
+          }
+          throw error;
+        }
+      }),
+
       listHiddenActivityEvents: builder.listHiddenActivityEvents
         .use(requireAdmin)
         .handler(async () => services.activityModeration.listHidden()),
