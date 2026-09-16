@@ -1,0 +1,32 @@
+name: Alert
+description: Posts a failure message to the ALERT_WEBHOOK_URL secret, if one is configured.
+
+inputs:
+  text:
+    description: Message to send.
+    required: true
+  webhook-url:
+    description: Slack- or Discord-compatible webhook URL. When empty, nothing is sent.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      env:
+        ALERT_TEXT: ${{ inputs.text }}
+        ALERT_WEBHOOK_URL: ${{ inputs.webhook-url }}
+      run: |
+        set -euo pipefail
+        if [ -z "${ALERT_WEBHOOK_URL:-}" ]; then
+          echo "No ALERT_WEBHOOK_URL secret set; GitHub's own failure notification is the only alert."
+          exit 0
+        fi
+        field=text
+        case "$ALERT_WEBHOOK_URL" in *discord*) field=content ;; esac
+        payload=$(ALERT_FIELD="$field" python3 -c '
+        import json, os
+        print(json.dumps({os.environ["ALERT_FIELD"]: os.environ["ALERT_TEXT"]}))')
+        curl -fsS -X POST -H "content-type: application/json" -d "$payload" "$ALERT_WEBHOOK_URL" >/dev/null
+        echo "Alert sent."
