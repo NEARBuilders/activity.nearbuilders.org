@@ -58,3 +58,13 @@ test("parses the kind allow list and rejects invalid entries", () => {
   assert.deepEqual([...parseKinds(" 1, 1701 ,,0")], [1, 1701, 0]);
   assert.throws(() => parseKinds("1,abc"), /Invalid kind/);
 });
+
+test("reports the blocked address to the operator log", () => {
+  const messages = [];
+  const decide = createPolicy({ ratePerSecond: 1, burst: 1, now: () => 0 });
+  decide(request(4, { sourceInfo: "203.0.113.5" }), (message) => messages.push(message));
+  decide(request(1701, { sourceInfo: "203.0.113.5" }), (message) => messages.push(message));
+  decide(request(1701, { sourceInfo: "203.0.113.5" }), (message) => messages.push(message));
+
+  assert.deepEqual(messages, ["rejected kind 4 from IP4 203.0.113.5", "rate-limited 203.0.113.5"]);
+});

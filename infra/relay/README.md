@@ -48,8 +48,26 @@ node --test infra/relay/write-policy.test.mjs
 
 ## Deploying on Railway
 
-Link the service to this repository with **Root Directory** `/infra/relay` and **Watch Paths**
-`/infra/relay/**`, so it rebuilds only when these files change. Mount a volume at `/data`.
+**Deployed on 2026-09-16** to the existing `activity-relay` service, replacing
+`ghcr.io/mattn/nostr-relay`. Railway has no access to this repository, so it was uploaded from a
+working copy:
+
+```bash
+railway up infra/relay --path-as-root --service activity-relay
+```
+
+Updates therefore need another `railway up` until someone with GitHub organisation access links the
+repository (below). `PORT=7447` is set so the existing `relay.nearbuilders.org` domain and DNS keep
+working, and the volume stayed mounted at `/data`; the previous relay's SQLite file is still there.
+
+Verified in production after the swap: the NIP-11 document reports `NEAR Builders Relay` with
+`max_limit: 1000`; Activity's `/api/v1/health` reports the relay ok; publishing and reading through
+nostr.nearbuilders.org both work; a kind 4 event is rejected by the write policy; and strfry logs a
+public client address rather than a proxy address, so per-address rate limits apply per client.
+
+Once repository access is available, link the service with **Root Directory** `/infra/relay` and
+**Watch Paths** `/infra/relay/**`, so it rebuilds only when these files change. Mount a volume at
+`/data`.
 
 To replace the previous relay in place (keeping the `relay.nearbuilders.org` domain and DNS):
 
