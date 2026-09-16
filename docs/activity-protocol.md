@@ -45,6 +45,20 @@ A successful request returns `{ "eventId": "<64-character Nostr event ID>" }`. T
 be enabled for the authenticated Activity Source, the actor must be a valid NEAR account, and the
 payload must be JSON within the 16 KiB limit.
 
+### Importing history with `occurredAt`
+
+Live producers omit `occurredAt`, and the event is signed with the time the gateway received it.
+An importer may send `"occurredAt": "<ISO timestamp>"`, which becomes the signed event's
+`created_at`, so the feed orders it and the leaderboard buckets it by when the activity actually
+happened. It must not be in the future and must be within the relay's accepted age (three years
+for `relay.nearbuilders.org`); both return `400`. It is part of the submission's identity, so the
+same idempotency key with a different `occurredAt` returns `409`.
+
+An imported event is normally dated before its Signing Identity was bound, which the feed's
+provenance check otherwise rejects. Such an event is accepted only when this service's submission
+ledger shows that it published it. A relay record claiming to predate its identity, from anywhere
+else, is still discarded.
+
 Before signing, the gateway commits a durable reservation keyed by Activity Source and idempotency
 key. It stores the signed event before relay publication and marks the reservation published only
 after a positive relay acknowledgement. An identical completed retry returns the original event ID

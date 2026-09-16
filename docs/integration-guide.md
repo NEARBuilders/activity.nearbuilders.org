@@ -69,6 +69,11 @@ const retried = await activity.submit(request);
 `first.eventId` and `retried.eventId` are identical. The duplicate adds no second event or score
 contribution.
 
+When importing existing history rather than reporting live activity, add `occurredAt` with the
+original ISO timestamp. The event is then signed, ordered, and scored at that time instead of the
+time it was received. It must be in the past and within the relay's accepted age, and it counts as
+part of the idempotency key's content.
+
 ## 3. Query history and cursors
 
 `GET /v1/events` is public. Filter with `source`, `type`, and `actor`, and set `limit` from 1 to 100.

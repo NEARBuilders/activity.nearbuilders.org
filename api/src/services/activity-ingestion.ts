@@ -20,6 +20,8 @@ export interface ActivityEventSubmission {
   actor: string;
   idempotencyKey: string;
   payload: unknown;
+  /** ISO timestamp of when the activity happened; defaults to the time it is received. */
+  occurredAt?: string;
 }
 
 export const ACTIVITY_EVENT_PAYLOAD_MAX_BYTES = 16 * 1_024;
@@ -68,6 +70,7 @@ export class ActivityIngestionService {
         message: "Activity event payload exceeds 16 KiB",
       });
     }
+    const occurredAt = input.occurredAt ? resolveOccurredAt(input.occurredAt) : null;
     const source = await this.#sources.getApprovedSourceForIngestion(credential.sourceId);
     const eventType = source.eventTypes.find(({ name }) => name === input.eventType);
     if (!eventType?.enabled) {
@@ -125,7 +128,7 @@ export class ActivityIngestionService {
     if (!submission.eventJson) {
       const event = await this.#credentials.signActivityEvent(credential, {
         kind: ACTIVITY_EVENT_KIND,
-        created_at: Math.floor(submission.createdAt.getTime() / 1_000),
+        created_at: Math.floor((occurredAt ?? submission.createdAt).getTime() / 1_000),
         tags: [
           ["s", credential.sourceId],
           ["t", input.eventType],
@@ -238,9 +241,34 @@ function hashSubmission(input: ActivityEventSubmission): string {
         actor: input.actor,
         eventType: input.eventType,
         payload: input.payload,
+        // Part of the event's identity: the same key with a different time is a different event.
+        occurredAt: input.occurredAt ?? null,
       }),
     )
     .digest("hex");
+}
+
+/**
+ * Relays reject events dated in the future or older than their configured age, so a submitted
+ * `occurredAt` is bounded here rather than failing at publish time with a relay error.
+ * `relay.nearbuilders.org` accepts events up to three years old (`infra/relay/strfry.conf`).
+ */
+export const ACTIVITY_MAX_EVENT_AGE_SECONDS = 94_608_000;
+
+function resolveOccurredAt(value: string, now = new Date()): Date {
+  const occurredAt = new Date(value);
+  if (Number.isNaN(occurredAt.getTime())) {
+    throw new ORPCError("BAD_REQUEST", { message: "occurredAt is not a valid timestamp" });
+  }
+  if (occurredAt.getTime() > now.getTime()) {
+    throw new ORPCError("BAD_REQUEST", { message: "occurredAt cannot be in the future" });
+  }
+  if (occurredAt.getTime() < now.getTime() - ACTIVITY_MAX_EVENT_AGE_SECONDS * 1_000) {
+    throw new ORPCError("BAD_REQUEST", {
+      message: "occurredAt is older than the relay accepts",
+    });
+  }
+  return occurredAt;
 }
 
 function canonicalJson(value: unknown): string {

@@ -28,6 +28,7 @@ import {
   ActivityFeedService,
   ActivityResumeError,
   DatabaseActivityIdentityStore,
+  DatabaseActivityPublishedEventStore,
 } from "./services/activity-feed";
 import { ActivityGithubService } from "./services/activity-github";
 import { ActivityHealthService } from "./services/activity-health";
@@ -179,6 +180,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityRelay,
         new DatabaseActivityIdentityStore(database),
         activityModerationStore,
+        new DatabaseActivityPublishedEventStore(database),
       );
       const activityModerationService = new ActivityModerationService(
         activityModerationStore,
