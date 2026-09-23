@@ -1,6 +1,29 @@
-This guide takes an external project from registration to a verified event, live updates, and a
-leaderboard result. The HTTP examples use `http://localhost:3000/api`; replace it with the deployed
-Activity API base URL outside local development, which is `https://activity.nearbuilders.org/api`.
+## What Activity is
+
+Activity is a shared record of what people do across the NEAR ecosystem. Your project reports an
+event someone submitted feedback, merged a pull request, completed a task  and Activity signs it
+with your project's own key, publishes it to a Nostr relay, and makes it publicly verifiable.
+Accepted events are never edited or deleted.
+
+## Why integrate
+
+**Reputation stops resetting.** A builder who has proven themselves in another app arrives at yours
+with that history intact, and what they do in yours carries forward to the next one. Every project
+integrating makes the record more useful for all of them.
+
+**You get scoring, leaderboards, and a live feed without building any of it.** Define your own event
+types and what each is worth. Read history back with a public API, or subscribe to a live stream.
+
+**The record holds up.** Events are cryptographically signed and tied to your project's identity, so
+what you report is a verifiable reference rather than a claim.
+
+## What it costs
+
+A plain HTTP request per event. No library to install, no infrastructure to run. Registration takes
+one on-chain transaction and an administrator's approval; after that you are sending events.
+
+---
+The HTTP examples use the deployed Activity API at https://activity.nearbuilders.org/api. If you are running Activity locally, replace it with http://localhost:3000/api.
 
 ## Before you start
 
@@ -107,7 +130,7 @@ SSE, and reads the all-time leaderboard.
 Run the wrapper from this repository:
 
 ```bash
-ACTIVITY_API_BASE_URL=http://localhost:3000/api \
+ACTIVITY_API_BASE_URL=https://activity.nearbuilders.org/api \
 ACTIVITY_API_KEY='act_REPLACE_WITH_SECRET' \
 ACTIVITY_SOURCE_ID='your-source' \
 ACTIVITY_EVENT_TYPE='feedback.submitted' \
