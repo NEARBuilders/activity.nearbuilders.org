@@ -72,6 +72,19 @@
         "typescript": "catalog:",
       },
     },
+    "packages/client": {
+      "name": "@nearbuilders/activity-client",
+      "version": "0.1.0",
+      "dependencies": {
+        "@orpc/client": "1.14.3",
+        "@orpc/contract": "1.14.3",
+        "every-plugin": "^2.10.1",
+      },
+      "devDependencies": {
+        "typescript": "^5.9.3",
+        "vitest": "^4.1.8",
+      },
+    },
     "ui": {
       "name": "ui",
       "version": "1.9.1",
@@ -642,6 +655,8 @@
     "@napi-rs/keyring-win32-x64-msvc": ["@napi-rs/keyring-win32-x64-msvc@1.3.0", "", { "os": "win32", "cpu": "x64" }, "sha512-4DnCWXwDc0HRKwyRlG5y0VhKZW2tNRQfKKfyj6IX/KWfDNyq9hn4n+GL1auyDcOO/v8PwnhmYo2+rOOqCkvvOg=="],
 
     "@napi-rs/wasm-runtime": ["@napi-rs/wasm-runtime@1.0.7", "", { "dependencies": { "@emnapi/core": "^1.5.0", "@emnapi/runtime": "^1.5.0", "@tybys/wasm-util": "^0.10.1" } }, "sha512-SeDnOO0Tk7Okiq6DbXmmBODgOAb9dp9gjlphokTUxmt8U3liIP1ZsozBahH69j/RJv+Rfs6IwUKHTgQYJ/HBAw=="],
+
+    "@nearbuilders/activity-client": ["@nearbuilders/activity-client@workspace:packages/client"],
 
     "@neodrag/core": ["@neodrag/core@3.0.0-next.11", "", {}, "sha512-3WQWxyrbxiaK9zS5JU2wJsW2gpoQlZBXVghduBh61JpqaeE0T0cte8R0qYK2RuJo3J2TYQYqxO19CpG/C1i5eg=="],
 

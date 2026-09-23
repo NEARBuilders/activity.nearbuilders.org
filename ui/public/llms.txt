@@ -16,6 +16,18 @@ Useful public paths:
 - /activity
 - /activity-sources
 - /organizations
+- /docs
 - /README.md
 - /skill.md
 - /site.webmanifest
+
+Developer resources:
+- Integration guide: https://github.com/NEARBuilders/activity.nearbuilders.org/blob/main/docs/integration-guide.md
+- Activity protocol: https://github.com/NEARBuilders/activity.nearbuilders.org/blob/main/docs/activity-protocol.md
+- Typed TypeScript client: @nearbuilders/activity-client (https://github.com/NEARBuilders/activity.nearbuilders.org/tree/main/packages/client)
+- Public oRPC endpoint: https://activity.nearbuilders.org/api/rpc
+- Public HTTP API and reference: https://activity.nearbuilders.org/api
+
+Authentication:
+- Source API Keys are server-side credentials sent as Authorization: Bearer act_...
+- Routes requiring a signed-in user use session cookies.

@@ -52,7 +52,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           shopt -s nullglob
-          changelogs=( */CHANGELOG.md plugins/*/CHANGELOG.md )
+          changelogs=( */CHANGELOG.md packages/*/CHANGELOG.md plugins/*/CHANGELOG.md )
           shopt -u nullglob
 
           for changelog in "${changelogs[@]}"; do

@@ -5,6 +5,7 @@
     "packages": [
       "api",
       "ui",
+      "packages/*",
       "plugins/*"
     ],
     "catalog": {
@@ -84,7 +85,7 @@
     "publish": "bos publish",
     "bos": "bos",
     "types:gen": "node node_modules/.bin/bos types gen",
-    "typecheck": "bun run types:gen && if [ -d ui ]; then bun run --cwd ui typecheck; fi && if [ -d api ]; then bun run --cwd api typecheck; fi && if [ -d plugins ]; then for dir in plugins/*; do if [ -f \"$dir/package.json\" ]; then bun run --cwd \"$dir\" typecheck; fi; done; fi",
+    "typecheck": "bun run types:gen && if [ -d ui ]; then bun run --cwd ui typecheck; fi && if [ -d api ]; then bun run --cwd api typecheck; fi && if [ -d packages ]; then for dir in packages/*; do if [ -f \"$dir/package.json\" ]; then bun run --cwd \"$dir\" typecheck; fi; done; fi && if [ -d plugins ]; then for dir in plugins/*; do if [ -f \"$dir/package.json\" ]; then bun run --cwd \"$dir\" typecheck; fi; done; fi",
     "typecheck:examples": "tsc --noEmit -p examples/tsconfig.json",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
@@ -99,7 +100,7 @@
     "db:studio": "bos db:studio",
     "db:generate": "bun run --cwd api drizzle-kit generate",
     "db:migrate": "bun run --cwd api drizzle-kit migrate",
-    "test": "bun run --if-present --cwd api test && bun run --if-present --cwd ui test && if [ -d plugins ]; then for d in plugins/*; do if [ -f \"$d/package.json\" ]; then bun run --if-present --cwd \"$d\" test; fi; done; fi",
+    "test": "bun run --if-present --cwd api test && bun run --if-present --cwd ui test && if [ -d packages ]; then for d in packages/*; do if [ -f \"$d/package.json\" ]; then bun run --if-present --cwd \"$d\" test; fi; done; fi && if [ -d plugins ]; then for d in plugins/*; do if [ -f \"$d/package.json\" ]; then bun run --if-present --cwd \"$d\" test; fi; done; fi",
     "test:api": "bun run --if-present --cwd api test",
     "test:integration": "bun run --if-present --cwd api test tests/integration/",
     "test:integration-guide": "bun run --cwd api test tests/integration/activity-client-example.test.ts",
