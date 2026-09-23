@@ -9,7 +9,7 @@ Activity API base URL outside local development, which is `https://activity.near
 **Activity is a plain HTTP API.** There is nothing to install: you authenticate with a bearer token
 and send JSON. It is not a plugin, and you do not need to run Nostr or Redis yourself. If your
 project is built on [everything.dev](https://everything.dev/), there is also a typed oRPC client —
-see [Use a typed client](#9-use-a-typed-client-inside-everythingdev).
+see [Use a typed client](#11-use-a-typed-client-inside-everythingdev).
 
 You will need:
 
@@ -28,8 +28,28 @@ minutes, but two steps before that are not instant:
 | Authorize the signing key on-chain | You, from the source's NEAR account | A transaction plus indexing |
 | Create an API key and publish | You | Minutes |
 
-Publishing returns `403` until the source is both approved and bound, so arrange approval before
-you plan a demo.
+> **Publishing returns `403` until the source is both approved and bound.** Arrange approval before
+> you plan a demo.
+
+Once you are publishing, this is what happens to an event:
+
+```text
+  your server
+      │  POST /v1/events   (Authorization: Bearer act_…)
+      ▼
+  Activity gateway
+      │  checks the key, the source, and the Event Type
+      │  reserves the idempotency key, so a retry cannot duplicate
+      │  signs the event with your source's own Nostr key
+      ▼
+  Nostr relay ──────────── immutable, signed, publicly verifiable
+      │
+      ├──────────────► feed and live stream readers
+      └──────────────► Redis counts ──► leaderboards
+```
+
+Activity never edits or deletes an accepted event. Everything you read back later — the feed, the
+live stream, the leaderboard — is derived from that signed record.
 
 ## 1. Register a source
 
@@ -61,14 +81,14 @@ small amount for one transaction (about 0.01 NEAR plus gas).
 7. **Create a Source API Key.** Copy the `act_…` value immediately: it is shown once and only its
    name, prefix, and timestamps are visible afterwards.
 
-Store the Source API Key in the deployment platform's encrypted secret manager. Never place it in
-source code, client-side JavaScript, logs, screenshots, issue bodies, `.env.example`, or committed
-`.env` files. Treat the key as a server-side bearer credential.
+> **Treat the Source API Key as a server-side credential.** Store it in your deployment platform's
+> encrypted secret manager. Never put it in source code, client-side JavaScript, logs, screenshots,
+> issue bodies, `.env.example`, or a committed `.env`.
 
-**Editing a source later sends it back for review.** Changing the display name, NEAR account, or
-Event Types returns the source to `pending`, and it stops ingesting until an administrator reviews
-it again. Changing the NEAR account also unbinds the Signing Identity, so step 6 has to be repeated
-from the new account. Plan Event Types up front where you can.
+> **Editing a source later sends it back for review.** Changing the display name, NEAR account, or
+> Event Types returns the source to `pending`, and it stops ingesting until an administrator
+> reviews it again. Changing the NEAR account also unbinds the Signing Identity, so step 6 has to
+> be repeated from the new account. Plan your Event Types up front where you can.
 
 ### Polling GitHub instead of publishing
 
@@ -164,7 +184,34 @@ Type's point value, historical accepted events use the new value immediately. Pl
 multipliers also apply at read time. Consumers should display the returned score and breakdown
 rather than caching their own permanent calculation.
 
-## 6. Handle failures safely
+## 6. Show endorsements
+
+Signed-in Activity users can endorse a visible event once. Endorsements are a local interaction
+record: they never modify the signed Nostr event, and they are not negative votes or a score input.
+
+If you render a feed of your own events, fetch counts for up to 100 at a time rather than one
+request per card:
+
+```http
+POST /v1/events/endorsements
+Content-Type: application/json
+
+{ "eventIds": ["<64-character Nostr event ID>"] }
+```
+
+The response maps each event ID to `{ eventId, totalCount, endorsedByCurrentUser }`, where
+`endorsedByCurrentUser` reflects the session making the request and is `false` when signed out.
+A signed-in user endorses with `POST /v1/events/{eventId}/endorsement` and withdraws with `DELETE`
+on the same path; both are idempotent and return the updated total.
+
+## 7. Check service health
+
+`GET /v1/health` is public and needs no credentials. It returns `200` only when the database, a
+real Redis write, and a relay query all succeed, and `503` with the same report naming the failed
+check otherwise. Read it before investigating your own integration: a `503` from submission during
+a relay outage is Activity's problem, not yours.
+
+## 8. Handle failures safely
 
 | Status | Meaning | Client action |
 | --- | --- | --- |
@@ -200,7 +247,7 @@ Repeating the request with the same idempotency key and reason is safe; reusing 
 different reason returns `409`. A retracted event cannot be restored, and re-submitting its
 idempotency key returns the same hidden event, so a later re-approval needs a new key.
 
-## 7. Rotate or revoke credentials
+## 9. Rotate or revoke credentials
 
 To replace a Source API Key, create a second key, install it in the producer, verify successful
 submissions, then revoke the old key. Revoked keys return `401` immediately and cannot be restored.
@@ -210,7 +257,7 @@ the new NEAR binding, and verify it before resuming writes. Historical events re
 the retired public identity during its recorded active window. Do not revoke the working API key as
 a substitute for Signing Identity rotation.
 
-## 8. API reference and CI proof
+## 10. API reference and CI proof
 
 The generated interactive OpenAPI reference is available at `/api` on the Activity host and at the
 API service's displayed **Docs** URL during `bun run dev`. Its public Activity operations are derived
@@ -227,7 +274,7 @@ The smoke test provisions a fresh approved and bound fixture source, receives it
 executes the documented example through the public HTTP routes, verifies duplicate identity and
 score count, and asserts that its output contains no credential.
 
-## 9. Use a typed client inside everything.dev
+## 11. Use a typed client inside everything.dev
 
 Every operation in this guide is also reachable over oRPC at `/api/rpc`, with the same
 authentication: a Source API Key in the `Authorization` header for ingestion, and a session cookie

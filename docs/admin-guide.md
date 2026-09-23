@@ -71,11 +71,12 @@ history with the administrator and timestamp, and are visible to the source owne
 Two rules to know:
 
 - **A source can be reviewed only while it is pending, and approval is one-way.** Reviewing a
-  source that is already approved or rejected returns `409 Conflict`. There is no "unapprove", and
-  **an administrator has no way to stop an approved source from publishing**: revoking API keys is
-  owner-only, and there is no route to disable or suspend a source. The only administrator remedy
-  today is hiding events one at a time, or asking the owner to revoke the key. Treat approval as
-  the decision point, and confirm the source and its owner before granting it.
+  source that is already approved or rejected returns `409 Conflict`.
+
+> **Approval is the decision point.** There is no "unapprove", and an administrator has no way to
+> stop an approved source from publishing: revoking API keys is owner-only, and no route disables
+> or suspends a source. The only administrator remedy today is hiding events one at a time, or
+> asking the owner to revoke the key. Confirm the source and its owner before granting approval.
 - **Editing a source sends it back to the queue.** If an owner changes the display name, NEAR
   account, or Event Types, the source returns to `pending` and its previous review is cleared, so
   it stops ingesting until it is reviewed again. Changing the NEAR account additionally unbinds the
@@ -123,9 +124,9 @@ Hiding removes the event from feed queries, live delivery, and SSE replay, and e
 leaderboard counts. Repeating the call with the same `idempotencyKey` and reason is safe; reusing
 that key with a different reason returns `409`.
 
-**Hiding cannot be undone through the API.** Treat it as permanent for the public surface, and note
-that the signed event remains readable by anyone querying the relay directly, so hiding is not a
-way to retract information that has already been published.
+> **Hiding cannot be undone through the API**, and the signed event stays readable by anyone
+> querying the relay directly. Treat it as permanent for the public surface, and not as a way to
+> retract information that has already been published.
 
 Source owners can hide their own source's events without an administrator, using their API key
 against `POST /api/v1/events/{eventId}/retract`; see

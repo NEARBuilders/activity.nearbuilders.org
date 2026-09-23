@@ -97,8 +97,10 @@ export function Markdown({ content, className }: MarkdownProps) {
 }
 
 const markdownComponents: Components = {
-  code: ({ className, children, ...props }) => {
-    const isBlock = className?.startsWith("language-");
+  code: ({ className, children, node: _node, ...props }) => {
+    // rehype-highlight rewrites the class to "hljs language-bash", so the language is no longer
+    // the first token. Matching only the start treated every fenced block as inline code.
+    const isBlock = className?.split(/\s+/).some((name) => name.startsWith("language-"));
 
     if (!isBlock) {
       return (

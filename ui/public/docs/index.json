@@ -3,24 +3,217 @@
     "slug": "integration-guide",
     "title": "Integrate with Activity",
     "description": "Register a source, get an API key, publish your first event, and read it back from the feed, live stream, and leaderboard.",
-    "audience": "External projects"
+    "audience": "External projects",
+    "headings": [
+      {
+        "depth": 2,
+        "text": "Before you start",
+        "slug": "before-you-start"
+      },
+      {
+        "depth": 2,
+        "text": "1. Register a source",
+        "slug": "1-register-a-source"
+      },
+      {
+        "depth": 3,
+        "text": "Polling GitHub instead of publishing",
+        "slug": "polling-github-instead-of-publishing"
+      },
+      {
+        "depth": 2,
+        "text": "2. Run the typed example",
+        "slug": "2-run-the-typed-example"
+      },
+      {
+        "depth": 2,
+        "text": "3. Query history and cursors",
+        "slug": "3-query-history-and-cursors"
+      },
+      {
+        "depth": 2,
+        "text": "4. Subscribe and reconnect",
+        "slug": "4-subscribe-and-reconnect"
+      },
+      {
+        "depth": 2,
+        "text": "5. Read scoring",
+        "slug": "5-read-scoring"
+      },
+      {
+        "depth": 2,
+        "text": "6. Show endorsements",
+        "slug": "6-show-endorsements"
+      },
+      {
+        "depth": 2,
+        "text": "7. Check service health",
+        "slug": "7-check-service-health"
+      },
+      {
+        "depth": 2,
+        "text": "8. Handle failures safely",
+        "slug": "8-handle-failures-safely"
+      },
+      {
+        "depth": 3,
+        "text": "Retract an event you published",
+        "slug": "retract-an-event-you-published"
+      },
+      {
+        "depth": 2,
+        "text": "9. Rotate or revoke credentials",
+        "slug": "9-rotate-or-revoke-credentials"
+      },
+      {
+        "depth": 2,
+        "text": "10. API reference and CI proof",
+        "slug": "10-api-reference-and-ci-proof"
+      },
+      {
+        "depth": 2,
+        "text": "11. Use a typed client inside everything.dev",
+        "slug": "11-use-a-typed-client-inside-everythingdev"
+      }
+    ]
   },
   {
     "slug": "admin-guide",
     "title": "Administer Activity",
     "description": "Review and approve sources, set trust and score multipliers, hide events, and check service health.",
-    "audience": "Platform Administrators"
+    "audience": "Platform Administrators",
+    "headings": [
+      {
+        "depth": 2,
+        "text": "Who can do what",
+        "slug": "who-can-do-what"
+      },
+      {
+        "depth": 2,
+        "text": "Become a Platform Administrator",
+        "slug": "become-a-platform-administrator"
+      },
+      {
+        "depth": 3,
+        "text": "Bootstrapping the first administrator",
+        "slug": "bootstrapping-the-first-administrator"
+      },
+      {
+        "depth": 3,
+        "text": "Promoting anyone afterwards",
+        "slug": "promoting-anyone-afterwards"
+      },
+      {
+        "depth": 2,
+        "text": "Review Activity Sources",
+        "slug": "review-activity-sources"
+      },
+      {
+        "depth": 2,
+        "text": "Set source trust and score multipliers",
+        "slug": "set-source-trust-and-score-multipliers"
+      },
+      {
+        "depth": 2,
+        "text": "Hide an event",
+        "slug": "hide-an-event"
+      },
+      {
+        "depth": 2,
+        "text": "Check service health",
+        "slug": "check-service-health"
+      },
+      {
+        "depth": 2,
+        "text": "What administrators cannot do",
+        "slug": "what-administrators-cannot-do"
+      }
+    ]
   },
   {
     "slug": "activity-protocol",
     "title": "Event protocol",
     "description": "The signed event envelope, indexed tags, ingestion and idempotency rules, feed cursors, and credential handling.",
-    "audience": "Implementers"
+    "audience": "Implementers",
+    "headings": [
+      {
+        "depth": 2,
+        "text": "Event envelope",
+        "slug": "event-envelope"
+      },
+      {
+        "depth": 2,
+        "text": "Ingestion gateway",
+        "slug": "ingestion-gateway"
+      },
+      {
+        "depth": 3,
+        "text": "Importing history with occurredAt",
+        "slug": "importing-history-with-occurredat"
+      },
+      {
+        "depth": 2,
+        "text": "Public feed",
+        "slug": "public-feed"
+      },
+      {
+        "depth": 2,
+        "text": "Event endorsements",
+        "slug": "event-endorsements"
+      },
+      {
+        "depth": 2,
+        "text": "GitHub repository polling",
+        "slug": "github-repository-polling"
+      },
+      {
+        "depth": 2,
+        "text": "Transport boundary",
+        "slug": "transport-boundary"
+      },
+      {
+        "depth": 2,
+        "text": "Source credentials and signing",
+        "slug": "source-credentials-and-signing"
+      },
+      {
+        "depth": 2,
+        "text": "Verification workflow",
+        "slug": "verification-workflow"
+      },
+      {
+        "depth": 2,
+        "text": "Production requirements",
+        "slug": "production-requirements"
+      }
+    ]
   },
   {
     "slug": "activity-leaderboard",
     "title": "Leaderboard internals",
     "description": "How raw counts are stored, how scores are computed at read time, and how the projection rebuilds.",
-    "audience": "Implementers"
+    "audience": "Implementers",
+    "headings": [
+      {
+        "depth": 2,
+        "text": "Query model",
+        "slug": "query-model"
+      },
+      {
+        "depth": 2,
+        "text": "Redis representation",
+        "slug": "redis-representation"
+      },
+      {
+        "depth": 2,
+        "text": "Reconnect and rebuild",
+        "slug": "reconnect-and-rebuild"
+      },
+      {
+        "depth": 2,
+        "text": "Benchmark",
+        "slug": "benchmark"
+      }
+    ]
   }
 ]
