@@ -48,9 +48,17 @@ function docsUrl(path: string, baseUrl?: string): string {
   return base ? `${base}${path}` : path;
 }
 
+/**
+ * These files are regenerated on every deploy at a stable URL, so a cached copy goes stale
+ * silently and readers keep seeing the previous version. Revalidating keeps that from happening
+ * while still allowing a 304. The header form works in the browser and during server rendering,
+ * where `RequestInit.cache` is not consistently supported.
+ */
+const REVALIDATE: RequestInit = { headers: { "cache-control": "no-cache" } };
+
 export async function loadDocsManifest(baseUrl?: string): Promise<DocSummary[]> {
   try {
-    const response = await fetch(docsUrl("/docs/index.json", baseUrl));
+    const response = await fetch(docsUrl("/docs/index.json", baseUrl), REVALIDATE);
     if (!response.ok) return [];
     const parsed: unknown = await response.json();
     return Array.isArray(parsed) ? parsed.filter(isDocSummary) : [];
@@ -69,7 +77,7 @@ export async function loadDoc(
 
   try {
     // The slug came from the manifest, so it cannot traverse outside /docs.
-    const response = await fetch(docsUrl(`/docs/${slug}.md`, baseUrl));
+    const response = await fetch(docsUrl(`/docs/${slug}.md`, baseUrl), REVALIDATE);
     if (!response.ok) return null;
     return { summary, content: await response.text() };
   } catch {

@@ -28,8 +28,28 @@ minutes, but two steps before that are not instant:
 | Authorize the signing key on-chain | You, from the source's NEAR account | A transaction plus indexing |
 | Create an API key and publish | You | Minutes |
 
-Publishing returns `403` until the source is both approved and bound, so arrange approval before
-you plan a demo.
+> **Publishing returns `403` until the source is both approved and bound.** Arrange approval before
+> you plan a demo.
+
+Once you are publishing, this is what happens to an event:
+
+```text
+  your server
+      │  POST /v1/events   (Authorization: Bearer act_…)
+      ▼
+  Activity gateway
+      │  checks the key, the source, and the Event Type
+      │  reserves the idempotency key, so a retry cannot duplicate
+      │  signs the event with your source's own Nostr key
+      ▼
+  Nostr relay ──────────── immutable, signed, publicly verifiable
+      │
+      ├──────────────► feed and live stream readers
+      └──────────────► Redis counts ──► leaderboards
+```
+
+Activity never edits or deletes an accepted event. Everything you read back later — the feed, the
+live stream, the leaderboard — is derived from that signed record.
 
 ## 1. Register a source
 
@@ -61,14 +81,14 @@ small amount for one transaction (about 0.01 NEAR plus gas).
 7. **Create a Source API Key.** Copy the `act_…` value immediately: it is shown once and only its
    name, prefix, and timestamps are visible afterwards.
 
-Store the Source API Key in the deployment platform's encrypted secret manager. Never place it in
-source code, client-side JavaScript, logs, screenshots, issue bodies, `.env.example`, or committed
-`.env` files. Treat the key as a server-side bearer credential.
+> **Treat the Source API Key as a server-side credential.** Store it in your deployment platform's
+> encrypted secret manager. Never put it in source code, client-side JavaScript, logs, screenshots,
+> issue bodies, `.env.example`, or a committed `.env`.
 
-**Editing a source later sends it back for review.** Changing the display name, NEAR account, or
-Event Types returns the source to `pending`, and it stops ingesting until an administrator reviews
-it again. Changing the NEAR account also unbinds the Signing Identity, so step 6 has to be repeated
-from the new account. Plan Event Types up front where you can.
+> **Editing a source later sends it back for review.** Changing the display name, NEAR account, or
+> Event Types returns the source to `pending`, and it stops ingesting until an administrator
+> reviews it again. Changing the NEAR account also unbinds the Signing Identity, so step 6 has to
+> be repeated from the new account. Plan your Event Types up front where you can.
 
 ### Polling GitHub instead of publishing
 
