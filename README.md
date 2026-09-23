@@ -6,6 +6,15 @@ This repository extends [`dev.everything`](https://everything.dev/) with local U
 
 The product scope comes from [NEAR Builders' Activity Service proposal](https://github.com/NEARBuilders/nearbuilders.org/blob/main/ACTIVITY.md), originally targeted for August 2026.
 
+## Guides
+
+| If you are | Read |
+| --- | --- |
+| An external project that wants to publish events | [Integrate with Activity](docs/integration-guide.md) |
+| A Platform Administrator reviewing sources or moderating | [Administer Activity](docs/admin-guide.md) |
+| Running the relay, Redis, backups, and alerts | [Infrastructure readiness](docs/activity-infrastructure.md) |
+| Implementing against the wire format | [Event protocol](docs/activity-protocol.md) and [leaderboard internals](docs/activity-leaderboard.md) |
+
 ## Why this exists
 
 Activity data is fragmented across NEAR applications. Games, governance tools, community platforms, and developer tooling each track engagement independently, so contributors cannot carry a useful history between applications and every new integration starts from zero.

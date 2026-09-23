@@ -6,20 +6,52 @@ Activity API base URL outside local development.
 
 ## 1. Register a source
 
-1. Sign in to Activity with the NEAR account that will own the source.
-2. Select or create an organization in the workspace menu. You must be an owner of that organization.
-3. Open `/activity-sources` and register a source ID, display name, NEAR account, and at least one
-   Event Type. Event Type names are lowercase names such as `feedback.submitted`.
-4. Ask an Activity Platform Administrator to approve the pending source. Approval controls whether
-   it may publish; the separate `standard` or `trusted` designation controls scoring weight.
-5. Create the Signing Identity. Activity shows only its public key and encrypts the private key at rest.
-6. Choose **Authorize with NEAR**, approve the mainnet binding transaction from the exact source
-   account, wait for it to be indexed, and choose **Check binding**.
-7. Create a Source API Key. Copy the `act_…` value immediately because it is shown once.
+Everything in this section happens in the browser, and it is the only part that needs a NEAR
+wallet. Before starting, have the **mainnet NEAR account that will own the source**, funded with a
+small amount for one transaction (about 0.01 NEAR plus gas).
+
+1. **Sign in** with that NEAR account.
+2. **Select or create an organization** in the workspace menu. You must be its **owner**: members
+   cannot register sources or manage credentials. A source belongs to one organization permanently.
+3. **Register the source** on `/activity-sources`:
+   - **Source ID** — lowercase, permanent, and shown publicly on every event, such as
+     `github.nearbuilders.org`. It cannot be changed later.
+   - **Display name** — shown on feed cards.
+   - **NEAR account** — the exact mainnet account that will sign the binding in step 6.
+   - **Event Types** — at least one, lowercase, such as `feedback.submitted`. Each carries a point
+     value used for scoring, and can be enabled or disabled. Add every type you expect to publish;
+     submitting a type that is missing or disabled returns `400`.
+4. **Wait for approval.** A Platform Administrator approves or rejects with a written reason, which
+   you can see on the source. Approval is what allows publishing at all. The separate `standard` or
+   `trusted` designation only affects scoring weight, and you do not need `trusted` to start.
+5. **Create the Signing Identity.** Activity generates a Nostr keypair for the source, shows you
+   only the public key, and encrypts the private key at rest. It is never shown or exported.
+6. **Authorize with NEAR.** Choose **Authorize with NEAR**, and approve the mainnet transaction
+   **from the source's exact NEAR account** — a different account, even one you also control, is
+   rejected. This writes the binding between the NEAR account and the signing key on-chain, and it
+   goes directly through your wallet, so no relayer is involved. Wait a few seconds for it to be
+   indexed, then choose **Check binding**. Until this succeeds, publishing returns `403`.
+7. **Create a Source API Key.** Copy the `act_…` value immediately: it is shown once and only its
+   name, prefix, and timestamps are visible afterwards.
 
 Store the Source API Key in the deployment platform's encrypted secret manager. Never place it in
 source code, client-side JavaScript, logs, screenshots, issue bodies, `.env.example`, or committed
 `.env` files. Treat the key as a server-side bearer credential.
+
+**Editing a source later sends it back for review.** Changing the display name, NEAR account, or
+Event Types returns the source to `pending`, and it stops ingesting until an administrator reviews
+it again. Changing the NEAR account also unbinds the Signing Identity, so step 6 has to be repeated
+from the new account. Plan Event Types up front where you can.
+
+### Polling GitHub instead of publishing
+
+An approved source can have Activity poll public GitHub repositories for it, rather than calling
+the API itself. Add `github.pr.merged` and/or `github.issue.closed` as Event Types, then configure
+repositories on the source. Every GitHub login must be explicitly mapped to the NEAR account that
+should receive credit; events from unmapped authors are quarantined until a mapping exists rather
+than being attributed to the wrong person. See
+[`activity-protocol.md`](activity-protocol.md#github-repository-polling) for polling intervals,
+rate limits, and backfill boundaries.
 
 ## 2. Run the typed example
 
