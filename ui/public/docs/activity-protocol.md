@@ -1,5 +1,3 @@
-# Activity event protocol
-
 ## Event envelope
 
 Activity records are signed Nostr events of kind `1701`. This is a regular event kind in the

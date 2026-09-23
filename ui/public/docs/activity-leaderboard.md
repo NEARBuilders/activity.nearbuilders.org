@@ -1,5 +1,3 @@
-# Activity leaderboard
-
 ## Query model
 
 `GET /api/v1/leaderboard` accepts `period=weekly|monthly|all-time`, `limit`, and optional `source`

@@ -6,12 +6,29 @@
  * against on the server, so callers pass the host URL from the runtime config when they have it.
  */
 
+export type DocHeading = {
+  depth: 2 | 3;
+  text: string;
+  slug: string;
+};
+
 export type DocSummary = {
   slug: string;
   title: string;
   description: string;
   audience: string;
+  headings: DocHeading[];
 };
+
+function isDocHeading(value: unknown): value is DocHeading {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Record<string, unknown>;
+  return (
+    (candidate.depth === 2 || candidate.depth === 3) &&
+    typeof candidate.text === "string" &&
+    typeof candidate.slug === "string"
+  );
+}
 
 function isDocSummary(value: unknown): value is DocSummary {
   if (!value || typeof value !== "object") return false;
@@ -20,7 +37,9 @@ function isDocSummary(value: unknown): value is DocSummary {
     typeof candidate.slug === "string" &&
     typeof candidate.title === "string" &&
     typeof candidate.description === "string" &&
-    typeof candidate.audience === "string"
+    typeof candidate.audience === "string" &&
+    Array.isArray(candidate.headings) &&
+    candidate.headings.every(isDocHeading)
   );
 }
 

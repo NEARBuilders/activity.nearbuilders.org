@@ -1,5 +1,3 @@
-# Administer Activity
-
 For Platform Administrators of `activity.nearbuilders.org`. External projects publishing events
 should read [`integration-guide.md`](/docs/integration-guide) instead; operators running the relay,
 Redis, and backups should read [`activity-infrastructure.md`](https://github.com/NEARBuilders/activity.nearbuilders.org/blob/main/docs/activity-infrastructure.md).

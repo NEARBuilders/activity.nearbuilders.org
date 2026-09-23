@@ -11,6 +11,7 @@
 import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import GithubSlugger from "github-slugger";
 
 const repositoryRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
 const docsDirectory = join(repositoryRoot, "docs");
@@ -84,25 +85,72 @@ export function rewriteLinks(markdown: string): string {
   });
 }
 
+/**
+ * The page header already shows the document's title, so the leading `# Heading` would appear
+ * twice. Only a title on the first non-empty line is removed.
+ */
+export function stripLeadingTitle(markdown: string): string {
+  return markdown.replace(/^\s*#\s+.*(\r?\n)+/, "");
+}
+
+export type DocHeading = { depth: 2 | 3; text: string; slug: string };
+
+/**
+ * Builds the on-page table of contents. Slugs come from the same slugger `rehype-slug` uses when
+ * the Markdown is rendered, so every entry links to a heading that exists. Headings inside fenced
+ * code blocks are skipped, because a `#` comment is not a heading.
+ */
+export function extractHeadings(markdown: string): DocHeading[] {
+  const slugger = new GithubSlugger();
+  const headings: DocHeading[] = [];
+  let insideFence = false;
+
+  for (const line of markdown.split(/\r?\n/)) {
+    if (/^\s*(```|~~~)/.test(line)) {
+      insideFence = !insideFence;
+      continue;
+    }
+    if (insideFence) continue;
+
+    const match = /^(#{2,3})\s+(.+?)\s*$/.exec(line);
+    if (!match) continue;
+
+    // Markdown emphasis and inline code are styling, not part of the heading's text.
+    const text = match[2]
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/\*([^*]+)\*/g, "$1")
+      .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+      .trim();
+    headings.push({ depth: match[1].length as 2 | 3, text, slug: slugger.slug(text) });
+  }
+
+  return headings;
+}
+
 function main(): void {
   rmSync(outputDirectory, { recursive: true, force: true });
   mkdirSync(outputDirectory, { recursive: true });
 
   const available = new Set(readdirSync(docsDirectory));
-  for (const doc of PUBLISHED_DOCS) {
+  const manifest = PUBLISHED_DOCS.map((doc) => {
     if (!available.has(doc.file)) {
       throw new Error(`docs/${doc.file} is listed in PUBLISHED_DOCS but does not exist`);
     }
-    const source = readFileSync(join(docsDirectory, doc.file), "utf8");
-    writeFileSync(join(outputDirectory, `${doc.slug}.md`), rewriteLinks(source));
-  }
+    const published = stripLeadingTitle(
+      rewriteLinks(readFileSync(join(docsDirectory, doc.file), "utf8")),
+    );
+    writeFileSync(join(outputDirectory, `${doc.slug}.md`), published);
 
-  const manifest = PUBLISHED_DOCS.map(({ slug, title, description, audience }) => ({
-    slug,
-    title,
-    description,
-    audience,
-  }));
+    return {
+      slug: doc.slug,
+      title: doc.title,
+      description: doc.description,
+      audience: doc.audience,
+      headings: extractHeadings(published),
+    };
+  });
+
   writeFileSync(join(outputDirectory, "index.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 
   console.log(`Published ${PUBLISHED_DOCS.length} documents to ui/public/docs/`);

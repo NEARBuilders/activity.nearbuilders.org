@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { PUBLISHED_DOCS, rewriteLinks } from "./sync-docs";
+import { extractHeadings, PUBLISHED_DOCS, rewriteLinks, stripLeadingTitle } from "./sync-docs";
 
 describe("rewriteLinks", () => {
   it("points links between published documents at site routes", () => {
@@ -42,5 +42,47 @@ describe("rewriteLinks", () => {
   it("publishes a unique slug per document", () => {
     const slugs = PUBLISHED_DOCS.map(({ slug }) => slug);
     expect(new Set(slugs).size).toBe(slugs.length);
+  });
+});
+
+describe("stripLeadingTitle", () => {
+  it("removes the leading title, which the page header already shows", () => {
+    expect(stripLeadingTitle("# Integrate with Activity\n\nBody text.\n")).toBe("Body text.\n");
+  });
+
+  it("keeps headings that are not the leading title", () => {
+    expect(stripLeadingTitle("Intro.\n\n# Later heading\n")).toBe("Intro.\n\n# Later heading\n");
+    expect(stripLeadingTitle("## Section\n\nBody.\n")).toBe("## Section\n\nBody.\n");
+  });
+});
+
+describe("extractHeadings", () => {
+  it("collects section headings with slugs that match rendered anchors", () => {
+    expect(extractHeadings("## Before you start\n\n### Sub section\n\ntext\n")).toEqual([
+      { depth: 2, text: "Before you start", slug: "before-you-start" },
+      { depth: 3, text: "Sub section", slug: "sub-section" },
+    ]);
+  });
+
+  it("ignores the title and anything deeper than a sub-section", () => {
+    expect(extractHeadings("# Title\n\n#### Too deep\n")).toEqual([]);
+  });
+
+  it("ignores comments inside fenced code blocks", () => {
+    const markdown = "## Real\n\n```bash\n## not a heading\n```\n\n## Also real\n";
+    expect(extractHeadings(markdown).map(({ text }) => text)).toEqual(["Real", "Also real"]);
+  });
+
+  it("strips inline formatting from the heading text", () => {
+    expect(extractHeadings("## Use `occurredAt` and **bold**\n")).toEqual([
+      { depth: 2, text: "Use occurredAt and bold", slug: "use-occurredat-and-bold" },
+    ]);
+  });
+
+  it("disambiguates repeated headings the way the renderer does", () => {
+    expect(extractHeadings("## Setup\n\n## Setup\n").map(({ slug }) => slug)).toEqual([
+      "setup",
+      "setup-1",
+    ]);
   });
 });
