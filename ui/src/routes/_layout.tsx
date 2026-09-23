@@ -1,4 +1,5 @@
 import {
+  BookOpenIcon,
   BroadcastIcon,
   HouseIcon,
   ListIcon,
@@ -67,6 +68,8 @@ function AppHeader() {
   const isTenantMember = !!tenant && !!activeOrgId && activeOrgId === tenant.orgId;
   const items = [
     { icon: PulseIcon, label: "Activity", to: "/activity" },
+    // Signed out too: integrators arrive here before they have an account.
+    { icon: BookOpenIcon, label: "Docs", to: "/docs" },
     ...(liveSession?.user
       ? [
           { icon: HouseIcon, label: "Overview", to: "/home" },

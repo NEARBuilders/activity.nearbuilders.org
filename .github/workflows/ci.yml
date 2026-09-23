@@ -74,6 +74,17 @@ jobs:
       - name: Test relay write policy
         run: node --test infra/relay/write-policy.test.mjs
 
+      - name: Test docs publishing
+        run: bun test scripts/sync-docs.test.ts
+
+      # ui/public/docs/ is generated from docs/. Fail if someone edited a published document
+      # without re-running the sync, so the website never serves stale guidance.
+      - name: Check published docs are current
+        run: |
+          bun run docs:sync
+          git diff --exit-code -- ui/public/docs \
+            || { echo "ui/public/docs is stale; run 'bun run docs:sync' and commit the result." >&2; exit 1; }
+
       - name: Run clean-room integration guide smoke test
         run: bun run test:integration-guide
 

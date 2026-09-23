@@ -1,0 +1,26 @@
+[
+  {
+    "slug": "integration-guide",
+    "title": "Integrate with Activity",
+    "description": "Register a source, get an API key, publish your first event, and read it back from the feed, live stream, and leaderboard.",
+    "audience": "External projects"
+  },
+  {
+    "slug": "admin-guide",
+    "title": "Administer Activity",
+    "description": "Review and approve sources, set trust and score multipliers, hide events, and check service health.",
+    "audience": "Platform Administrators"
+  },
+  {
+    "slug": "activity-protocol",
+    "title": "Event protocol",
+    "description": "The signed event envelope, indexed tags, ingestion and idempotency rules, feed cursors, and credential handling.",
+    "audience": "Implementers"
+  },
+  {
+    "slug": "activity-leaderboard",
+    "title": "Leaderboard internals",
+    "description": "How raw counts are stored, how scores are computed at read time, and how the projection rebuilds.",
+    "audience": "Implementers"
+  }
+]

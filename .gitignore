@@ -340,6 +340,8 @@ node_modules/.federation
 !**/CHANGELOG.md
 !.changeset/**/*.md
 !docs/**/*.md
+# Generated from docs/ by `bun run docs:sync`; the website serves these.
+!ui/public/docs/*.md
 !CONTEXT.md
 !CONTEXT-MAP.md
 !**/CONTEXT.md
