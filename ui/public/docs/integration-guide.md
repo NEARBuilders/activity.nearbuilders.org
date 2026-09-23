@@ -4,10 +4,9 @@ Activity API base URL outside local development, which is `https://activity.near
 
 ## Before you start
 
-**Activity is a plain HTTP API.** There is nothing to install: you authenticate with a bearer token
-and send JSON. It is not a plugin, and you do not need to run Nostr or Redis yourself. If your
-project is built on [everything.dev](https://everything.dev/), there is also a typed oRPC client —
-see [Use a typed client](#11-use-a-typed-client-inside-everythingdev).
+**Activity is a plain HTTP API.** You can authenticate with a bearer token and send JSON without
+installing a package. You do not need to run Nostr or Redis yourself. A typed oRPC client is also
+available in this repository; see [Use a typed client](#11-use-a-typed-client).
 
 You will need:
 
@@ -272,31 +271,30 @@ The smoke test provisions a fresh approved and bound fixture source, receives it
 executes the documented example through the public HTTP routes, verifies duplicate identity and
 score count, and asserts that its output contains no credential.
 
-## 11. Use a typed client inside everything.dev
+## 11. Use a typed client
 
 Every operation in this guide is also reachable over oRPC at `/api/rpc`, with the same
 authentication: a Source API Key in the `Authorization` header for ingestion, and a session cookie
 for anything requiring a signed-in user. The two surfaces are the same handlers, so nothing behaves
 differently between them.
 
+The [`@nearbuilders/activity-client`](https://github.com/NEARBuilders/activity.nearbuilders.org/blob/main/packages/client/) package contains the Activity contract
+and a typed `createActivityClient` helper. It is ready to install from npm once published. The
+helper takes the site's base URL, adds `/api/rpc`, and includes session cookies in browser requests.
+Pass a Source API Key only from server-side code:
+
 ```ts
-import { createORPCClient } from "@orpc/client";
-import { RPCLink } from "@orpc/client/fetch";
+import { createActivityClient } from "@nearbuilders/activity-client";
 
-const client = createORPCClient(
-  new RPCLink({ url: "https://activity.nearbuilders.org/api/rpc" }),
-);
+const activity = createActivityClient("https://activity.nearbuilders.org", {
+  apiKey: process.env.ACTIVITY_API_KEY,
+});
 
-const feed = await client.listActivityEvents({ limit: 5 });
+const feed = await activity.listActivityEvents({ limit: 5 });
 ```
 
-**Which surface you should use depends on where your project lives.**
-
-- **Inside everything.dev.** Add Activity to your `bos.config.json` and run `bos types gen`. You get
-  a generated contract, so `createORPCClient<ApiClient>(...)` is fully typed, and the plugin client
-  composes in-process without an HTTP round trip. This is the better path, and it is what
-  nearbuilders.org uses.
-- **Outside everything.dev.** The contract is not published as an installable package, so an oRPC
-  client here is untyped and you gain nothing over `fetch`. Use the HTTP calls in the sections
-  above, or copy [`examples/activity-client.ts`](https://github.com/NEARBuilders/activity.nearbuilders.org/blob/main/examples/activity-client.ts), which is
-  dependency-free and carries its own types.
+For a browser session, omit `apiKey`. The helper sends Source API Keys as
+`Authorization: Bearer act_...`, matching the HTTP endpoint. If your project runs on
+[everything.dev](https://everything.dev/), you can also add Activity to `bos.config.json` and run
+`bos types gen` to include its contract in the generated in-process client. For a dependency-free
+HTTP client, copy [`examples/activity-client.ts`](https://github.com/NEARBuilders/activity.nearbuilders.org/blob/main/examples/activity-client.ts).

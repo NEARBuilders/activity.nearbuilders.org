@@ -9,7 +9,6 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { ClientOnly, createFileRoute, Link, Outlet, useRouterState } from "@tanstack/react-router";
 import { getAccount, sessionQueryOptions, useAuthClient } from "@/app";
-import { BetaBanner } from "@/components/beta-banner";
 import { BrandElement } from "@/components/brand-element";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
@@ -36,7 +35,6 @@ export const Route = createFileRoute("/_layout")({
 });
 
 function Layout() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isNavigating = useRouterState({ select: (s) => s.status === "pending" });
   return (
     <div className="min-h-dvh bg-background">
@@ -50,7 +48,6 @@ function Layout() {
           />
         )}
       </ClientOnly>
-      {pathname !== "/login" && <BetaBanner />}
       <main className="min-w-0">
         <Outlet />
       </main>

@@ -1,0 +1,31 @@
+{
+  "name": "@nearbuilders/activity-client",
+  "version": "0.1.0",
+  "description": "Typed oRPC client for activity.nearbuilders.org",
+  "type": "module",
+  "sideEffects": false,
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/packages/client/src/index.d.ts",
+      "default": "./dist/packages/client/src/index.js"
+    }
+  },
+  "dependencies": {
+    "@orpc/client": "1.14.3",
+    "@orpc/contract": "1.14.3",
+    "every-plugin": "^2.10.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.8"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "prepack": "bun run build"
+  }
+}
