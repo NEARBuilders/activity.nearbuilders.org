@@ -77,12 +77,12 @@ the API itself. Add `github.pr.merged` and/or `github.issue.closed` as Event Typ
 repositories on the source. Every GitHub login must be explicitly mapped to the NEAR account that
 should receive credit; events from unmapped authors are quarantined until a mapping exists rather
 than being attributed to the wrong person. See
-[`activity-protocol.md`](activity-protocol.md#github-repository-polling) for polling intervals,
+[`activity-protocol.md`](/docs/activity-protocol#github-repository-polling) for polling intervals,
 rate limits, and backfill boundaries.
 
 ## 2. Run the typed example
 
-[`examples/activity-client.ts`](../examples/activity-client.ts) is dependency-free TypeScript built
+[`examples/activity-client.ts`](https://github.com/NEARBuilders/activity.nearbuilders.org/blob/main/examples/activity-client.ts) is dependency-free TypeScript built
 on the standard Fetch, Web Streams, and AbortSignal APIs. It submits an event, repeats the exact
 request, proves both calls return the same event ID, queries the event, receives a second event over
 SSE, and reads the all-time leaderboard.
@@ -253,5 +253,5 @@ const feed = await client.listActivityEvents({ limit: 5 });
   nearbuilders.org uses.
 - **Outside everything.dev.** The contract is not published as an installable package, so an oRPC
   client here is untyped and you gain nothing over `fetch`. Use the HTTP calls in the sections
-  above, or copy [`examples/activity-client.ts`](../examples/activity-client.ts), which is
+  above, or copy [`examples/activity-client.ts`](https://github.com/NEARBuilders/activity.nearbuilders.org/blob/main/examples/activity-client.ts), which is
   dependency-free and carries its own types.

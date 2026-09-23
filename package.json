@@ -77,6 +77,7 @@
     "setup:check": "bun run scripts/setup-check.ts",
     "compose:doctor": "bun run scripts/compose-doctor.ts",
     "seed:demo": "bun run scripts/seed-demo-data.ts",
+    "docs:sync": "bun run scripts/sync-docs.ts",
     "keys:gen": "bun run scripts/keys-gen.ts",
     "build": "bos build",
     "deploy": "bos build --deploy",

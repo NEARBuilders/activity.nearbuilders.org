@@ -8,6 +8,10 @@ The product scope comes from [NEAR Builders' Activity Service proposal](https://
 
 ## Guides
 
+These are published on the site at [`/docs`](https://activity.nearbuilders.org/docs), rendered from
+the Markdown below. Edit the files in `docs/`, then run `bun run docs:sync`; CI fails if the
+published copies are stale.
+
 | If you are | Read |
 | --- | --- |
 | An external project that wants to publish events | [Integrate with Activity](docs/integration-guide.md) |

@@ -16,6 +16,8 @@ import { Route as LayoutLoginRouteImport } from './routes/_layout/login'
 import { Route as LayoutActivityRouteImport } from './routes/_layout/activity'
 import { Route as LayoutAboutRouteImport } from './routes/_layout/about'
 import { Route as LayoutAuthenticatedRouteImport } from './routes/_layout/_authenticated'
+import { Route as LayoutDocsIndexRouteImport } from './routes/_layout/docs/index'
+import { Route as LayoutDocsSlugRouteImport } from './routes/_layout/docs/$slug'
 import { Route as LayoutAuthenticatedSettingsRouteImport } from './routes/_layout/_authenticated/settings'
 import { Route as LayoutAuthenticatedHomeRouteImport } from './routes/_layout/_authenticated/home'
 import { Route as LayoutAuthenticatedAdminRouteImport } from './routes/_layout/_authenticated/admin'
@@ -62,6 +64,16 @@ const LayoutAboutRoute = LayoutAboutRouteImport.update({
 } as any)
 const LayoutAuthenticatedRoute = LayoutAuthenticatedRouteImport.update({
   id: '/_authenticated',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutDocsIndexRoute = LayoutDocsIndexRouteImport.update({
+  id: '/docs/',
+  path: '/docs/',
+  getParentRoute: () => LayoutRoute,
+} as any)
+const LayoutDocsSlugRoute = LayoutDocsSlugRouteImport.update({
+  id: '/docs/$slug',
+  path: '/docs/$slug',
   getParentRoute: () => LayoutRoute,
 } as any)
 const LayoutAuthenticatedSettingsRoute =
@@ -158,6 +170,8 @@ export interface FileRoutesByFullPath {
   '/admin': typeof LayoutAuthenticatedAdminRoute
   '/home': typeof LayoutAuthenticatedHomeRoute
   '/settings': typeof LayoutAuthenticatedSettingsRouteWithChildren
+  '/docs/$slug': typeof LayoutDocsSlugRoute
+  '/docs/': typeof LayoutDocsIndexRoute
   '/accept-invitation/$id': typeof LayoutAuthenticatedAcceptInvitationIdRoute
   '/organizations/$slug': typeof LayoutAuthenticatedOrganizationsSlugRoute
   '/organizations/new': typeof LayoutAuthenticatedOrganizationsNewRoute
@@ -178,6 +192,8 @@ export interface FileRoutesByTo {
   '/activity-sources': typeof LayoutAuthenticatedActivitySourcesRoute
   '/admin': typeof LayoutAuthenticatedAdminRoute
   '/home': typeof LayoutAuthenticatedHomeRoute
+  '/docs/$slug': typeof LayoutDocsSlugRoute
+  '/docs': typeof LayoutDocsIndexRoute
   '/accept-invitation/$id': typeof LayoutAuthenticatedAcceptInvitationIdRoute
   '/organizations/$slug': typeof LayoutAuthenticatedOrganizationsSlugRoute
   '/organizations/new': typeof LayoutAuthenticatedOrganizationsNewRoute
@@ -202,6 +218,8 @@ export interface FileRoutesById {
   '/_layout/_authenticated/admin': typeof LayoutAuthenticatedAdminRoute
   '/_layout/_authenticated/home': typeof LayoutAuthenticatedHomeRoute
   '/_layout/_authenticated/settings': typeof LayoutAuthenticatedSettingsRouteWithChildren
+  '/_layout/docs/$slug': typeof LayoutDocsSlugRoute
+  '/_layout/docs/': typeof LayoutDocsIndexRoute
   '/_layout/_authenticated/accept-invitation/$id': typeof LayoutAuthenticatedAcceptInvitationIdRoute
   '/_layout/_authenticated/organizations/$slug': typeof LayoutAuthenticatedOrganizationsSlugRoute
   '/_layout/_authenticated/organizations/new': typeof LayoutAuthenticatedOrganizationsNewRoute
@@ -225,6 +243,8 @@ export interface FileRouteTypes {
     | '/admin'
     | '/home'
     | '/settings'
+    | '/docs/$slug'
+    | '/docs/'
     | '/accept-invitation/$id'
     | '/organizations/$slug'
     | '/organizations/new'
@@ -245,6 +265,8 @@ export interface FileRouteTypes {
     | '/activity-sources'
     | '/admin'
     | '/home'
+    | '/docs/$slug'
+    | '/docs'
     | '/accept-invitation/$id'
     | '/organizations/$slug'
     | '/organizations/new'
@@ -268,6 +290,8 @@ export interface FileRouteTypes {
     | '/_layout/_authenticated/admin'
     | '/_layout/_authenticated/home'
     | '/_layout/_authenticated/settings'
+    | '/_layout/docs/$slug'
+    | '/_layout/docs/'
     | '/_layout/_authenticated/accept-invitation/$id'
     | '/_layout/_authenticated/organizations/$slug'
     | '/_layout/_authenticated/organizations/new'
@@ -333,6 +357,20 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof LayoutAuthenticatedRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/docs/': {
+      id: '/_layout/docs/'
+      path: '/docs'
+      fullPath: '/docs/'
+      preLoaderRoute: typeof LayoutDocsIndexRouteImport
+      parentRoute: typeof LayoutRoute
+    }
+    '/_layout/docs/$slug': {
+      id: '/_layout/docs/$slug'
+      path: '/docs/$slug'
+      fullPath: '/docs/$slug'
+      preLoaderRoute: typeof LayoutDocsSlugRouteImport
       parentRoute: typeof LayoutRoute
     }
     '/_layout/_authenticated/settings': {
@@ -503,6 +541,8 @@ interface LayoutRouteChildren {
   LayoutLoginRoute: typeof LayoutLoginRoute
   LayoutSkillRoute: typeof LayoutSkillRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
+  LayoutDocsSlugRoute: typeof LayoutDocsSlugRoute
+  LayoutDocsIndexRoute: typeof LayoutDocsIndexRoute
 }
 
 const LayoutRouteChildren: LayoutRouteChildren = {
@@ -512,6 +552,8 @@ const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutLoginRoute: LayoutLoginRoute,
   LayoutSkillRoute: LayoutSkillRoute,
   LayoutIndexRoute: LayoutIndexRoute,
+  LayoutDocsSlugRoute: LayoutDocsSlugRoute,
+  LayoutDocsIndexRoute: LayoutDocsIndexRoute,
 }
 
 const LayoutRouteWithChildren =
