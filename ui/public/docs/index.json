@@ -7,6 +7,21 @@
     "headings": [
       {
         "depth": 2,
+        "text": "What Activity is",
+        "slug": "what-activity-is"
+      },
+      {
+        "depth": 2,
+        "text": "Why integrate",
+        "slug": "why-integrate"
+      },
+      {
+        "depth": 2,
+        "text": "What it costs",
+        "slug": "what-it-costs"
+      },
+      {
+        "depth": 2,
         "text": "Before you start",
         "slug": "before-you-start"
       },

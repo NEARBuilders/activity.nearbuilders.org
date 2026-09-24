@@ -1,7 +1,7 @@
 ## What Activity is
 
 Activity is a shared record of what people do across the NEAR ecosystem. Your project reports an
-event someone submitted feedback, merged a pull request, completed a task  and Activity signs it
+event — someone submitted feedback, merged a pull request, completed a task — and Activity signs it
 with your project's own key, publishes it to a Nostr relay, and makes it publicly verifiable.
 Accepted events are never edited or deleted.
 
@@ -23,7 +23,10 @@ A plain HTTP request per event. No library to install, no infrastructure to run.
 one on-chain transaction and an administrator's approval; after that you are sending events.
 
 ---
-The HTTP examples use the deployed Activity API at https://activity.nearbuilders.org/api. If you are running Activity locally, replace it with http://localhost:3000/api.
+
+This guide takes an external project from registration to a verified event, live updates, and a
+leaderboard result. The HTTP examples use `https://activity.nearbuilders.org/api`; if you are
+running Activity locally, replace it with `http://localhost:3000/api`.
 
 ## Before you start
 
