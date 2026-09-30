@@ -4,6 +4,7 @@ import {
   CopyIcon as Copy,
   LinkIcon as Link2,
   ArrowsClockwiseIcon as RefreshCw,
+  TerminalWindowIcon as TerminalWindow,
   WalletIcon as Wallet,
 } from "@phosphor-icons/react/ssr";
 import { Link } from "@tanstack/react-router";
@@ -221,25 +222,34 @@ export function ActivitySetupComplete({
       </div>
 
       {command && (
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between gap-2">
+        <div className="space-y-2">
+          <div className="space-y-0.5">
             <p className="text-sm font-medium text-foreground">Send your first event</p>
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => copyText(command, "Command")}
-            >
-              <Copy />
-              Copy
-            </Button>
+            <p className="text-xs text-muted-foreground">
+              Run this from a terminal. It returns an event ID, and the status below updates.
+            </p>
           </div>
-          <pre className="overflow-x-auto rounded-lg bg-muted p-3 font-mono text-xs text-foreground">
-            {command}
-          </pre>
-          <p className="text-xs text-muted-foreground">
-            Run it from a terminal. It should return an event ID.
-          </p>
+          <div className="overflow-hidden rounded-[10px] border border-border bg-muted">
+            <div className="flex items-center justify-between gap-2 border-b border-border py-1 pr-1 pl-3">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                <TerminalWindow className="size-3.5" />
+                Terminal
+              </span>
+              <Button
+                type="button"
+                size="xs"
+                variant="ghost"
+                aria-label="Copy command"
+                onClick={() => copyText(command, "Command")}
+              >
+                <Copy />
+                Copy
+              </Button>
+            </div>
+            <pre className="overflow-x-auto p-4 font-mono text-xs leading-relaxed text-foreground">
+              <code>{command}</code>
+            </pre>
+          </div>
         </div>
       )}
 
