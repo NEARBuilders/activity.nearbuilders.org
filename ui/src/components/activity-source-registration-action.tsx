@@ -26,13 +26,13 @@ function OrganizationAction() {
   const { organizations, activeOrgId, handleOrgSwitch } = useOrganizationSwitcher();
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
       <OrgSwitcher
         organizations={organizations}
         activeOrgId={activeOrgId}
         onSwitch={handleOrgSwitch}
       />
-      <Button asChild variant="outline" size="sm">
+      <Button asChild variant="outline" className="w-full sm:w-auto">
         <Link to="/organizations/new">Create an organization</Link>
       </Button>
     </div>
@@ -69,7 +69,7 @@ function NearAction() {
   return (
     <Button
       type="button"
-      size="sm"
+      className="w-full sm:w-auto"
       onClick={() => connectNear.mutate()}
       disabled={connectNear.isPending}
     >

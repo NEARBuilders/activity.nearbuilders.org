@@ -1,11 +1,17 @@
 import {
   WarningIcon as AlertTriangle,
-  ClockIcon as Clock3,
+  BroadcastIcon as Broadcast,
+  CaretDownIcon as CaretDown,
   GitPullRequestIcon as GitPullRequest,
   HeartIcon as Heart,
+  MagnifyingGlassIcon as MagnifyingGlass,
   ShieldCheckIcon as ShieldCheck,
+  TagIcon as Tag,
+  UserIcon as User,
+  XIcon as X,
 } from "@phosphor-icons/react/ssr";
-import { useState } from "react";
+import { type ReactNode, useState } from "react";
+import { ActivityTimestamp } from "@/components/activity-timestamp";
 import { ActivityTrustBadge } from "@/components/ui/activity-trust-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -87,6 +93,10 @@ export function ActivityFeed({
   const [source, setSource] = useState(filters.source ?? "");
   const [type, setType] = useState(filters.type ?? "");
   const [actor, setActor] = useState(filters.actor ?? "");
+  const setters = { source: setSource, type: setType, actor: setActor };
+  const activeFilters = (
+    Object.entries(filters) as Array<[keyof ActivityFeedFilters, string]>
+  ).filter(([, value]) => Boolean(value));
 
   return (
     <div className="space-y-6">
@@ -94,7 +104,7 @@ export function ActivityFeed({
         <h1 className="text-xl font-semibold tracking-tight text-foreground">Activity feed</h1>
         {liveStatus && (
           <span
-            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground"
+            className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground capitalize"
             role="status"
           >
             <span
@@ -113,60 +123,82 @@ export function ActivityFeed({
         )}
       </header>
 
-      <form
-        className="grid grid-cols-1 gap-3 border-b pb-5 sm:grid-cols-3"
-        onSubmit={(formEvent) => {
-          formEvent.preventDefault();
-          onApplyFilters({
-            source: source.trim() || undefined,
-            type: type.trim() || undefined,
-            actor: actor.trim() || undefined,
-          });
-        }}
-      >
-        <div className="space-y-1.5">
-          <Label htmlFor="activity-source-filter">Activity Source</Label>
-          <Input
+      <div className="space-y-3">
+        <form
+          className="flex flex-col gap-2 rounded-xl border border-border bg-card p-2 sm:flex-row sm:items-center sm:gap-0"
+          onSubmit={(formEvent) => {
+            formEvent.preventDefault();
+            onApplyFilters({
+              source: source.trim() || undefined,
+              type: type.trim() || undefined,
+              actor: actor.trim() || undefined,
+            });
+          }}
+        >
+          <FilterField
             id="activity-source-filter"
+            label="Activity Source"
+            icon={<Broadcast />}
             value={source}
-            onChange={(event) => setSource(event.target.value)}
-            placeholder="feedback-rounds"
+            onChange={setSource}
+            placeholder="Source"
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="activity-type-filter">Event type</Label>
-          <Input
+          <FilterField
             id="activity-type-filter"
+            label="Event type"
+            icon={<Tag />}
             value={type}
-            onChange={(event) => setType(event.target.value)}
-            placeholder="feedback.submitted"
+            onChange={setType}
+            placeholder="Event type"
           />
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="activity-actor-filter">NEAR actor</Label>
-          <Input
+          <FilterField
             id="activity-actor-filter"
+            label="NEAR actor"
+            icon={<User />}
             value={actor}
-            onChange={(event) => setActor(event.target.value)}
-            placeholder="alice.near"
+            onChange={setActor}
+            placeholder="NEAR account"
           />
-        </div>
-        <div className="flex flex-wrap gap-2 sm:col-span-3">
-          <Button type="submit">Apply filters</Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              setSource("");
-              setType("");
-              setActor("");
-              onApplyFilters({});
-            }}
-          >
-            Clear
+          <Button type="submit" className="w-full sm:ml-2 sm:w-auto">
+            <MagnifyingGlass />
+            Apply filters
           </Button>
-        </div>
-      </form>
+        </form>
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2">
+            {activeFilters.map(([key, value]) => (
+              <Badge key={key} variant="secondary" className="gap-1 pr-1 font-normal">
+                <span className="text-muted-foreground">{filterLabels[key]}:</span>
+                <span className="font-mono">{value}</span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${filterLabels[key]} filter`}
+                  className="rounded-full p-0.5 hover:bg-background"
+                  onClick={() => {
+                    setters[key]("");
+                    onApplyFilters({ ...filters, [key]: undefined });
+                  }}
+                >
+                  <X className="size-3" />
+                </button>
+              </Badge>
+            ))}
+            <Button
+              type="button"
+              size="xs"
+              variant="ghost"
+              onClick={() => {
+                setSource("");
+                setType("");
+                setActor("");
+                onApplyFilters({});
+              }}
+            >
+              Clear
+            </Button>
+          </div>
+        )}
+      </div>
 
       {status === "loading" ? (
         <div role="status" aria-live="polite" className="space-y-6 py-2">
@@ -234,83 +266,81 @@ export function ActivityFeed({
                 };
                 return (
                   <li key={event.id}>
-                    <Card className="gap-3 p-5">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="flex items-start gap-3">
-                          <Avatar className="mt-0.5">
-                            <AvatarFallback>{getInitials(event.actor)}</AvatarFallback>
-                          </Avatar>
-                          <div className="space-y-1">
-                            <p className="font-semibold text-foreground">{event.actor}</p>
-                            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                              <span className="font-mono">{event.type}</span>
-                              <span>{event.provenance.sourceDisplayName}</span>
-                              <span className="font-mono">{event.source}</span>
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2 pt-1">
-                              <Badge variant="secondary">
-                                <ShieldCheck />
-                                Verified signature
-                              </Badge>
-                              <ActivityTrustBadge
-                                trustStatus={event.provenance.trustStatus}
-                                scoreMultiplier={event.provenance.scoreMultiplier}
-                              />
-                              {event.provenance.integration === "github" &&
-                                event.type.startsWith("github.") && (
-                                  <Badge variant="outline">
-                                    <GitPullRequest />
-                                    GitHub
-                                  </Badge>
-                                )}
-                              {event.provenance.signingIdentityStatus === "retired" && (
-                                <Badge variant="outline">Historical signing key</Badge>
-                              )}
-                            </div>
+                    <Card className="gap-4 p-4 sm:p-5">
+                      <div className="flex items-start gap-3">
+                        <Avatar className="size-9">
+                          <AvatarFallback className="text-xs">
+                            {getInitials(event.actor)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline justify-between gap-3">
+                            <p className="truncate font-semibold text-foreground">{event.actor}</p>
+                            <ActivityTimestamp value={event.timestamp} className="shrink-0" />
                           </div>
+                          <p className="truncate text-xs text-muted-foreground">
+                            via{" "}
+                            <span title={event.source}>{event.provenance.sourceDisplayName}</span>
+                          </p>
                         </div>
-                        <time
-                          dateTime={event.timestamp}
-                          className="flex items-center gap-1.5 text-xs text-muted-foreground"
-                        >
-                          <Clock3 className="h-3.5 w-3.5" />
-                          {new Date(event.timestamp).toLocaleString("en-US", { timeZone: "UTC" })}{" "}
-                          UTC
-                        </time>
                       </div>
-                      <p className="text-sm leading-relaxed">
+                      <p className="text-sm leading-relaxed text-foreground">
                         {eventSummary(event.payload, event.type)}
                       </p>
-                      <details className="text-xs text-muted-foreground">
-                        <summary className="cursor-pointer hover:text-foreground">
-                          Event details
-                        </summary>
-                        <pre className="mt-3 overflow-x-auto whitespace-pre-wrap break-words font-mono">
-                          {payloadSummary(event.payload)}
-                        </pre>
-                        <p className="mt-2">
-                          The signature matches this Activity Source&apos;s registered key. Payload
-                          claims are not independently verified.
-                        </p>
-                      </details>
-                      <div className="flex items-center gap-2 border-t pt-3">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <Badge variant="outline" className="font-mono font-normal">
+                          {event.type}
+                        </Badge>
+                        <Badge variant="outline" className="text-muted-foreground">
+                          <ShieldCheck />
+                          Verified signature
+                        </Badge>
+                        <ActivityTrustBadge
+                          trustStatus={event.provenance.trustStatus}
+                          scoreMultiplier={event.provenance.scoreMultiplier}
+                        />
+                        {event.provenance.integration === "github" &&
+                          event.type.startsWith("github.") && (
+                            <Badge variant="outline">
+                              <GitPullRequest />
+                              GitHub
+                            </Badge>
+                          )}
+                        {event.provenance.signingIdentityStatus === "retired" && (
+                          <Badge variant="outline">Historical signing key</Badge>
+                        )}
+                      </div>
+                      <ActivityEventDetails payload={event.payload} />
+                      <div className="flex items-center border-t border-border pt-3">
                         <Button
                           type="button"
                           size="sm"
-                          variant={endorsement.endorsedByCurrentUser ? "secondary" : "ghost"}
+                          variant="outline"
+                          className={cn(
+                            "rounded-full",
+                            endorsement.endorsedByCurrentUser &&
+                              "border-brand-accent/50 bg-brand-accent/10 hover:bg-brand-accent/20",
+                          )}
                           aria-pressed={endorsement.endorsedByCurrentUser}
+                          aria-label={endorsement.endorsedByCurrentUser ? "Endorsed" : "Endorse"}
                           disabled={!canEndorse || pendingEndorsementId === event.id}
                           title={canEndorse ? undefined : "Sign in to endorse Activity events"}
                           onClick={() => onToggleEndorsement?.(event.id)}
                         >
-                          <Heart />
+                          <Heart
+                            weight={endorsement.endorsedByCurrentUser ? "fill" : "regular"}
+                            className={cn(endorsement.endorsedByCurrentUser && "text-brand-accent")}
+                          />
                           {pendingEndorsementId === event.id
                             ? "Updating…"
                             : endorsement.endorsedByCurrentUser
                               ? "Endorsed"
                               : "Endorse"}
+                          <span aria-hidden="true" className="text-muted-foreground tabular-nums">
+                            {endorsement.totalCount}
+                          </span>
                         </Button>
-                        <span className="text-sm text-muted-foreground" aria-live="polite">
+                        <span className="sr-only" aria-live="polite">
                           {endorsement.totalCount}{" "}
                           {endorsement.totalCount === 1 ? "endorsement" : "endorsements"}
                         </span>
@@ -342,9 +372,119 @@ export function ActivityFeed({
   );
 }
 
+const filterLabels: Record<keyof ActivityFeedFilters, string> = {
+  source: "Source",
+  type: "Type",
+  actor: "Actor",
+};
+
+function FilterField({
+  id,
+  label,
+  icon,
+  value,
+  onChange,
+  placeholder,
+}: {
+  id: string;
+  label: string;
+  icon: ReactNode;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+}) {
+  return (
+    <div className="relative flex-1 border-b border-border sm:border-r sm:border-b-0">
+      <Label htmlFor={id} className="sr-only">
+        {label}
+      </Label>
+      <span className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground [&_svg]:size-4">
+        {icon}
+      </span>
+      <Input
+        id={id}
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        placeholder={placeholder}
+        className="border-0 bg-transparent pl-9 shadow-none focus-visible:ring-0 dark:bg-transparent"
+      />
+    </div>
+  );
+}
+
 function payloadSummary(payload: unknown): string {
   const summary = JSON.stringify(payload, null, 2) ?? String(payload);
-  return summary.length > 500 ? `${summary.slice(0, 497)}…` : summary;
+  return summary.length > 2000 ? `${summary.slice(0, 1997)}…` : summary;
+}
+
+function humanizeKey(key: string): string {
+  const spaced = key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ");
+  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
+}
+
+function PayloadValue({ value }: { value: unknown }) {
+  if (value === null || value === undefined || value === "") {
+    return <span className="text-muted-foreground">—</span>;
+  }
+  if (typeof value === "string" && /^https?:\/\//.test(value)) {
+    return (
+      <a
+        href={value}
+        target="_blank"
+        rel="noreferrer"
+        className="break-all underline underline-offset-2 hover:text-foreground"
+      >
+        {value}
+      </a>
+    );
+  }
+  if (typeof value === "object") {
+    return <code className="break-all font-mono">{JSON.stringify(value)}</code>;
+  }
+  return <span className="break-words">{String(value)}</span>;
+}
+
+function ActivityEventDetails({ payload }: { payload: unknown }) {
+  const entries =
+    payload && typeof payload === "object" && !Array.isArray(payload)
+      ? Object.entries(payload)
+      : [];
+
+  return (
+    <details className="group rounded-lg border border-border">
+      <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground [&::-webkit-details-marker]:hidden">
+        Event details
+        <CaretDown className="size-3.5 transition-transform group-open:rotate-180" />
+      </summary>
+      <div className="space-y-3 border-t border-border px-3 py-3 text-xs">
+        {entries.length > 0 ? (
+          <dl className="grid gap-x-4 gap-y-2 sm:grid-cols-[9rem_1fr]">
+            {entries.map(([key, value]) => (
+              <div key={key} className="contents">
+                <dt className="text-muted-foreground">{humanizeKey(key)}</dt>
+                <dd className="text-foreground">
+                  <PayloadValue value={value} />
+                </dd>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+        <details>
+          <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
+            Raw JSON
+          </summary>
+          <pre className="mt-2 overflow-x-auto rounded-md bg-muted p-3 font-mono whitespace-pre-wrap break-words text-foreground">
+            {payloadSummary(payload)}
+          </pre>
+        </details>
+        <p className="flex items-start gap-1.5 text-muted-foreground">
+          <ShieldCheck className="mt-px size-3.5 shrink-0" />
+          The signature matches this Activity Source&apos;s registered key. Payload claims are not
+          independently verified.
+        </p>
+      </div>
+    </details>
+  );
 }
 
 function eventSummary(payload: unknown, type: string): string {

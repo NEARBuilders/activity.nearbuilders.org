@@ -2,7 +2,9 @@ import { ArrowRightIcon, BroadcastIcon, BuildingsIcon, GearIcon } from "@phospho
 import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { sessionQueryOptions, useApiClient, useAuthClient } from "@/app";
+import { ActivityTimestamp } from "@/components/activity-timestamp";
 import { PageContainer } from "@/components/layout/page-container";
+import { ActivityRankBadge } from "@/components/ui/activity-leaderboard";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -40,14 +42,16 @@ function Home() {
   );
   return (
     <PageContainer variant="wide">
-      <header className="mb-8 flex items-center justify-between gap-4">
+      <header className="mb-8 space-y-1">
         <h1 className="text-xl font-semibold tracking-tight">Overview</h1>
-        <span className="text-sm text-muted-foreground">{session?.user.name}</span>
+        {session?.user.name && (
+          <p className="text-sm text-muted-foreground">Welcome back, {session.user.name}</p>
+        )}
       </header>
-      <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_18rem]">
-        <section className="min-w-0" aria-labelledby="recent-activity">
-          <div className="flex items-center justify-between gap-4 border-b pb-3">
-            <h2 id="recent-activity" className="text-sm font-medium">
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-8">
+        <section className="min-w-0 space-y-3" aria-labelledby="recent-activity">
+          <div className="flex items-center justify-between gap-4">
+            <h2 id="recent-activity" className="text-base font-semibold">
               Recent activity
             </h2>
             <Link
@@ -87,36 +91,43 @@ function Home() {
               No activity yet. Connect a source to start publishing.
             </p>
           ) : (
-            <ol className="divide-y">
-              {feed.data.data.slice(0, 6).map((event) => (
-                <li key={event.id} className="flex gap-3 py-4">
-                  <Avatar className="mt-0.5">
-                    <AvatarFallback>{getInitials(event.actor)}</AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <span className="text-sm font-medium break-all">{event.actor}</span>
-                      <time className="text-xs text-muted-foreground" dateTime={event.timestamp}>
-                        {new Date(event.timestamp).toLocaleDateString("en-US", {
-                          month: "short",
-                          day: "numeric",
-                          timeZone: "UTC",
-                        })}
-                      </time>
+            <Card className="gap-0 overflow-hidden py-0">
+              <ol className="divide-y divide-border">
+                {feed.data.data.slice(0, 6).map((event) => (
+                  <li key={event.id} className="flex gap-3 px-4 py-3.5">
+                    <Avatar className="size-9">
+                      <AvatarFallback className="text-xs">
+                        {getInitials(event.actor)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="truncate text-sm font-medium">{event.actor}</span>
+                        <ActivityTimestamp value={event.timestamp} className="shrink-0" />
+                      </div>
+                      <p className="text-sm text-foreground">
+                        {eventTitle(event.payload, event.type)}
+                      </p>
+                      <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+                        <span>{event.provenance.sourceDisplayName}</span>
+                        <span aria-hidden="true">·</span>
+                        <span className="font-mono">{event.type}</span>
+                      </div>
                     </div>
-                    <p className="text-sm">{eventTitle(event.payload, event.type)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {event.provenance.sourceDisplayName}
-                    </p>
-                  </div>
-                </li>
-              ))}
-            </ol>
+                  </li>
+                ))}
+              </ol>
+            </Card>
           )}
         </section>
         <aside className="space-y-6">
-          <Card className="gap-4 p-5">
-            <h2 className="text-sm font-medium">{activeOrg?.name ?? "Your workspace"}</h2>
+          <Card className="gap-3 p-4">
+            <div className="px-1">
+              <p className="text-xs text-muted-foreground">Workspace</p>
+              <h2 className="truncate text-base font-semibold">
+                {activeOrg?.name ?? "Your workspace"}
+              </h2>
+            </div>
             <nav className="flex flex-col gap-1 -mx-2" aria-label="Workspace actions">
               <Button asChild variant="ghost" className="justify-start">
                 <Link to="/activity-sources">
@@ -141,10 +152,18 @@ function Home() {
               </Button>
             </nav>
           </Card>
-          <section aria-labelledby="weekly-builders">
-            <h2 id="weekly-builders" className="border-b pb-3 text-sm font-medium">
-              Leading this week
-            </h2>
+          <section className="space-y-3" aria-labelledby="weekly-builders">
+            <div className="flex items-center justify-between gap-4">
+              <h2 id="weekly-builders" className="text-base font-semibold">
+                Leading this week
+              </h2>
+              <Link
+                to="/activity"
+                className="inline-flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground"
+              >
+                View all <ArrowRightIcon aria-hidden="true" />
+              </Link>
+            </div>
             {leaderboard.isPending ? (
               <div role="status" aria-live="polite" className="space-y-3 py-4">
                 <span className="sr-only">Loading rankings…</span>
@@ -167,16 +186,25 @@ function Home() {
             ) : !leaderboard.data?.data.length ? (
               <p className="py-4 text-xs text-muted-foreground">No contributions this week.</p>
             ) : (
-              <ol className="divide-y">
-                {leaderboard.data.data.slice(0, 3).map((entry) => (
-                  <li key={entry.actor} className="flex items-center gap-3 py-3 text-sm">
-                    <span className="min-w-0 flex-1 truncate">{entry.actor}</span>
-                    <span className="tabular-nums text-xs text-muted-foreground">
-                      {entry.score} pts
-                    </span>
-                  </li>
-                ))}
-              </ol>
+              <Card className="gap-0 overflow-hidden py-0">
+                <ol className="divide-y divide-border">
+                  {leaderboard.data.data.slice(0, 5).map((entry) => (
+                    <li key={entry.actor} className="flex items-center gap-3 px-4 py-3 text-sm">
+                      <ActivityRankBadge rank={entry.rank} />
+                      <Avatar className="size-7">
+                        <AvatarFallback className="text-[10px]">
+                          {getInitials(entry.actor)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="min-w-0 flex-1 truncate">{entry.actor}</span>
+                      <span className="text-sm font-semibold tabular-nums">
+                        {entry.score}
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">pts</span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </Card>
             )}
           </section>
         </aside>

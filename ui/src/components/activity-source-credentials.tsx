@@ -109,7 +109,7 @@ export function ActivitySigningKeyPanel({
         <Button
           type="button"
           variant="outline"
-          className="shrink-0 self-start sm:self-auto"
+          className="w-full shrink-0 sm:w-auto"
           onClick={onRotate}
           disabled={isRotating}
         >
@@ -242,10 +242,10 @@ function ApiKeyRow({
   onRevoke: (apiKeyId: string) => void | Promise<void>;
 }) {
   return (
-    <li className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+    <li className="flex items-center justify-between gap-3 px-4 py-3">
       <div className="min-w-0 space-y-1">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-sm font-medium text-foreground">{apiKey.name}</span>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="truncate text-sm font-medium text-foreground">{apiKey.name}</span>
           <code className="font-mono text-xs text-muted-foreground">{apiKey.prefix}…</code>
         </div>
         <p className="text-xs text-muted-foreground">
