@@ -4,6 +4,7 @@ import {
   XIcon as X,
 } from "@phosphor-icons/react/ssr";
 import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type {
   ActivityOnboardingStep,
@@ -70,11 +71,15 @@ export function ActivityOnboardingProgress({
   nearAccountId,
   action,
   complete,
+  title,
+  onCancel,
 }: {
   steps: ActivityOnboardingStep[];
   nearAccountId: string | null;
   action?: ReactNode;
   complete?: ReactNode;
+  title?: string;
+  onCancel?: () => void;
 }) {
   const activeIndex = steps.findIndex((step) => step.status !== "complete");
 
@@ -91,7 +96,17 @@ export function ActivityOnboardingProgress({
         <p className="text-xs font-medium text-muted-foreground">
           Setup · Step {activeIndex + 1} of {steps.length}
         </p>
-        <p className="text-xs font-medium text-foreground md:hidden">{stepLabel[activeStep.id]}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-medium text-foreground md:hidden">
+            {stepLabel[activeStep.id]}
+          </p>
+          {onCancel && (
+            <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+              <X />
+              Cancel
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-1 md:hidden" aria-hidden="true">
@@ -135,7 +150,7 @@ export function ActivityOnboardingProgress({
 
       <div className="space-y-4 rounded-lg bg-muted p-4">
         <div className="space-y-1">
-          <h2 className="text-base font-semibold text-foreground">{guide.title}</h2>
+          <h2 className="text-base font-semibold text-foreground">{title ?? guide.title}</h2>
           <p className="text-sm text-muted-foreground">{guide.description(nearAccountId)}</p>
         </div>
         {action}

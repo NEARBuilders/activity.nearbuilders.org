@@ -40,7 +40,14 @@ function githubQueryKey(sourceId: string) {
   return ["activity-source-github", sourceId] as const;
 }
 
+interface ActivitySourcesSearch {
+  setup?: string;
+}
+
 export const Route = createFileRoute("/_layout/_authenticated/activity-sources")({
+  validateSearch: (search: Record<string, unknown>): ActivitySourcesSearch => ({
+    setup: typeof search.setup === "string" ? search.setup : undefined,
+  }),
   head: () => ({
     meta: [{ title: "Activity Sources | NEAR Builders" }],
   }),
@@ -73,6 +80,8 @@ function ActivitySourcesPage() {
   const authClient = useAuthClient();
   const queryClient = useQueryClient();
   const { auth } = Route.useRouteContext();
+  const { setup: setupSearch } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const nearState = authClient.useNearState();
   const isClient = useIsClient();
 
@@ -185,7 +194,14 @@ function ActivitySourcesPage() {
     linkedNearAccountsPending && resolvedAccess === "near-required" ? null : resolvedAccess;
 
   const isOrganizationOwner = Boolean(activeOrganizationId) && activeOrganizationRole === "owner";
-  const setupSource = isOrganizationOwner ? pickOnboardingSource(sources) : null;
+  const isRegisteringAnother = setupSearch === "new";
+  const focusedSource = sources.find(({ sourceId }) => sourceId === setupSearch);
+  const setupSource =
+    isOrganizationOwner && !isRegisteringAnother
+      ? (focusedSource ?? pickOnboardingSource(sources))
+      : null;
+  const focusSetup = (setup?: string) =>
+    navigate({ search: setup ? { setup } : {}, replace: true });
   const setupCredentialsEnabled = setupSource?.approvalStatus === "approved";
   const setup = useActivitySourceCredentials(setupSource, setupCredentialsEnabled);
   const steps = getActivityOnboardingSteps({
@@ -244,6 +260,7 @@ function ActivitySourcesPage() {
       isSubmitting={createSource.isPending}
       onCreate={async (input) => {
         await createSource.mutateAsync(input);
+        focusSetup(input.sourceId);
       }}
     />
   );
@@ -305,12 +322,15 @@ function ActivitySourcesPage() {
         isAdmin={auth.isAdmin}
         registrationAccess={registrationAccess}
         showRegistration={setupComplete}
+        onRegisterAnother={() => focusSetup("new")}
         onboarding={
           setupReady ? (
             <ActivityOnboardingProgress
               steps={steps}
               nearAccountId={setupSource?.nearAccountId ?? null}
               action={renderSetupAction()}
+              title={isRegisteringAnother ? "Register another source" : undefined}
+              onCancel={isRegisteringAnother ? () => focusSetup() : undefined}
               complete={
                 setupSource ? (
                   <ActivitySetupComplete

@@ -1,11 +1,5 @@
-import {
-  BroadcastIcon,
-  GavelIcon,
-  PlusIcon,
-  ShieldCheckIcon,
-  XIcon,
-} from "@phosphor-icons/react/ssr";
-import { type ReactNode, useState } from "react";
+import { BroadcastIcon, GavelIcon, PlusIcon, ShieldCheckIcon } from "@phosphor-icons/react/ssr";
+import type { ReactNode } from "react";
 import {
   ActivitySourceCard,
   type ActivitySourceCardTab,
@@ -21,7 +15,6 @@ import type {
 import { EmptyState } from "@/components/empty-state";
 import { ActivitySourceTrustCard } from "@/components/ui/activity-source-trust-card";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { ActivitySourceRegistrationAccess } from "@/lib/activity-source-permissions";
 
@@ -49,6 +42,7 @@ interface ActivitySourcesDashboardProps {
   registrationAction?: ReactNode;
   onboarding?: ReactNode;
   showRegistration?: boolean;
+  onRegisterAnother?: () => void;
 }
 
 export function ActivitySourcesDashboard({
@@ -67,8 +61,8 @@ export function ActivitySourcesDashboard({
   registrationAction,
   onboarding,
   showRegistration = true,
+  onRegisterAnother,
 }: ActivitySourcesDashboardProps) {
-  const [isRegisteringAnother, setIsRegisteringAnother] = useState(false);
   const canRegisterAnother = sources.length > 0 && registrationAccess === "allowed";
 
   const yourSources = (
@@ -104,8 +98,8 @@ export function ActivitySourcesDashboard({
     <div className="space-y-8">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">Activity Sources</h1>
-        {showRegistration && canRegisterAnother && !isRegisteringAnother && (
-          <Button type="button" onClick={() => setIsRegisteringAnother(true)}>
+        {showRegistration && canRegisterAnother && onRegisterAnother && (
+          <Button type="button" onClick={onRegisterAnother}>
             <PlusIcon />
             Register another source
           </Button>
@@ -114,48 +108,14 @@ export function ActivitySourcesDashboard({
 
       {onboarding}
 
-      {showRegistration &&
-        (canRegisterAnother ? (
-          isRegisteringAnother && (
-            <Card className="gap-6 p-5 sm:p-6">
-              <div className="flex items-start justify-between gap-3">
-                <div className="space-y-1">
-                  <h2 className="text-base font-semibold text-foreground">
-                    Register another source
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    It goes to a Platform Administrator for review, like your first one.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Cancel registration"
-                  onClick={() => setIsRegisteringAnother(false)}
-                >
-                  <XIcon />
-                </Button>
-              </div>
-              <ActivitySourceRegistration
-                access={registrationAccess}
-                embedded
-                isSubmitting={isSubmitting}
-                onCreate={async (input) => {
-                  await onCreate(input);
-                  setIsRegisteringAnother(false);
-                }}
-              />
-            </Card>
-          )
-        ) : (
-          <ActivitySourceRegistration
-            access={registrationAccess}
-            isSubmitting={isSubmitting}
-            onCreate={onCreate}
-            registrationAction={registrationAction}
-          />
-        ))}
+      {showRegistration && !canRegisterAnother && (
+        <ActivitySourceRegistration
+          access={registrationAccess}
+          isSubmitting={isSubmitting}
+          onCreate={onCreate}
+          registrationAction={registrationAction}
+        />
+      )}
 
       {isAdmin ? (
         <Tabs defaultValue="sources" className="gap-6">

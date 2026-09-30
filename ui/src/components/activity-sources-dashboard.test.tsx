@@ -49,6 +49,7 @@ describe("ActivitySourcesDashboard", () => {
         onCreate={vi.fn()}
         onReview={vi.fn()}
         onTrust={vi.fn()}
+        onRegisterAnother={vi.fn()}
       />,
     );
 
