@@ -292,7 +292,7 @@ export const ActivityCredentialsLive = (
             }
             if (result.source.nearAccountId !== nearAccountId) {
               throw new ORPCError("FORBIDDEN", {
-                message: "Connect the Activity Source NEAR account to authorize this binding",
+                message: `Only ${result.source.nearAccountId} can link this source. You are signed in as ${nearAccountId}.`,
               });
             }
             const now = Math.floor(Date.now() / 1_000);
@@ -336,8 +336,8 @@ export const ActivityCredentialsLive = (
                 key,
                 value,
                 args: { [key]: value },
-                gas: "300000000000000",
-                attachedDeposit: "10000000000000000000000",
+                gas: "20000000000000",
+                attachedDeposit: "0",
               };
             } finally {
               privateKey.fill(0);

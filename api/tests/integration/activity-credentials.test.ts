@@ -126,7 +126,7 @@ describe("Activity source credentials", () => {
 
     await expect(
       otherNearAccount.prepareActivitySigningIdentityBinding({ sourceId: "binding-source" }),
-    ).rejects.toThrow("Connect the Activity Source NEAR account");
+    ).rejects.toThrow(/^Only .+ can link this source\. You are signed in as /);
 
     const prepared = await owner.prepareActivitySigningIdentityBinding({
       sourceId: "binding-source",
@@ -139,8 +139,8 @@ describe("Activity source credentials", () => {
       methodName: "__fastdata_kv",
       key: "nostr/binding-source.near",
       args: { "nostr/binding-source.near": prepared.value },
-      gas: "300000000000000",
-      attachedDeposit: "10000000000000000000000",
+      gas: "20000000000000",
+      attachedDeposit: "0",
     });
     expect(bindingValue).toMatchObject({
       npub: identity.publicKey,

@@ -63,6 +63,18 @@ export function ActivitySourceCard({
         ))}
       </div>
 
+      {source.approvalStatus === "pending" && (
+        <div className="rounded-lg bg-muted p-3">
+          <p className="text-xs font-medium text-foreground">Waiting on a Platform Administrator</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            A Platform Administrator reviews this source and approves or rejects it with a written
+            reason. That role is separate from your organization's roles — being an owner or admin
+            of your organization does not let you approve it. Credentials and the Source API Key
+            appear here once the source is approved.
+          </p>
+        </div>
+      )}
+
       {source.reviewReason && (
         <p className="text-xs text-muted-foreground">Review: {source.reviewReason}</p>
       )}

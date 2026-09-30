@@ -58,13 +58,14 @@ describe("ActivitySourceCredentials", () => {
     );
 
     expect(screen.getByText("a".repeat(64))).toBeTruthy();
-    expect(screen.getByText(/Connect feedback\.near, authorize the binding/)).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Authorize with NEAR" }));
+    expect(screen.getByText(/Authorize the binding transaction from feedback\.near/)).toBeTruthy();
+
     fireEvent.click(screen.getByRole("button", { name: "Check binding" }));
-    await waitFor(() => {
-      expect(onBind).toHaveBeenCalledOnce();
-      expect(onConfirmBinding).toHaveBeenCalledOnce();
-    });
+    await waitFor(() => expect(onConfirmBinding).toHaveBeenCalledOnce());
+
+    fireEvent.click(screen.getByRole("button", { name: "Authorize with NEAR" }));
+    await waitFor(() => expect(onBind).toHaveBeenCalledOnce());
+    expect(screen.getByText(/This checks automatically/)).toBeTruthy();
     expect(screen.queryByLabelText("Source API Key name")).toBeNull();
   });
 

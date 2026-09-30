@@ -25,12 +25,15 @@ interface ActivitySourcesDashboardProps {
   reviewQueue: ActivitySourceView[];
   adminSources: ActivitySourceView[];
   isAdmin: boolean;
-  registrationAccess: ActivitySourceRegistrationAccess;
+  registrationAccess: ActivitySourceRegistrationAccess | null;
   isSubmitting: boolean;
   onCreate: (input: CreateActivitySourceInput) => void | Promise<void>;
   onReview: (input: ReviewActivitySourceInput) => void | Promise<void>;
   onTrust: (input: UpdateActivitySourceTrustInput) => void | Promise<void>;
   renderCredentials?: (source: ActivitySourceView) => ReactNode;
+  registrationAction?: ReactNode;
+  onboarding?: ReactNode;
+  showRegistration?: boolean;
 }
 
 export function ActivitySourcesDashboard({
@@ -44,43 +47,65 @@ export function ActivitySourcesDashboard({
   onReview,
   onTrust,
   renderCredentials,
+  registrationAction,
+  onboarding,
+  showRegistration = true,
 }: ActivitySourcesDashboardProps) {
+  const registration = (
+    <ActivitySourceRegistration
+      access={registrationAccess}
+      isSubmitting={isSubmitting}
+      onCreate={onCreate}
+      registrationAction={registrationAction}
+    />
+  );
+
   return (
     <div className="space-y-8">
       <header className="space-y-2">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">Activity Sources</h1>
       </header>
 
-      <ActivitySourceRegistration
-        access={registrationAccess}
-        isSubmitting={isSubmitting}
-        onCreate={onCreate}
-      />
+      {onboarding}
 
-      <section className="space-y-3">
-        <div className="flex items-end justify-between gap-3">
-          <h2 className="text-lg font-semibold text-foreground">Your sources</h2>
-          <span className="text-xs text-muted-foreground">{sources.length} registered</span>
-        </div>
-        {sources.length === 0 ? (
-          <EmptyState
-            compact
-            icon={BroadcastIcon}
-            title="No Activity Sources yet"
-            description="Register a source above to start publishing events for this organization."
-          />
+      {showRegistration &&
+        (sources.length > 0 && registrationAccess === "allowed" ? (
+          <details className="group">
+            <summary className="cursor-pointer text-sm font-medium text-foreground">
+              Register another source
+            </summary>
+            <div className="mt-4">{registration}</div>
+          </details>
         ) : (
-          <div className="flex flex-col gap-4">
-            {sources.map((source) => (
-              <ActivitySourceCard
-                key={source.sourceId}
-                source={source}
-                credentials={renderCredentials?.(source)}
-              />
-            ))}
+          registration
+        ))}
+
+      {(showRegistration || sources.length > 0) && (
+        <section className="space-y-3">
+          <div className="flex items-end justify-between gap-3">
+            <h2 className="text-lg font-semibold text-foreground">Your sources</h2>
+            <span className="text-xs text-muted-foreground">{sources.length} registered</span>
           </div>
-        )}
-      </section>
+          {sources.length === 0 ? (
+            <EmptyState
+              compact
+              icon={BroadcastIcon}
+              title="No Activity Sources yet"
+              description="Register a source above to start publishing events for this organization."
+            />
+          ) : (
+            <div className="flex flex-col gap-4">
+              {sources.map((source) => (
+                <ActivitySourceCard
+                  key={source.sourceId}
+                  source={source}
+                  credentials={renderCredentials?.(source)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      )}
 
       {isAdmin && (
         <section className="space-y-3">

@@ -6,7 +6,7 @@ import {
   ArrowClockwiseIcon as RotateCw,
   ShieldCheckIcon as ShieldCheck,
 } from "@phosphor-icons/react/ssr";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type {
   ActivitySigningIdentityView,
@@ -16,6 +16,9 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+
+const BINDING_POLL_INTERVAL_MS = 2000;
+const BINDING_POLL_ATTEMPTS = 15;
 
 interface ActivitySourceCredentialsProps {
   sourceId: string;
@@ -49,6 +52,37 @@ export function ActivitySourceCredentials({
   onDismissReveal,
 }: ActivitySourceCredentialsProps) {
   const [apiKeyName, setApiKeyName] = useState("");
+  const [isPolling, setIsPolling] = useState(false);
+  const [pollExpired, setPollExpired] = useState(false);
+  const confirmBindingRef = useRef(onConfirmBinding);
+  confirmBindingRef.current = onConfirmBinding;
+  const bindingStatus = identity?.bindingStatus ?? null;
+
+  useEffect(() => {
+    if (!isPolling) return;
+    if (bindingStatus !== "pending") {
+      setIsPolling(false);
+      return;
+    }
+
+    let attempts = 0;
+    const timer = setInterval(() => {
+      attempts += 1;
+      void Promise.resolve(confirmBindingRef.current()).catch(() => {});
+      if (attempts >= BINDING_POLL_ATTEMPTS) {
+        setIsPolling(false);
+        setPollExpired(true);
+      }
+    }, BINDING_POLL_INTERVAL_MS);
+
+    return () => clearInterval(timer);
+  }, [isPolling, bindingStatus]);
+
+  const authorizeBinding = async () => {
+    setPollExpired(false);
+    await onBind();
+    setIsPolling(true);
+  };
 
   const createApiKey = async () => {
     const name = apiKeyName.trim();
@@ -101,11 +135,28 @@ export function ActivitySourceCredentials({
           {identity.bindingStatus === "pending" ? (
             <div className="space-y-2">
               <p className="text-xs text-muted-foreground">
-                Connect {nearAccountId}, authorize the binding transaction, then check it after the
-                transaction is indexed.
+                Authorize the binding transaction from {nearAccountId}. Your wallet will ask you to
+                approve an on-chain transaction, which is separate from signing in. Binding usually
+                confirms within a few seconds.
               </p>
+              {isPolling && (
+                <p className="text-xs text-muted-foreground">
+                  Waiting for the transaction to be indexed. This checks automatically.
+                </p>
+              )}
+              {pollExpired && (
+                <p className="text-xs text-muted-foreground">
+                  Still not confirmed. The transaction may be slow to index — use Check binding to
+                  try again.
+                </p>
+              )}
               <div className="flex flex-wrap gap-2">
-                <Button type="button" size="sm" onClick={onBind} disabled={isSubmitting}>
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={authorizeBinding}
+                  disabled={isSubmitting || isPolling}
+                >
                   <Link2 />
                   Authorize with NEAR
                 </Button>
@@ -114,10 +165,10 @@ export function ActivitySourceCredentials({
                   size="sm"
                   variant="outline"
                   onClick={onConfirmBinding}
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || isPolling}
                 >
                   <RefreshCw />
-                  Check binding
+                  {isPolling ? "Checking..." : "Check binding"}
                 </Button>
               </div>
             </div>
