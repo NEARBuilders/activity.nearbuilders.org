@@ -4,6 +4,7 @@ import {
   XIcon as X,
 } from "@phosphor-icons/react/ssr";
 import type { ReactNode } from "react";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import type {
   ActivityOnboardingStep,
@@ -70,11 +71,15 @@ export function ActivityOnboardingProgress({
   nearAccountId,
   action,
   complete,
+  title,
+  onCancel,
 }: {
   steps: ActivityOnboardingStep[];
   nearAccountId: string | null;
   action?: ReactNode;
   complete?: ReactNode;
+  title?: string;
+  onCancel?: () => void;
 }) {
   const activeIndex = steps.findIndex((step) => step.status !== "complete");
 
@@ -91,7 +96,17 @@ export function ActivityOnboardingProgress({
         <p className="text-xs font-medium text-muted-foreground">
           Setup · Step {activeIndex + 1} of {steps.length}
         </p>
-        <p className="text-xs font-medium text-foreground md:hidden">{stepLabel[activeStep.id]}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-medium text-foreground md:hidden">
+            {stepLabel[activeStep.id]}
+          </p>
+          {onCancel && (
+            <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
+              <X />
+              Cancel
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-1 md:hidden" aria-hidden="true">
@@ -115,7 +130,7 @@ export function ActivityOnboardingProgress({
                 aria-hidden="true"
                 className={cn(
                   "absolute top-3.5 right-1/2 h-px w-full",
-                  steps[index - 1].status === "complete" ? "bg-primary" : "bg-border",
+                  steps[index - 1].status === "complete" ? "bg-brand-accent" : "bg-border",
                 )}
               />
             )}
@@ -135,7 +150,7 @@ export function ActivityOnboardingProgress({
 
       <div className="space-y-4 rounded-lg bg-muted p-4">
         <div className="space-y-1">
-          <h2 className="text-base font-semibold text-foreground">{guide.title}</h2>
+          <h2 className="text-base font-semibold text-foreground">{title ?? guide.title}</h2>
           <p className="text-sm text-muted-foreground">{guide.description(nearAccountId)}</p>
         </div>
         {action}
@@ -145,9 +160,9 @@ export function ActivityOnboardingProgress({
 }
 
 const segmentClass: Record<ActivityOnboardingStepStatus, string> = {
-  complete: "bg-primary",
-  current: "bg-primary/50",
-  waiting: "bg-primary/50",
+  complete: "bg-brand-accent",
+  current: "bg-brand-accent/50",
+  waiting: "bg-brand-accent/50",
   blocked: "bg-destructive",
   upcoming: "bg-border",
 };
@@ -157,9 +172,10 @@ function StepMarker({ status, index }: { status: ActivityOnboardingStepStatus; i
     <span
       className={cn(
         "relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
-        status === "complete" && "border-primary bg-primary text-primary-foreground",
-        status === "current" && "border-primary bg-background text-primary ring-2 ring-primary/30",
-        status === "waiting" && "border-primary bg-background text-primary",
+        status === "complete" && "border-brand-accent bg-brand-accent text-brand-accent-foreground",
+        status === "current" &&
+          "border-brand-accent bg-background text-foreground ring-2 ring-brand-accent/30",
+        status === "waiting" && "border-brand-accent bg-background text-foreground",
         status === "blocked" && "border-destructive bg-background text-destructive",
         status === "upcoming" && "border-border bg-background text-muted-foreground",
       )}

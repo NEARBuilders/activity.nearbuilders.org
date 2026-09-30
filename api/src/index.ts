@@ -88,6 +88,14 @@ function validateAccountId(accountId: string): void {
   }
 }
 
+function mainnetNearAccountIds(
+  linkedAccounts: Array<{ accountId: string; network: string }>,
+): string[] {
+  return linkedAccounts
+    .filter(({ network }) => network === "mainnet")
+    .map(({ accountId }) => accountId);
+}
+
 export default createPlugin.withPlugins<PluginsClient>()({
   variables: z.object({
     activityNostrBindingContract: z.string().default("contextual.near"),
@@ -535,14 +543,10 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .use(requireOrgRole("owner"))
         .use(requireNearAuthentication)
         .handler(async ({ input, context }) => {
-          const nearAccountId = context.near.primaryAccountId;
-          if (!nearAccountId) {
-            throw new ORPCError("FORBIDDEN", { message: "NEAR authentication required" });
-          }
           return services.activityCredentials.prepareSigningIdentityBinding(
             context.organization.activeOrganizationId,
             input.sourceId,
-            nearAccountId,
+            mainnetNearAccountIds(context.near.linkedAccounts),
           );
         }),
 
@@ -550,14 +554,10 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .use(requireOrgRole("owner"))
         .use(requireNearAuthentication)
         .handler(async ({ input, context }) => {
-          const nearAccountId = context.near.primaryAccountId;
-          if (!nearAccountId) {
-            throw new ORPCError("FORBIDDEN", { message: "NEAR authentication required" });
-          }
           return services.activityCredentials.confirmSigningIdentityBinding(
             context.organization.activeOrganizationId,
             input.sourceId,
-            nearAccountId,
+            mainnetNearAccountIds(context.near.linkedAccounts),
           );
         }),
 

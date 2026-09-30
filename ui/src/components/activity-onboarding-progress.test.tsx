@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { ActivityOnboardingProgress } from "@/components/activity-onboarding-progress";
 import {
   type ActivityOnboardingInput,
@@ -63,5 +63,22 @@ describe("ActivityOnboardingProgress", () => {
 
     expect(screen.getByText("All done")).toBeTruthy();
     expect(screen.queryByLabelText("Setup progress")).toBeNull();
+  });
+
+  it("restarts at the register step for another source and can be cancelled", () => {
+    const onCancel = vi.fn();
+    render(
+      <ActivityOnboardingProgress
+        steps={getActivityOnboardingSteps({ ...approvedSource, source: null })}
+        nearAccountId={null}
+        title="Register another source"
+        onCancel={onCancel}
+      />,
+    );
+
+    expect(screen.getByText("Setup · Step 3 of 6")).toBeTruthy();
+    expect(screen.getByText("Register another source")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onCancel).toHaveBeenCalled();
   });
 });

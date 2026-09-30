@@ -12,7 +12,10 @@ import {
   ActivityLinkOnChainAction,
   ActivitySetupComplete,
 } from "@/components/activity-setup-actions";
-import { ActivitySourceCredentials } from "@/components/activity-source-credentials";
+import {
+  ActivityApiKeysPanel,
+  ActivitySigningKeyPanel,
+} from "@/components/activity-source-credentials";
 import { ActivitySourceRegistration } from "@/components/activity-source-registration";
 import { ActivitySourceRegistrationAction } from "@/components/activity-source-registration-action";
 import {
@@ -25,8 +28,10 @@ import {
 import { PageContainer } from "@/components/layout/page-container";
 import { useActivitySourceCredentials } from "@/hooks/use-activity-source-credentials";
 import { useIsClient } from "@/hooks/use-client";
+import { useLatestSourceEvent } from "@/hooks/use-latest-source-event";
 import { getActivityOnboardingSteps, pickOnboardingSource } from "@/lib/activity-onboarding";
 import { getActivitySourceRegistrationAccess } from "@/lib/activity-source-permissions";
+import { formatRelativeTime } from "@/lib/relative-time";
 
 const activitySourcesQueryKey = ["activity-sources"] as const;
 const adminActivitySourcesQueryKey = ["activity-source-reviews", "all"] as const;
@@ -35,7 +40,14 @@ function githubQueryKey(sourceId: string) {
   return ["activity-source-github", sourceId] as const;
 }
 
+interface ActivitySourcesSearch {
+  setup?: string;
+}
+
 export const Route = createFileRoute("/_layout/_authenticated/activity-sources")({
+  validateSearch: (search: Record<string, unknown>): ActivitySourcesSearch => ({
+    setup: typeof search.setup === "string" ? search.setup : undefined,
+  }),
   head: () => ({
     meta: [{ title: "Activity Sources | NEAR Builders" }],
   }),
@@ -68,6 +80,8 @@ function ActivitySourcesPage() {
   const authClient = useAuthClient();
   const queryClient = useQueryClient();
   const { auth } = Route.useRouteContext();
+  const { setup: setupSearch } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const nearState = authClient.useNearState();
   const isClient = useIsClient();
 
@@ -180,7 +194,14 @@ function ActivitySourcesPage() {
     linkedNearAccountsPending && resolvedAccess === "near-required" ? null : resolvedAccess;
 
   const isOrganizationOwner = Boolean(activeOrganizationId) && activeOrganizationRole === "owner";
-  const setupSource = isOrganizationOwner ? pickOnboardingSource(sources) : null;
+  const isRegisteringAnother = setupSearch === "new";
+  const focusedSource = sources.find(({ sourceId }) => sourceId === setupSearch);
+  const setupSource =
+    isOrganizationOwner && !isRegisteringAnother
+      ? (focusedSource ?? pickOnboardingSource(sources))
+      : null;
+  const focusSetup = (setup?: string) =>
+    navigate({ search: setup ? { setup } : {}, replace: true });
   const setupCredentialsEnabled = setupSource?.approvalStatus === "approved";
   const setup = useActivitySourceCredentials(setupSource, setupCredentialsEnabled);
   const steps = getActivityOnboardingSteps({
@@ -193,11 +214,43 @@ function ActivitySourcesPage() {
   const setupComplete = steps.every(({ status }) => status === "complete");
   const setupReady = registrationAccess !== null && !setup.isLoading;
   const currentStep = steps.find(({ status }) => status !== "complete");
-  const signedInNearAccountId =
-    linkedNearAccounts?.find((account) => account.isPrimary)?.accountId ??
-    linkedNearAccounts?.[0]?.accountId ??
-    null;
-  const defaultNearAccountId = signedInNearAccountId ?? nearState?.accountId ?? "";
+  const revealedKeyCreatedAt = setup.apiKeys.find(
+    ({ id }) => id === setup.revealedApiKey?.apiKeyId,
+  )?.createdAt;
+  const latestSetupEvent = useLatestSourceEvent(setupSource?.sourceId ?? null, {
+    enabled: Boolean(setup.revealedApiKey),
+    pollUntilFound: true,
+  });
+  const firstEventAfterKey =
+    latestSetupEvent.data &&
+    revealedKeyCreatedAt &&
+    Date.parse(latestSetupEvent.data.timestamp) >= Date.parse(revealedKeyCreatedAt)
+      ? latestSetupEvent.data
+      : null;
+  const linkedNearAccountIds = (linkedNearAccounts ?? [])
+    .filter(({ network }) => network === "mainnet")
+    .map(({ accountId }) => accountId);
+  const sourceNearAccountIds = new Set(sources.map(({ nearAccountId }) => nearAccountId));
+  const defaultNearAccountId =
+    linkedNearAccountIds.find((accountId) => !sourceNearAccountIds.has(accountId)) ?? "";
+
+  const linkNearAccount = useMutation({
+    mutationFn: async () => {
+      await authClient.near.disconnect();
+      let linkError: Error | null = null;
+      await authClient.near.link({
+        onError: (error) => {
+          linkError = error;
+        },
+      });
+      if (linkError) throw linkError;
+    },
+    onSuccess: async () => {
+      toast.success("NEAR account added to your profile");
+      await queryClient.invalidateQueries({ queryKey: ["near-linked-accounts"] });
+    },
+    onError: (error: Error) => toast.error(error.message || "Failed to add NEAR account"),
+  });
 
   const registrationForm = (
     <ActivitySourceRegistration
@@ -207,6 +260,7 @@ function ActivitySourcesPage() {
       isSubmitting={createSource.isPending}
       onCreate={async (input) => {
         await createSource.mutateAsync(input);
+        focusSetup(input.sourceId);
       }}
     />
   );
@@ -239,9 +293,11 @@ function ActivitySourcesPage() {
         return (
           <ActivityLinkOnChainAction
             requiredAccountId={setupSource?.nearAccountId ?? ""}
-            signedInAccountId={signedInNearAccountId}
+            linkedAccountIds={linkedNearAccountIds}
             isLinking={setup.linkOnChain.isPending}
             isChecking={setup.confirmBinding.isPending}
+            isLinkingAccount={linkNearAccount.isPending}
+            onLinkAccount={() => linkNearAccount.mutate()}
             canCheck={setup.identity !== null}
             onLink={() => setup.linkOnChain.mutate()}
             onCheck={() => setup.confirmBinding.mutate()}
@@ -266,18 +322,22 @@ function ActivitySourcesPage() {
         isAdmin={auth.isAdmin}
         registrationAccess={registrationAccess}
         showRegistration={setupComplete}
+        onRegisterAnother={() => focusSetup("new")}
         onboarding={
           setupReady ? (
             <ActivityOnboardingProgress
               steps={steps}
               nearAccountId={setupSource?.nearAccountId ?? null}
               action={renderSetupAction()}
+              title={isRegisteringAnother ? "Register another source" : undefined}
+              onCancel={isRegisteringAnother ? () => focusSetup() : undefined}
               complete={
                 setupSource ? (
                   <ActivitySetupComplete
                     revealedSecret={setup.revealedApiKey?.secret ?? null}
                     eventType={setupSource.eventTypes.find(({ enabled }) => enabled)?.name ?? null}
                     actor={setupSource.nearAccountId}
+                    firstEvent={setup.revealedApiKey ? firstEventAfterKey : undefined}
                     onDismiss={setup.dismissRevealedApiKey}
                   />
                 ) : null
@@ -300,15 +360,41 @@ function ActivitySourcesPage() {
         onTrust={async (input) => {
           await updateTrust.mutateAsync(input);
         }}
-        renderCredentials={(source) =>
+        setupSourceId={setupComplete ? null : (setupSource?.sourceId ?? null)}
+        renderHealth={(source) =>
+          source.approvalStatus === "approved" ? (
+            <ActivitySourceHealth sourceId={source.sourceId} />
+          ) : null
+        }
+        renderTabs={(source) =>
           source.approvalStatus === "approved" &&
           isOrganizationOwner &&
-          (setupComplete || source.sourceId !== setupSource?.sourceId) ? (
-            <>
-              <ActivityCredentialsManager source={source} />
-              <ActivityGithubManager sourceId={source.sourceId} />
-            </>
-          ) : null
+          (setupComplete || source.sourceId !== setupSource?.sourceId)
+            ? [
+                {
+                  value: "api-keys",
+                  label: "API keys",
+                  content: <ActivityApiKeysManager source={source} />,
+                },
+                {
+                  value: "signing-key",
+                  label: "Signing key",
+                  content: (
+                    <ActivitySigningKeyManager
+                      source={source}
+                      linkedAccountIds={linkedNearAccountIds}
+                      isLinkingAccount={linkNearAccount.isPending}
+                      onLinkAccount={() => linkNearAccount.mutate()}
+                    />
+                  ),
+                },
+                {
+                  value: "github",
+                  label: "GitHub",
+                  content: <ActivityGithubManager sourceId={source.sourceId} />,
+                },
+              ]
+            : null
         }
       />
     </PageContainer>
@@ -361,29 +447,32 @@ function ActivityGithubManager({ sourceId }: { sourceId: string }) {
   );
 }
 
-function ActivityCredentialsManager({ source }: { source: ActivitySourceView }) {
+function ActivitySourceHealth({ sourceId }: { sourceId: string }) {
+  const { data: latestEvent, isPending } = useLatestSourceEvent(sourceId);
+  if (isPending) return null;
+  return (
+    <p className="text-xs text-muted-foreground">
+      {latestEvent ? (
+        <>
+          Last event {formatRelativeTime(latestEvent.timestamp)} ·{" "}
+          <span className="font-mono">{latestEvent.type}</span>
+        </>
+      ) : (
+        "No events yet"
+      )}
+    </p>
+  );
+}
+
+function ActivityApiKeysManager({ source }: { source: ActivitySourceView }) {
   const credentials = useActivitySourceCredentials(source, true);
 
   return (
-    <ActivitySourceCredentials
-      sourceId={source.sourceId}
-      nearAccountId={source.nearAccountId}
-      identity={credentials.identity}
+    <ActivityApiKeysPanel
       apiKeys={credentials.apiKeys}
+      isLinked={credentials.identity?.bindingStatus === "bound"}
       revealedApiKey={credentials.revealedApiKey}
       isSubmitting={credentials.isSubmitting}
-      onCreateIdentity={async () => {
-        await credentials.createIdentity.mutateAsync();
-      }}
-      onBind={async () => {
-        await credentials.bindIdentity.mutateAsync();
-      }}
-      onConfirmBinding={async () => {
-        await credentials.confirmBinding.mutateAsync();
-      }}
-      onRotate={async () => {
-        await credentials.rotateIdentity.mutateAsync();
-      }}
       onCreateApiKey={async (name) => {
         await credentials.createApiKey.mutateAsync(name);
       }}
@@ -391,6 +480,42 @@ function ActivityCredentialsManager({ source }: { source: ActivitySourceView }) 
         await credentials.revokeApiKey.mutateAsync(apiKeyId);
       }}
       onDismissReveal={credentials.dismissRevealedApiKey}
+    />
+  );
+}
+
+function ActivitySigningKeyManager({
+  source,
+  linkedAccountIds,
+  isLinkingAccount,
+  onLinkAccount,
+}: {
+  source: ActivitySourceView;
+  linkedAccountIds: string[];
+  isLinkingAccount: boolean;
+  onLinkAccount: () => void;
+}) {
+  const credentials = useActivitySourceCredentials(source, true);
+
+  return (
+    <ActivitySigningKeyPanel
+      nearAccountId={source.nearAccountId}
+      identity={credentials.identity}
+      isRotating={credentials.rotateIdentity.isPending}
+      onRotate={() => credentials.rotateIdentity.mutate()}
+      linkAction={
+        <ActivityLinkOnChainAction
+          requiredAccountId={source.nearAccountId}
+          linkedAccountIds={linkedAccountIds}
+          isLinking={credentials.linkOnChain.isPending}
+          isChecking={credentials.confirmBinding.isPending}
+          isLinkingAccount={isLinkingAccount}
+          canCheck={credentials.identity !== null}
+          onLink={() => credentials.linkOnChain.mutate()}
+          onCheck={() => credentials.confirmBinding.mutate()}
+          onLinkAccount={onLinkAccount}
+        />
+      }
     />
   );
 }

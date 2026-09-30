@@ -32,6 +32,36 @@ describe("Activity sources", () => {
     ).rejects.toThrow("NEAR authentication required");
   });
 
+  it("names the field that conflicts with an existing source", async () => {
+    const client = await getPluginClient(orgOwnerContext("conflict-owner", "org-conflict"));
+    const eventTypes = [
+      { name: "conflict.action", description: "A conflict test", enabled: true, pointValue: 1 },
+    ];
+    await client.createActivitySource({
+      sourceId: "conflict-source",
+      displayName: "Conflict Source",
+      nearAccountId: "conflict-source.near",
+      eventTypes,
+    });
+
+    await expect(
+      client.createActivitySource({
+        sourceId: "conflict-source",
+        displayName: "Duplicate ID",
+        nearAccountId: "another-conflict.near",
+        eventTypes,
+      }),
+    ).rejects.toThrow("The Source ID conflict-source is already taken");
+    await expect(
+      client.createActivitySource({
+        sourceId: "conflict-source-two",
+        displayName: "Duplicate account",
+        nearAccountId: "conflict-source.near",
+        eventTypes,
+      }),
+    ).rejects.toThrow("The NEAR account conflict-source.near already owns an Activity Source");
+  });
+
   it("lets an organization owner register and retrieve a pending source", async () => {
     const client = await getPluginClient(orgOwnerContext());
 

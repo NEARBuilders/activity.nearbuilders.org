@@ -205,8 +205,15 @@ export const ActivitySourcesLive = Layer.effect(
               .onConflictDoNothing()
               .returning();
             if (!created) {
+              const [existing] = await tx
+                .select({ sourceId: sourcesTable.sourceId })
+                .from(sourcesTable)
+                .where(eq(sourcesTable.sourceId, input.sourceId))
+                .limit(1);
               throw new ORPCError("CONFLICT", {
-                message: "An Activity Source already uses this source ID or NEAR account",
+                message: existing
+                  ? `The Source ID ${input.sourceId} is already taken`
+                  : `The NEAR account ${input.nearAccountId} already owns an Activity Source`,
               });
             }
             await tx.insert(eventTypesTable).values(
