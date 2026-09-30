@@ -52,7 +52,7 @@ describe("ActivitySourcesDashboard", () => {
       />,
     );
 
-    expect(markup).toContain("Register Activity Source");
+    expect(markup).toContain("Register another source");
     expect(markup).toContain("NEAR Catalog");
     expect(markup).toContain("catalog.project.published");
     expect(markup).toContain("25 points");
@@ -76,6 +76,8 @@ describe("ActivitySourcesDashboard", () => {
       />,
     );
 
+    expect(markup).toContain("Review queue");
+    expect(markup).toContain("Trust controls");
     expect(markup).toContain("Source review queue");
     expect(markup).toContain("Approve source");
     expect(markup).toContain("Reject source");

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ActivitySourceRegistration } from "@/components/activity-source-registration";
 
@@ -51,8 +51,47 @@ describe("ActivitySourceRegistration", () => {
     render(<ActivitySourceRegistration access="allowed" isSubmitting={false} onCreate={vi.fn()} />);
 
     expect(screen.getByText(/It cannot be changed later/)).toBeTruthy();
-    expect(screen.getByText(/exact mainnet account that will sign the binding/)).toBeTruthy();
-    expect(screen.getByText(/0 means events of this type score nothing/)).toBeTruthy();
-    expect(screen.getByText(/returns a 400/)).toBeTruthy();
+    expect(screen.getByText(/Each NEAR account can own only one source/)).toBeTruthy();
+    expect(screen.getByText(/0 scores nothing/)).toBeTruthy();
+    expect(screen.getByText(/rejected with a 400/)).toBeTruthy();
+  });
+
+  it("flags an invalid Source ID as it is typed and blocks submission", () => {
+    const onCreate = vi.fn();
+    render(
+      <ActivitySourceRegistration access="allowed" isSubmitting={false} onCreate={onCreate} />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Source ID"), { target: { value: "Near Catalog" } });
+
+    expect(screen.getByRole("alert").textContent).toMatch(/lowercase letters and numbers/);
+  });
+
+  it("shows a conflict under the field it belongs to", async () => {
+    const onCreate = vi
+      .fn()
+      .mockRejectedValue(
+        new Error("The NEAR account catalog.near already owns an Activity Source"),
+      );
+    render(
+      <ActivitySourceRegistration
+        access="allowed"
+        isSubmitting={false}
+        onCreate={onCreate}
+        defaultNearAccountId="catalog.near"
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Source ID"), { target: { value: "near-catalog" } });
+    fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "NEAR Catalog" } });
+    fireEvent.change(screen.getByLabelText("Name"), { target: { value: "catalog.published" } });
+    fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Published" } });
+    fireEvent.submit(screen.getByRole("button", { name: "Register source" }));
+
+    await waitFor(() =>
+      expect(screen.getByRole("alert").textContent).toBe(
+        "The NEAR account catalog.near already owns an Activity Source",
+      ),
+    );
   });
 });

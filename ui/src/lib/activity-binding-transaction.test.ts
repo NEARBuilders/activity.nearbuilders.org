@@ -12,6 +12,7 @@ describe("submitActivityBindingTransaction", () => {
     const wallet: ActivityBindingWallet = {
       switchToMainnet,
       connect,
+      disconnect: vi.fn().mockResolvedValue(undefined),
       getActiveAccount: () => ({ accountId: "feedback.near", network: "mainnet" }),
       callContract,
     };
@@ -52,6 +53,7 @@ describe("submitActivityBindingTransaction", () => {
         account = { accountId: "feedback.near", network: "mainnet" };
         return connect();
       },
+      disconnect: vi.fn().mockResolvedValue(undefined),
       getActiveAccount: () => account,
       callContract,
     };
@@ -78,6 +80,7 @@ describe("submitActivityBindingTransaction", () => {
     const wallet: ActivityBindingWallet = {
       switchToMainnet: vi.fn(),
       connect: vi.fn().mockResolvedValue(true),
+      disconnect: vi.fn().mockResolvedValue(undefined),
       getActiveAccount: () => ({ accountId: "feedback.near", network: "testnet" }),
       callContract,
     };
@@ -98,11 +101,45 @@ describe("submitActivityBindingTransaction", () => {
     expect(callContract).not.toHaveBeenCalled();
   });
 
-  it("refuses to bind when a different account is connected", async () => {
+  it("switches the wallet to the source account when another account is connected", async () => {
+    let accountId = "alice.near";
+    const disconnect = vi.fn().mockResolvedValue(undefined);
+    const connect = vi.fn().mockImplementation(async () => {
+      accountId = "feedback.near";
+      return true;
+    });
+    const callContract = vi.fn().mockResolvedValue({ txHash: "switched" });
+    const wallet: ActivityBindingWallet = {
+      switchToMainnet: vi.fn(),
+      connect,
+      disconnect,
+      getActiveAccount: () => ({ accountId, network: "mainnet" }),
+      callContract,
+    };
+
+    await expect(
+      submitActivityBindingTransaction({
+        wallet,
+        nearAccountId: "feedback.near",
+        binding: {
+          contractId: "contextual.near",
+          methodName: "__fastdata_kv",
+          args: {},
+          gas: "20000000000000",
+          attachedDeposit: "0",
+        },
+      }),
+    ).resolves.toEqual({ txHash: "switched" });
+    expect(disconnect).toHaveBeenCalledOnce();
+    expect(callContract).toHaveBeenCalledOnce();
+  });
+
+  it("refuses to bind when the wallet still connects a different account", async () => {
     const callContract = vi.fn();
     const wallet: ActivityBindingWallet = {
       switchToMainnet: vi.fn(),
       connect: vi.fn().mockResolvedValue(true),
+      disconnect: vi.fn().mockResolvedValue(undefined),
       getActiveAccount: () => ({ accountId: "alice.near", network: "mainnet" }),
       callContract,
     };
@@ -132,6 +169,7 @@ describe("submitActivityBindingTransaction", () => {
     const wallet: ActivityBindingWallet = {
       switchToMainnet: vi.fn(),
       connect,
+      disconnect: vi.fn().mockResolvedValue(undefined),
       getActiveAccount: () => ({ accountId: "feedback.near", network: "mainnet" }),
       callContract,
     };

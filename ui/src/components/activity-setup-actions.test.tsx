@@ -25,7 +25,9 @@ describe("ActivityLinkOnChainAction", () => {
     render(
       <ActivityLinkOnChainAction
         requiredAccountId="catalog.near"
-        signedInAccountId="catalog.near"
+        linkedAccountIds={["catalog.near"]}
+        isLinkingAccount={false}
+        onLinkAccount={vi.fn()}
         isLinking={false}
         isChecking={false}
         canCheck={false}
@@ -43,7 +45,9 @@ describe("ActivityLinkOnChainAction", () => {
     render(
       <ActivityLinkOnChainAction
         requiredAccountId="catalog.near"
-        signedInAccountId="catalog.near"
+        linkedAccountIds={["catalog.near"]}
+        isLinkingAccount={false}
+        onLinkAccount={vi.fn()}
         isLinking
         isChecking={false}
         canCheck
@@ -57,21 +61,44 @@ describe("ActivityLinkOnChainAction", () => {
 });
 
 describe("ActivityLinkOnChainAction account mismatch", () => {
-  it("names the required account instead of offering a wallet approval that cannot succeed", () => {
+  it("offers to add the source account instead of a wallet approval that cannot succeed", () => {
+    const onLinkAccount = vi.fn();
     render(
       <ActivityLinkOnChainAction
         requiredAccountId="catalog.near"
-        signedInAccountId="someone.near"
+        linkedAccountIds={["someone.near"]}
         isLinking={false}
         isChecking={false}
+        isLinkingAccount={false}
         canCheck
         onLink={vi.fn()}
         onCheck={vi.fn()}
+        onLinkAccount={onLinkAccount}
       />,
     );
 
-    expect(screen.getByText("Sign in as catalog.near to continue")).toBeTruthy();
+    expect(screen.getByText("Add catalog.near to your profile")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Approve in wallet" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Add catalog.near" }));
+    expect(onLinkAccount).toHaveBeenCalled();
+  });
+
+  it("allows linking when the source account is any linked account, not only the primary", () => {
+    render(
+      <ActivityLinkOnChainAction
+        requiredAccountId="catalog.near"
+        linkedAccountIds={["someone.near", "catalog.near"]}
+        isLinking={false}
+        isChecking={false}
+        isLinkingAccount={false}
+        canCheck={false}
+        onLink={vi.fn()}
+        onCheck={vi.fn()}
+        onLinkAccount={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Approve in wallet" })).toBeTruthy();
   });
 });
 
@@ -115,6 +142,28 @@ describe("ActivitySetupComplete", () => {
 
     expect(screen.getByText("Setup complete")).toBeTruthy();
     expect(screen.queryByLabelText("Your API key")).toBeNull();
+  });
+});
+
+describe("ActivitySetupComplete first event", () => {
+  it("waits for the first event, then confirms it arrived", () => {
+    const props = {
+      revealedSecret: "act_test_secret",
+      eventType: "build.completed",
+      actor: "catalog.near",
+      onDismiss: vi.fn(),
+    };
+    const { rerender } = render(<ActivitySetupComplete {...props} firstEvent={null} />);
+    expect(screen.getByText(/Waiting for your first event/)).toBeTruthy();
+
+    rerender(
+      <ActivitySetupComplete
+        {...props}
+        firstEvent={{ type: "build.completed", timestamp: new Date().toISOString() }}
+      />,
+    );
+    expect(screen.getByText(/First event received/)).toBeTruthy();
+    expect(screen.getByText("View in feed")).toBeTruthy();
   });
 });
 

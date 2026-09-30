@@ -50,6 +50,7 @@ code {
   --brand-accent: #00D9A3;
   --brand-accent-light: #CCFBEA;
   --brand-accent-border: #99F7D5;
+  --brand-accent-foreground: #042f24;
   --status-danger-bg: #FFE3E2;
   --status-danger-border: #FD9AAE;
   --status-danger-fg: #D21B14;
@@ -102,6 +103,7 @@ code {
   --brand-accent: #00D9A3;
   --brand-accent-light: #14532d;
   --brand-accent-border: #166534;
+  --brand-accent-foreground: #042f24;
   --status-danger-bg: #451a1a;
   --status-danger-border: #dc2626;
   --status-danger-fg: #fca5a5;
@@ -154,6 +156,7 @@ code {
   --color-brand-accent: var(--brand-accent);
   --color-brand-accent-light: var(--brand-accent-light);
   --color-brand-accent-border: var(--brand-accent-border);
+  --color-brand-accent-foreground: var(--brand-accent-foreground);
   --color-status-danger-bg: var(--status-danger-bg);
   --color-status-danger-border: var(--status-danger-border);
   --color-status-danger-fg: var(--status-danger-fg);
