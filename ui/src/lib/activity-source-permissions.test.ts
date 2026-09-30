@@ -19,6 +19,10 @@ describe("getActivitySourceRegistrationAccess", () => {
       expected: "near-required",
     },
     {
+      input: { activeOrganizationId: null, organizationRole: null, hasNearAccount: false },
+      expected: "near-required",
+    },
+    {
       input: { activeOrganizationId: "org-1", organizationRole: "owner", hasNearAccount: true },
       expected: "allowed",
     },

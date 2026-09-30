@@ -1,13 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
 import { toast } from "sonner";
 import { sessionQueryOptions, useApiClient, useAuthClient } from "@/app";
 import {
   type ActivityGithubConfigurationInput,
   ActivityGithubIntegration,
 } from "@/components/activity-github-integration";
+import { ActivityOnboardingProgress } from "@/components/activity-onboarding-progress";
+import {
+  ActivityApiKeyAction,
+  ActivityLinkOnChainAction,
+  ActivitySetupComplete,
+} from "@/components/activity-setup-actions";
 import { ActivitySourceCredentials } from "@/components/activity-source-credentials";
+import { ActivitySourceRegistration } from "@/components/activity-source-registration";
+import { ActivitySourceRegistrationAction } from "@/components/activity-source-registration-action";
 import {
   ActivitySourcesDashboard,
   type ActivitySourceView,
@@ -16,23 +23,13 @@ import {
   type UpdateActivitySourceTrustInput,
 } from "@/components/activity-sources-dashboard";
 import { PageContainer } from "@/components/layout/page-container";
+import { useActivitySourceCredentials } from "@/hooks/use-activity-source-credentials";
 import { useIsClient } from "@/hooks/use-client";
-import {
-  createActivityBindingWallet,
-  submitActivityBindingTransaction,
-} from "@/lib/activity-binding-transaction";
+import { getActivityOnboardingSteps, pickOnboardingSource } from "@/lib/activity-onboarding";
 import { getActivitySourceRegistrationAccess } from "@/lib/activity-source-permissions";
 
 const activitySourcesQueryKey = ["activity-sources"] as const;
 const adminActivitySourcesQueryKey = ["activity-source-reviews", "all"] as const;
-
-function credentialQueryKey(sourceId: string) {
-  return ["activity-source-credentials", sourceId] as const;
-}
-
-function apiKeysQueryKey(sourceId: string) {
-  return ["activity-source-api-keys", sourceId] as const;
-}
 
 function githubQueryKey(sourceId: string) {
   return ["activity-source-github", sourceId] as const;
@@ -73,7 +70,23 @@ function ActivitySourcesPage() {
   const { auth } = Route.useRouteContext();
   const nearState = authClient.useNearState();
   const isClient = useIsClient();
-  const hasNearAccount = isClient ? Boolean(nearState?.accountId) : auth.hasNearAccount;
+
+  const { data: linkedNearAccounts, isPending: linkedNearAccountsPending } = useQuery({
+    queryKey: ["near-linked-accounts"],
+    queryFn: async () => {
+      const { data, error } = await authClient.near.listAccounts();
+      if (error) throw new Error(error.message || "Failed to read linked NEAR accounts");
+      return data?.accounts ?? [];
+    },
+    staleTime: 30_000,
+  });
+
+  const hasNearAccount =
+    linkedNearAccounts !== undefined
+      ? linkedNearAccounts.length > 0
+      : isClient
+        ? Boolean(nearState?.accountId) || auth.hasNearAccount
+        : auth.hasNearAccount;
 
   const { data: liveSession } = useQuery(sessionQueryOptions(authClient));
   const activeOrganizationId =
@@ -100,6 +113,8 @@ function ActivitySourcesPage() {
     queryFn: () => apiClient.listActivitySources(),
     enabled: Boolean(activeOrganizationId),
     staleTime: 30_000,
+    refetchInterval: (query) =>
+      query.state.data?.some(({ approvalStatus }) => approvalStatus === "pending") ? 30_000 : false,
   });
 
   const { data: adminSources = [] } = useQuery({
@@ -156,6 +171,92 @@ function ActivitySourcesPage() {
     },
   });
 
+  const resolvedAccess = getActivitySourceRegistrationAccess({
+    activeOrganizationId,
+    organizationRole: activeOrganizationRole,
+    hasNearAccount,
+  });
+  const registrationAccess =
+    linkedNearAccountsPending && resolvedAccess === "near-required" ? null : resolvedAccess;
+
+  const isOrganizationOwner = Boolean(activeOrganizationId) && activeOrganizationRole === "owner";
+  const setupSource = isOrganizationOwner ? pickOnboardingSource(sources) : null;
+  const setupCredentialsEnabled = setupSource?.approvalStatus === "approved";
+  const setup = useActivitySourceCredentials(setupSource, setupCredentialsEnabled);
+  const steps = getActivityOnboardingSteps({
+    hasNearAccount,
+    isOrganizationOwner,
+    source: setupSource,
+    identity: setupCredentialsEnabled ? setup.identity : null,
+    hasApiKey: setupCredentialsEnabled && setup.hasActiveApiKey,
+  });
+  const setupComplete = steps.every(({ status }) => status === "complete");
+  const setupReady = registrationAccess !== null && !setup.isLoading;
+  const currentStep = steps.find(({ status }) => status !== "complete");
+  const signedInNearAccountId =
+    linkedNearAccounts?.find((account) => account.isPrimary)?.accountId ??
+    linkedNearAccounts?.[0]?.accountId ??
+    null;
+  const defaultNearAccountId = signedInNearAccountId ?? nearState?.accountId ?? "";
+
+  const registrationForm = (
+    <ActivitySourceRegistration
+      access="allowed"
+      embedded
+      defaultNearAccountId={defaultNearAccountId}
+      isSubmitting={createSource.isPending}
+      onCreate={async (input) => {
+        await createSource.mutateAsync(input);
+      }}
+    />
+  );
+
+  const renderSetupAction = () => {
+    if (!currentStep || !registrationAccess) return null;
+    switch (currentStep.id) {
+      case "near":
+      case "organization":
+        return <ActivitySourceRegistrationAction access={registrationAccess} />;
+      case "register":
+        return registrationForm;
+      case "approval":
+        if (currentStep.status === "blocked") {
+          return (
+            <div className="space-y-4">
+              {setupSource?.reviewReason && (
+                <p className="text-sm text-foreground">Reviewer: {setupSource.reviewReason}</p>
+              )}
+              {registrationForm}
+            </div>
+          );
+        }
+        return (
+          <p className="font-mono text-xs text-muted-foreground">
+            Submitted: {setupSource?.sourceId} · {setupSource?.nearAccountId}
+          </p>
+        );
+      case "binding":
+        return (
+          <ActivityLinkOnChainAction
+            requiredAccountId={setupSource?.nearAccountId ?? ""}
+            signedInAccountId={signedInNearAccountId}
+            isLinking={setup.linkOnChain.isPending}
+            isChecking={setup.confirmBinding.isPending}
+            canCheck={setup.identity !== null}
+            onLink={() => setup.linkOnChain.mutate()}
+            onCheck={() => setup.confirmBinding.mutate()}
+          />
+        );
+      case "api-key":
+        return (
+          <ActivityApiKeyAction
+            isSubmitting={setup.createApiKey.isPending}
+            onCreate={(name) => setup.createApiKey.mutate(name)}
+          />
+        );
+    }
+  };
+
   return (
     <PageContainer variant="wide">
       <ActivitySourcesDashboard
@@ -163,11 +264,32 @@ function ActivitySourcesPage() {
         reviewQueue={adminSources.filter(({ approvalStatus }) => approvalStatus === "pending")}
         adminSources={adminSources}
         isAdmin={auth.isAdmin}
-        registrationAccess={getActivitySourceRegistrationAccess({
-          activeOrganizationId,
-          organizationRole: activeOrganizationRole,
-          hasNearAccount,
-        })}
+        registrationAccess={registrationAccess}
+        showRegistration={setupComplete}
+        onboarding={
+          setupReady ? (
+            <ActivityOnboardingProgress
+              steps={steps}
+              nearAccountId={setupSource?.nearAccountId ?? null}
+              action={renderSetupAction()}
+              complete={
+                setupSource ? (
+                  <ActivitySetupComplete
+                    revealedSecret={setup.revealedApiKey?.secret ?? null}
+                    eventType={setupSource.eventTypes.find(({ enabled }) => enabled)?.name ?? null}
+                    actor={setupSource.nearAccountId}
+                    onDismiss={setup.dismissRevealedApiKey}
+                  />
+                ) : null
+              }
+            />
+          ) : null
+        }
+        registrationAction={
+          registrationAccess ? (
+            <ActivitySourceRegistrationAction access={registrationAccess} />
+          ) : null
+        }
         isSubmitting={createSource.isPending || reviewSource.isPending || updateTrust.isPending}
         onCreate={async (input) => {
           await createSource.mutateAsync(input);
@@ -179,7 +301,9 @@ function ActivitySourcesPage() {
           await updateTrust.mutateAsync(input);
         }}
         renderCredentials={(source) =>
-          source.approvalStatus === "approved" && activeOrganizationRole === "owner" ? (
+          source.approvalStatus === "approved" &&
+          isOrganizationOwner &&
+          (setupComplete || source.sourceId !== setupSource?.sourceId) ? (
             <>
               <ActivityCredentialsManager source={source} />
               <ActivityGithubManager sourceId={source.sourceId} />
@@ -238,140 +362,35 @@ function ActivityGithubManager({ sourceId }: { sourceId: string }) {
 }
 
 function ActivityCredentialsManager({ source }: { source: ActivitySourceView }) {
-  const apiClient = useApiClient();
-  const authClient = useAuthClient();
-  const queryClient = useQueryClient();
-  const [revealedApiKey, setRevealedApiKey] = useState<{
-    secret: string;
-    apiKeyId: string;
-  } | null>(null);
-
-  const { data: identity = null } = useQuery({
-    queryKey: credentialQueryKey(source.sourceId),
-    queryFn: () => apiClient.getActivitySigningIdentity({ sourceId: source.sourceId }),
-  });
-  const { data: apiKeys = [] } = useQuery({
-    queryKey: apiKeysQueryKey(source.sourceId),
-    queryFn: () => apiClient.listActivitySourceApiKeys({ sourceId: source.sourceId }),
-  });
-
-  const refreshCredentials = async () => {
-    await Promise.all([
-      queryClient.invalidateQueries({ queryKey: credentialQueryKey(source.sourceId) }),
-      queryClient.invalidateQueries({ queryKey: apiKeysQueryKey(source.sourceId) }),
-    ]);
-  };
-
-  const createIdentity = useMutation({
-    mutationFn: () => apiClient.createActivitySigningIdentity({ sourceId: source.sourceId }),
-    onSuccess: async () => {
-      toast.success("Signing Identity created");
-      await refreshCredentials();
-    },
-    onError: (error: Error) => toast.error(error.message || "Failed to create Signing Identity"),
-  });
-
-  const bindIdentity = useMutation({
-    mutationFn: async () => {
-      const prepared = await apiClient.prepareActivitySigningIdentityBinding({
-        sourceId: source.sourceId,
-      });
-      return submitActivityBindingTransaction({
-        wallet: createActivityBindingWallet(authClient.near),
-        nearAccountId: source.nearAccountId,
-        binding: prepared,
-      });
-    },
-    onSuccess: (result) => {
-      toast.success("Binding transaction submitted", {
-        description: result?.txHash
-          ? `Transaction ${result.txHash}. Check the binding after it is indexed.`
-          : "Check the binding after it is indexed.",
-      });
-    },
-    onError: (error: Error) => toast.error(error.message || "Failed to authorize binding"),
-  });
-
-  const confirmBinding = useMutation({
-    mutationFn: () =>
-      apiClient.confirmActivitySigningIdentityBinding({ sourceId: source.sourceId }),
-    onSuccess: async () => {
-      toast.success("NEAR-to-Nostr binding confirmed");
-      await refreshCredentials();
-    },
-    onError: (error: Error) =>
-      toast.error(error.message || "Binding is not indexed yet. Try again shortly."),
-  });
-
-  const rotateIdentity = useMutation({
-    mutationFn: () => apiClient.rotateActivitySigningIdentity({ sourceId: source.sourceId }),
-    onSuccess: async () => {
-      setRevealedApiKey(null);
-      toast.success("Signing Identity rotated", {
-        description: "Authorize the new public key with the Activity Source NEAR account.",
-      });
-      await refreshCredentials();
-    },
-    onError: (error: Error) => toast.error(error.message || "Failed to rotate Signing Identity"),
-  });
-
-  const createApiKey = useMutation({
-    mutationFn: (name: string) =>
-      apiClient.createActivitySourceApiKey({ sourceId: source.sourceId, name }),
-    onSuccess: async ({ secret, apiKey }) => {
-      setRevealedApiKey({ secret, apiKeyId: apiKey.id });
-      toast.success("Source API Key created");
-      await queryClient.invalidateQueries({ queryKey: apiKeysQueryKey(source.sourceId) });
-    },
-    onError: (error: Error) => toast.error(error.message || "Failed to create Source API Key"),
-  });
-
-  const revokeApiKey = useMutation({
-    mutationFn: (apiKeyId: string) =>
-      apiClient.revokeActivitySourceApiKey({ sourceId: source.sourceId, apiKeyId }),
-    onSuccess: async ({ id }) => {
-      if (revealedApiKey?.apiKeyId === id) setRevealedApiKey(null);
-      toast.success("Source API Key revoked");
-      await queryClient.invalidateQueries({ queryKey: apiKeysQueryKey(source.sourceId) });
-    },
-    onError: (error: Error) => toast.error(error.message || "Failed to revoke Source API Key"),
-  });
-
-  const isSubmitting =
-    createIdentity.isPending ||
-    bindIdentity.isPending ||
-    confirmBinding.isPending ||
-    rotateIdentity.isPending ||
-    createApiKey.isPending ||
-    revokeApiKey.isPending;
+  const credentials = useActivitySourceCredentials(source, true);
 
   return (
     <ActivitySourceCredentials
       sourceId={source.sourceId}
       nearAccountId={source.nearAccountId}
-      identity={identity}
-      apiKeys={apiKeys}
-      revealedApiKey={revealedApiKey}
-      isSubmitting={isSubmitting}
+      identity={credentials.identity}
+      apiKeys={credentials.apiKeys}
+      revealedApiKey={credentials.revealedApiKey}
+      isSubmitting={credentials.isSubmitting}
       onCreateIdentity={async () => {
-        await createIdentity.mutateAsync();
+        await credentials.createIdentity.mutateAsync();
       }}
       onBind={async () => {
-        await bindIdentity.mutateAsync();
+        await credentials.bindIdentity.mutateAsync();
       }}
       onConfirmBinding={async () => {
-        await confirmBinding.mutateAsync();
+        await credentials.confirmBinding.mutateAsync();
       }}
       onRotate={async () => {
-        await rotateIdentity.mutateAsync();
+        await credentials.rotateIdentity.mutateAsync();
       }}
       onCreateApiKey={async (name) => {
-        await createApiKey.mutateAsync(name);
+        await credentials.createApiKey.mutateAsync(name);
       }}
       onRevokeApiKey={async (apiKeyId) => {
-        await revokeApiKey.mutateAsync(apiKeyId);
+        await credentials.revokeApiKey.mutateAsync(apiKeyId);
       }}
-      onDismissReveal={() => setRevealedApiKey(null)}
+      onDismissReveal={credentials.dismissRevealedApiKey}
     />
   );
 }

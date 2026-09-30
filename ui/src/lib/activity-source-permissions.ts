@@ -21,8 +21,8 @@ export function getActivitySourceRegistrationAccess(input: {
   organizationRole: string | null;
   hasNearAccount: boolean;
 }): ActivitySourceRegistrationAccess {
+  if (!input.hasNearAccount) return "near-required";
   if (!input.activeOrganizationId) return "organization-required";
   if (input.organizationRole !== "owner") return "owner-required";
-  if (!input.hasNearAccount) return "near-required";
   return "allowed";
 }

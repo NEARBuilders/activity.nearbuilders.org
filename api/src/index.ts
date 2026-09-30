@@ -426,8 +426,8 @@ export default createPlugin.withPlugins<PluginsClient>()({
       }),
 
       createActivitySource: builder.createActivitySource
-        .use(requireNearAuthentication)
         .use(requireOrgRole("owner"))
+        .use(requireNearAuthentication)
         .handler(async ({ input, context }) => {
           validateAccountId(input.nearAccountId);
           return await services.activitySources.createSource({
@@ -532,8 +532,8 @@ export default createPlugin.withPlugins<PluginsClient>()({
         ),
 
       prepareActivitySigningIdentityBinding: builder.prepareActivitySigningIdentityBinding
-        .use(requireNearAuthentication)
         .use(requireOrgRole("owner"))
+        .use(requireNearAuthentication)
         .handler(async ({ input, context }) => {
           const nearAccountId = context.near.primaryAccountId;
           if (!nearAccountId) {
@@ -547,8 +547,8 @@ export default createPlugin.withPlugins<PluginsClient>()({
         }),
 
       confirmActivitySigningIdentityBinding: builder.confirmActivitySigningIdentityBinding
-        .use(requireNearAuthentication)
         .use(requireOrgRole("owner"))
+        .use(requireNearAuthentication)
         .handler(async ({ input, context }) => {
           const nearAccountId = context.near.primaryAccountId;
           if (!nearAccountId) {

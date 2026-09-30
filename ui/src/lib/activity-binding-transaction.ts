@@ -65,11 +65,39 @@ export async function submitActivityBindingTransaction({
   binding: ActivityBindingWrite;
 }): Promise<{ txHash: string | null }> {
   wallet.switchToMainnet();
-  const connected = await wallet.connect();
-  if (!connected) {
-    throw new Error(`Connect ${nearAccountId} on NEAR mainnet to continue.`);
+
+  if (!wallet.getActiveAccount()?.accountId) {
+    const connected = await wallet.connect();
+    if (!connected) {
+      throw new Error(`Connect ${nearAccountId} on NEAR mainnet to continue.`);
+    }
   }
 
+  assertSourceAccount(wallet, nearAccountId);
+
+  const call = {
+    signerId: nearAccountId,
+    contractId: binding.contractId,
+    methodName: binding.methodName,
+    args: binding.args,
+    gas: binding.gas,
+    attachedDeposit: binding.attachedDeposit,
+  };
+
+  try {
+    return await wallet.callContract(call);
+  } catch (error) {
+    if (!isStaleWalletSession(error)) throw error;
+    const connected = await wallet.connect();
+    if (!connected) {
+      throw new Error(`Connect ${nearAccountId} on NEAR mainnet to continue.`);
+    }
+    assertSourceAccount(wallet, nearAccountId);
+    return wallet.callContract(call);
+  }
+}
+
+function assertSourceAccount(wallet: ActivityBindingWallet, nearAccountId: string) {
   const activeAccount = wallet.getActiveAccount();
   if (activeAccount?.network !== "mainnet") {
     throw new Error("Switch your wallet to NEAR mainnet to authorize this source.");
@@ -77,13 +105,8 @@ export async function submitActivityBindingTransaction({
   if (activeAccount.accountId !== nearAccountId) {
     throw new Error(`Connect ${nearAccountId} to authorize this Activity Source.`);
   }
+}
 
-  return wallet.callContract({
-    signerId: nearAccountId,
-    contractId: binding.contractId,
-    methodName: binding.methodName,
-    args: binding.args,
-    gas: binding.gas,
-    attachedDeposit: binding.attachedDeposit,
-  });
+function isStaleWalletSession(error: unknown) {
+  return error instanceof Error && /No accounts found|No wallet selected/.test(error.message);
 }

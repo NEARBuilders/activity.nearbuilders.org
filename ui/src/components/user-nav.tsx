@@ -2,7 +2,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef } from "react";
 import { toast } from "sonner";
-import type { Organization } from "@/app";
 import { sessionQueryOptions, useAuthClient } from "@/app";
 import { OrgSwitcher } from "@/components/org-switcher";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -15,7 +14,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { synchronizeActiveOrganization } from "@/lib/active-organization";
+import { useOrganizationSwitcher } from "@/hooks/use-organization-switcher";
 import { getInitials } from "@/lib/utils";
 
 export function UserNav() {
@@ -25,16 +24,7 @@ export function UserNav() {
   const router = useRouter();
   const { data: session } = useQuery(sessionQueryOptions(auth));
   const user = session?.user;
-  const { data: organizations } = useQuery({
-    queryKey: ["organizations"],
-    queryFn: async () => {
-      const { data } = await auth.organization.list();
-      return (data || []) as Organization[];
-    },
-    staleTime: 30 * 1000,
-    enabled: !!user,
-  });
-  const activeOrgId = session?.session?.activeOrganizationId;
+  const { organizations, activeOrgId, handleOrgSwitch } = useOrganizationSwitcher();
 
   const activeOrg = useMemo(() => {
     return organizations?.find((org) => org.id === activeOrgId);
@@ -60,33 +50,6 @@ export function UserNav() {
     },
   });
 
-  const handleOrgSwitch = async (organizationId: string) =>
-    synchronizeActiveOrganization({
-      organizationId,
-      queryClient,
-      setActiveOrganization: async () => {
-        const { error } = await auth.organization.setActive({ organizationId });
-        if (error?.status === 401) {
-          await auth.signOut();
-          queryClient.setQueryData(["session"], null);
-          queryClient.removeQueries({ queryKey: ["activity-sources"] });
-          await navigate({ to: "/login", search: { redirect: "/activity-sources" } });
-          throw new Error("Your session expired. Sign in again to switch workspaces.");
-        }
-        if (error) throw new Error(error.message || "Failed to switch organization");
-      },
-      confirmActiveOrganization: async () => {
-        const { data, error } = await auth.getSession({
-          query: { disableCookieCache: true },
-        });
-        if (error) {
-          throw new Error(error.message || "Failed to confirm the selected workspace");
-        }
-        return data?.session.activeOrganizationId ?? null;
-      },
-      invalidateRouter: () => router.invalidate(),
-    });
-
   const autoSelection = useRef<string | null>(null);
   useEffect(() => {
     if (!user || activeOrgId || !organizations?.length || autoSelection.current === user.id) return;
@@ -111,7 +74,7 @@ export function UserNav() {
   return (
     <div className="flex min-w-0 items-center gap-2">
       <OrgSwitcher
-        organizations={organizations ?? []}
+        organizations={organizations}
         activeOrgId={activeOrgId}
         onSwitch={handleOrgSwitch}
       />

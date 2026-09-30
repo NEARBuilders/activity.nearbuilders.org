@@ -100,6 +100,25 @@ describe("ActivitySourcesDashboard", () => {
     expect(markup).not.toContain("Register source");
   });
 
+  it("tells a waiting owner who approves the source and that the role is separate", () => {
+    const markup = renderToStaticMarkup(
+      <ActivitySourcesDashboard
+        sources={[pendingSource]}
+        reviewQueue={[]}
+        adminSources={[]}
+        isAdmin={false}
+        registrationAccess="allowed"
+        isSubmitting={false}
+        onCreate={vi.fn()}
+        onReview={vi.fn()}
+        onTrust={vi.fn()}
+      />,
+    );
+
+    expect(markup).toContain("Waiting on a Platform Administrator");
+    expect(markup).toContain("separate from your organization");
+  });
+
   it("explains when the active member is not an organization owner", () => {
     const markup = renderToStaticMarkup(
       <ActivitySourcesDashboard
