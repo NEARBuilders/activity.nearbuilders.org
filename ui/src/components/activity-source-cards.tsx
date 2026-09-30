@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
 const statusLabel: Record<ActivitySourceView["approvalStatus"], string> = {
@@ -17,23 +18,54 @@ const statusLabel: Record<ActivitySourceView["approvalStatus"], string> = {
   rejected: "Rejected",
 };
 
+export interface ActivitySourceCardTab {
+  value: string;
+  label: string;
+  content: ReactNode;
+}
+
 export function ActivitySourceCard({
   source,
-  credentials,
+  tabs,
+  health,
+  showPendingNotice = true,
 }: {
   source: ActivitySourceView;
-  credentials?: ReactNode;
+  tabs?: ActivitySourceCardTab[] | null;
+  health?: ReactNode;
+  showPendingNotice?: boolean;
 }) {
   const statusVariant = source.approvalStatus === "rejected" ? "destructive" : "secondary";
 
+  const eventTypes = (
+    <ul className="divide-y divide-border rounded-lg border border-border">
+      {source.eventTypes.map((eventType) => (
+        <li
+          key={eventType.name}
+          className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+        >
+          <div className="min-w-0 space-y-0.5">
+            <p className="font-mono text-sm text-foreground">{eventType.name}</p>
+            <p className="text-xs text-muted-foreground">{eventType.description}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {!eventType.enabled && <Badge variant="outline">Disabled</Badge>}
+            <Badge variant="secondary">{eventType.pointValue} points</Badge>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+
   return (
-    <Card className="gap-4 p-5">
+    <Card className="gap-5 p-5 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="space-y-1">
-          <h3 className="font-semibold text-foreground">{source.displayName}</h3>
-          <p className="font-mono text-xs text-muted-foreground">
+        <div className="min-w-0 space-y-1">
+          <h3 className="text-base font-semibold text-foreground">{source.displayName}</h3>
+          <p className="truncate font-mono text-xs text-muted-foreground">
             {source.sourceId} · {source.nearAccountId}
           </p>
+          {health}
         </div>
         <div className="flex flex-wrap gap-2">
           <Badge variant={statusVariant}>{statusLabel[source.approvalStatus]}</Badge>
@@ -45,47 +77,51 @@ export function ActivitySourceCard({
         </div>
       </div>
 
-      <div className="space-y-2">
-        {source.eventTypes.map((eventType) => (
-          <div
-            key={eventType.name}
-            className="flex flex-wrap items-center justify-between gap-2 border-t border-border pt-2 text-xs"
-          >
-            <div>
-              <div className="font-mono text-foreground">{eventType.name}</div>
-              <div className="text-muted-foreground">{eventType.description}</div>
-            </div>
-            <div className="flex items-center gap-2 text-muted-foreground">
-              <span>{eventType.pointValue} points</span>
-              <span>{eventType.enabled ? "Enabled" : "Disabled"}</span>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {source.approvalStatus === "pending" && (
-        <div className="rounded-lg bg-muted p-3">
-          <p className="text-xs font-medium text-foreground">Waiting on a Platform Administrator</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            A Platform Administrator reviews this source and approves or rejects it with a written
-            reason. That role is separate from your organization's roles — being an owner or admin
-            of your organization does not let you approve it. Credentials and the Source API Key
-            appear here once the source is approved.
+      {source.approvalStatus === "pending" && showPendingNotice && (
+        <div className="rounded-lg bg-muted p-4">
+          <p className="text-sm font-medium text-foreground">Waiting on a Platform Administrator</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            They approve or reject it with a written reason. This is separate from your
+            organization's roles, so owners cannot approve their own sources.
           </p>
         </div>
       )}
 
-      {source.reviewReason && (
-        <p className="text-xs text-muted-foreground">Review: {source.reviewReason}</p>
+      {source.reviewReason && source.approvalStatus === "rejected" && (
+        <p className="rounded-lg bg-muted p-4 text-sm text-foreground">
+          Reviewer: {source.reviewReason}
+        </p>
       )}
 
-      {credentials && (
-        <details className="border-t pt-3">
-          <summary className="cursor-pointer text-sm font-medium">
-            Credentials and publishing
-          </summary>
-          <div className="mt-4">{credentials}</div>
-        </details>
+      {tabs && tabs.length > 0 ? (
+        <Tabs defaultValue="event-types" className="gap-4">
+          <TabsList
+            variant="line"
+            className="w-full justify-start overflow-x-auto border-b border-border"
+          >
+            <TabsTrigger value="event-types" className="flex-none">
+              Event types
+            </TabsTrigger>
+            {tabs.map((tab) => (
+              <TabsTrigger key={tab.value} value={tab.value} className="flex-none">
+                {tab.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+          <TabsContent value="event-types">{eventTypes}</TabsContent>
+          {tabs.map((tab) => (
+            <TabsContent
+              key={tab.value}
+              value={tab.value}
+              forceMount
+              className="data-[state=inactive]:hidden"
+            >
+              {tab.content}
+            </TabsContent>
+          ))}
+        </Tabs>
+      ) : (
+        eventTypes
       )}
     </Card>
   );

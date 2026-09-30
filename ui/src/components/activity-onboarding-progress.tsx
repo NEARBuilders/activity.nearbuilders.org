@@ -115,7 +115,7 @@ export function ActivityOnboardingProgress({
                 aria-hidden="true"
                 className={cn(
                   "absolute top-3.5 right-1/2 h-px w-full",
-                  steps[index - 1].status === "complete" ? "bg-primary" : "bg-border",
+                  steps[index - 1].status === "complete" ? "bg-brand-accent" : "bg-border",
                 )}
               />
             )}
@@ -145,9 +145,9 @@ export function ActivityOnboardingProgress({
 }
 
 const segmentClass: Record<ActivityOnboardingStepStatus, string> = {
-  complete: "bg-primary",
-  current: "bg-primary/50",
-  waiting: "bg-primary/50",
+  complete: "bg-brand-accent",
+  current: "bg-brand-accent/50",
+  waiting: "bg-brand-accent/50",
   blocked: "bg-destructive",
   upcoming: "bg-border",
 };
@@ -157,9 +157,10 @@ function StepMarker({ status, index }: { status: ActivityOnboardingStepStatus; i
     <span
       className={cn(
         "relative z-10 flex size-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold",
-        status === "complete" && "border-primary bg-primary text-primary-foreground",
-        status === "current" && "border-primary bg-background text-primary ring-2 ring-primary/30",
-        status === "waiting" && "border-primary bg-background text-primary",
+        status === "complete" && "border-brand-accent bg-brand-accent text-brand-accent-foreground",
+        status === "current" &&
+          "border-brand-accent bg-background text-foreground ring-2 ring-brand-accent/30",
+        status === "waiting" && "border-brand-accent bg-background text-foreground",
         status === "blocked" && "border-destructive bg-background text-destructive",
         status === "upcoming" && "border-border bg-background text-muted-foreground",
       )}

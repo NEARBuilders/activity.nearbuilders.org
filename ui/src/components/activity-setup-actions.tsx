@@ -4,6 +4,7 @@ import {
   CopyIcon as Copy,
   LinkIcon as Link2,
   ArrowsClockwiseIcon as RefreshCw,
+  WalletIcon as Wallet,
 } from "@phosphor-icons/react/ssr";
 import { Link } from "@tanstack/react-router";
 import { useState } from "react";
@@ -13,6 +14,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import { formatRelativeTime } from "@/lib/relative-time";
 
 async function copyText(text: string, label: string) {
   try {
@@ -25,30 +27,40 @@ async function copyText(text: string, label: string) {
 
 export function ActivityLinkOnChainAction({
   requiredAccountId,
-  signedInAccountId,
+  linkedAccountIds,
   isLinking,
   isChecking,
+  isLinkingAccount,
   canCheck,
   onLink,
   onCheck,
+  onLinkAccount,
 }: {
   requiredAccountId: string;
-  signedInAccountId: string | null;
+  linkedAccountIds: string[];
   isLinking: boolean;
   isChecking: boolean;
+  isLinkingAccount: boolean;
   canCheck: boolean;
   onLink: () => void;
   onCheck: () => void;
+  onLinkAccount: () => void;
 }) {
-  if (signedInAccountId && signedInAccountId !== requiredAccountId) {
+  if (linkedAccountIds.length > 0 && !linkedAccountIds.includes(requiredAccountId)) {
     return (
-      <div className="space-y-1 rounded-md border border-border bg-background p-3 text-sm">
-        <p className="font-medium text-foreground">Sign in as {requiredAccountId} to continue</p>
-        <p className="text-muted-foreground">
-          Only {requiredAccountId} can link this source, and you are signed in as{" "}
-          {signedInAccountId}. Sign out and sign back in with {requiredAccountId}, then come back to
-          this page.
-        </p>
+      <div className="space-y-3 rounded-md border border-border bg-background p-3 text-sm">
+        <div className="space-y-1">
+          <p className="font-medium text-foreground">Add {requiredAccountId} to your profile</p>
+          <p className="text-muted-foreground">
+            Only {requiredAccountId} can link this source, and your profile has{" "}
+            {linkedAccountIds.join(", ")}. Add {requiredAccountId} by signing one message with it;
+            you stay signed in and keep this organization.
+          </p>
+        </div>
+        <Button type="button" onClick={onLinkAccount} disabled={isLinkingAccount}>
+          <Wallet />
+          {isLinkingAccount ? "Waiting for wallet..." : `Add ${requiredAccountId}`}
+        </Button>
       </div>
     );
   }
@@ -136,11 +148,13 @@ export function ActivitySetupComplete({
   revealedSecret,
   eventType,
   actor,
+  firstEvent,
   onDismiss,
 }: {
   revealedSecret: string | null;
   eventType: string | null;
   actor: string;
+  firstEvent?: { type: string; timestamp: string } | null;
   onDismiss: () => void;
 }) {
   const guideLink = (
@@ -156,7 +170,7 @@ export function ActivitySetupComplete({
     return (
       <Card className="flex-row flex-wrap items-center justify-between gap-3 p-4">
         <div className="flex items-center gap-3">
-          <CheckCircle className="size-6 shrink-0 text-primary" weight="fill" />
+          <CheckCircle className="size-6 shrink-0 text-brand-accent" weight="fill" />
           <div>
             <p className="text-sm font-semibold text-foreground">Setup complete</p>
             <p className="text-xs text-muted-foreground">
@@ -177,7 +191,7 @@ export function ActivitySetupComplete({
   return (
     <Card className="gap-5 p-4 sm:p-5" aria-label="Setup complete">
       <div className="flex items-start gap-3">
-        <CheckCircle className="mt-0.5 size-6 shrink-0 text-primary" weight="fill" />
+        <CheckCircle className="mt-0.5 size-6 shrink-0 text-brand-accent" weight="fill" />
         <div className="space-y-1">
           <h2 className="text-base font-semibold text-foreground">You're ready to send events</h2>
           <p className="text-sm text-muted-foreground">
@@ -224,11 +238,12 @@ export function ActivitySetupComplete({
             {command}
           </pre>
           <p className="text-xs text-muted-foreground">
-            Run it from a terminal. It should return an event ID, and the event appears in the
-            Activity feed.
+            Run it from a terminal. It should return an event ID.
           </p>
         </div>
       )}
+
+      {firstEvent !== undefined && <FirstEventStatus firstEvent={firstEvent} />}
 
       <div className="flex flex-wrap gap-2">
         <Button type="button" onClick={onDismiss}>
@@ -237,5 +252,41 @@ export function ActivitySetupComplete({
         {guideLink}
       </div>
     </Card>
+  );
+}
+
+function FirstEventStatus({
+  firstEvent,
+}: {
+  firstEvent: { type: string; timestamp: string } | null;
+}) {
+  if (!firstEvent) {
+    return (
+      <div
+        className="flex items-center gap-3 rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground"
+        aria-live="polite"
+      >
+        <Spinner className="size-4" />
+        Waiting for your first event. This updates on its own once it arrives.
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-brand-accent/40 bg-brand-accent/5 p-4"
+      aria-live="polite"
+    >
+      <div className="flex items-center gap-3">
+        <CheckCircle className="size-5 shrink-0 text-brand-accent" weight="fill" />
+        <p className="text-sm text-foreground">
+          First event received: <span className="font-mono">{firstEvent.type}</span>,{" "}
+          {formatRelativeTime(firstEvent.timestamp)}
+        </p>
+      </div>
+      <Button asChild size="sm" variant="outline">
+        <Link to="/activity">View in feed</Link>
+      </Button>
+    </div>
   );
 }

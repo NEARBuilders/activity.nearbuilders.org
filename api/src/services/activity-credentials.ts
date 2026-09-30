@@ -43,7 +43,7 @@ export interface ActivityCredentialsService {
   prepareSigningIdentityBinding(
     organizationId: string,
     sourceId: string,
-    nearAccountId: string,
+    linkedNearAccountIds: string[],
   ): Promise<ActivityBindingWrite>;
   getSigningIdentity(
     organizationId: string,
@@ -52,7 +52,7 @@ export interface ActivityCredentialsService {
   confirmSigningIdentityBinding(
     organizationId: string,
     sourceId: string,
-    nearAccountId: string,
+    linkedNearAccountIds: string[],
   ): Promise<ActivitySigningIdentityRecord>;
   createApiKey(
     organizationId: string,
@@ -162,6 +162,18 @@ function toApiKeyRecord(
 
 function hashApiKey(secret: string): string {
   return createHash("sha256").update(secret, "utf8").digest("hex");
+}
+
+function requireLinkedSourceAccount(
+  sourceNearAccountId: string,
+  linkedNearAccountIds: string[],
+): string {
+  if (!linkedNearAccountIds.includes(sourceNearAccountId)) {
+    throw new ORPCError("FORBIDDEN", {
+      message: `Only ${sourceNearAccountId} can link this source. Link that NEAR account to your profile, then try again.`,
+    });
+  }
+  return sourceNearAccountId;
 }
 
 function hasCurrentBinding(
@@ -284,17 +296,16 @@ export const ActivityCredentialsLive = (
           }
         },
 
-        prepareSigningIdentityBinding: async (organizationId, sourceId, nearAccountId) => {
+        prepareSigningIdentityBinding: async (organizationId, sourceId, linkedNearAccountIds) => {
           try {
             const result = await findActiveIdentity(organizationId, sourceId);
             if (result.source.approvalStatus !== "approved") {
               throw new ORPCError("FORBIDDEN", { message: "Activity Source is not approved" });
             }
-            if (result.source.nearAccountId !== nearAccountId) {
-              throw new ORPCError("FORBIDDEN", {
-                message: `Only ${result.source.nearAccountId} can link this source. You are signed in as ${nearAccountId}.`,
-              });
-            }
+            const nearAccountId = requireLinkedSourceAccount(
+              result.source.nearAccountId,
+              linkedNearAccountIds,
+            );
             const now = Math.floor(Date.now() / 1_000);
             const challenge = `bind:${nearAccountId}:${now + 300}:near-nostr-bindings`;
             const privateKey = decryptActivitySecret(
@@ -378,17 +389,16 @@ export const ActivityCredentialsLive = (
           }
         },
 
-        confirmSigningIdentityBinding: async (organizationId, sourceId, nearAccountId) => {
+        confirmSigningIdentityBinding: async (organizationId, sourceId, linkedNearAccountIds) => {
           try {
             const result = await findActiveIdentity(organizationId, sourceId);
             if (result.source.approvalStatus !== "approved") {
               throw new ORPCError("FORBIDDEN", { message: "Activity Source is not approved" });
             }
-            if (result.source.nearAccountId !== nearAccountId) {
-              throw new ORPCError("FORBIDDEN", {
-                message: "Connect the Activity Source NEAR account to confirm this binding",
-              });
-            }
+            const nearAccountId = requireLinkedSourceAccount(
+              result.source.nearAccountId,
+              linkedNearAccountIds,
+            );
             const accountPath = encodeURIComponent(nearAccountId);
             const bindingUrl = `${bindingConfig.kvApiUrl.replace(/\/$/, "")}/v0/latest/${encodeURIComponent(bindingConfig.contractId)}/${accountPath}/nostr/${accountPath}`;
             let response: Response;

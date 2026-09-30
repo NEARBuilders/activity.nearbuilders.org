@@ -2,130 +2,148 @@
 
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ActivitySourceCredentials } from "@/components/activity-source-credentials";
+import {
+  ActivityApiKeysPanel,
+  ActivitySigningKeyPanel,
+  shortenKey,
+} from "@/components/activity-source-credentials";
+import type {
+  ActivitySigningIdentityView,
+  ActivitySourceApiKeyView,
+} from "@/components/activity-sources-model";
+
+vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 afterEach(cleanup);
 
-describe("ActivitySourceCredentials", () => {
-  it("walks an approved source owner through identity, binding, and API-key controls", async () => {
-    const onCreateIdentity = vi.fn().mockResolvedValue(undefined);
-    const { rerender } = render(
-      <ActivitySourceCredentials
-        sourceId="feedback"
+const boundIdentity: ActivitySigningIdentityView = {
+  publicKey: "a".repeat(64),
+  bindingStatus: "bound",
+  boundNearAccountId: "feedback.near",
+  boundAt: "2026-09-25T08:32:44.000Z",
+  keyVersion: "v1",
+  createdBy: "owner",
+  createdAt: "2026-09-25T08:30:00.000Z",
+  retiredBy: null,
+  retirementReason: null,
+  retiredAt: null,
+};
+
+const activeKey: ActivitySourceApiKeyView = {
+  id: "key-1",
+  sourceId: "feedback",
+  name: "Production",
+  prefix: "act_Uw9Het6B",
+  permissions: ["event:write"],
+  createdAt: "2026-09-25T09:00:00.000Z",
+  lastUsedAt: null,
+  revokedAt: null,
+};
+
+describe("ActivitySigningKeyPanel", () => {
+  it("shows the link action until the key is linked on-chain", () => {
+    render(
+      <ActivitySigningKeyPanel
         nearAccountId="feedback.near"
-        identity={null}
-        apiKeys={[]}
-        isSubmitting={false}
-        onCreateIdentity={onCreateIdentity}
-        onBind={vi.fn()}
-        onConfirmBinding={vi.fn()}
+        identity={{ ...boundIdentity, bindingStatus: "pending" }}
+        isRotating={false}
         onRotate={vi.fn()}
-        onCreateApiKey={vi.fn()}
-        onRevokeApiKey={vi.fn()}
+        linkAction={<button type="button">Approve in wallet</button>}
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Create Signing Identity" }));
-    await waitFor(() => expect(onCreateIdentity).toHaveBeenCalledOnce());
-
-    const onBind = vi.fn().mockResolvedValue(undefined);
-    const onConfirmBinding = vi.fn().mockResolvedValue(undefined);
-    rerender(
-      <ActivitySourceCredentials
-        sourceId="feedback"
-        nearAccountId="feedback.near"
-        identity={{
-          publicKey: "a".repeat(64),
-          bindingStatus: "pending",
-          boundNearAccountId: null,
-          boundAt: null,
-          keyVersion: "v1",
-          createdBy: "owner-1",
-          createdAt: "2026-09-03T00:00:00.000Z",
-          retiredBy: null,
-          retirementReason: null,
-          retiredAt: null,
-        }}
-        apiKeys={[]}
-        isSubmitting={false}
-        onCreateIdentity={onCreateIdentity}
-        onBind={onBind}
-        onConfirmBinding={onConfirmBinding}
-        onRotate={vi.fn()}
-        onCreateApiKey={vi.fn()}
-        onRevokeApiKey={vi.fn()}
-      />,
-    );
-
-    expect(screen.getByText("a".repeat(64))).toBeTruthy();
-    expect(screen.getByText(/Authorize the binding transaction from feedback\.near/)).toBeTruthy();
-
-    fireEvent.click(screen.getByRole("button", { name: "Check binding" }));
-    await waitFor(() => expect(onConfirmBinding).toHaveBeenCalledOnce());
-
-    fireEvent.click(screen.getByRole("button", { name: "Authorize with NEAR" }));
-    await waitFor(() => expect(onBind).toHaveBeenCalledOnce());
-    expect(screen.getByText(/This checks automatically/)).toBeTruthy();
-    expect(screen.queryByLabelText("Source API Key name")).toBeNull();
+    expect(screen.getByText("Not linked on-chain yet")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Approve in wallet" })).toBeTruthy();
   });
 
-  it("reveals a newly created key while listing only safe key metadata", async () => {
-    const onCreateApiKey = vi.fn().mockResolvedValue(undefined);
-    const onRevokeApiKey = vi.fn().mockResolvedValue(undefined);
+  it("summarises a linked key in plain terms and offers rotation", () => {
+    const onRotate = vi.fn();
     render(
-      <ActivitySourceCredentials
-        sourceId="feedback"
+      <ActivitySigningKeyPanel
         nearAccountId="feedback.near"
-        identity={{
-          publicKey: "b".repeat(64),
-          bindingStatus: "bound",
-          boundNearAccountId: "feedback.near",
-          boundAt: "2026-09-03T00:00:00.000Z",
-          keyVersion: "v1",
-          createdBy: "owner-1",
-          createdAt: "2026-09-03T00:00:00.000Z",
-          retiredBy: null,
-          retirementReason: null,
-          retiredAt: null,
-        }}
-        apiKeys={[
-          {
-            id: "key-1",
-            sourceId: "feedback",
-            name: "Production",
-            prefix: "act_abcdefgh",
-            permissions: ["event:write"],
-            createdAt: "2026-09-03T00:00:00.000Z",
-            lastUsedAt: null,
-            revokedAt: null,
-          },
-        ]}
-        revealedApiKey={{
-          secret: `act_${"x".repeat(43)}`,
-          apiKeyId: "key-1",
-        }}
-        isSubmitting={false}
-        onCreateIdentity={vi.fn()}
-        onBind={vi.fn()}
-        onConfirmBinding={vi.fn()}
-        onRotate={vi.fn()}
-        onCreateApiKey={onCreateApiKey}
-        onRevokeApiKey={onRevokeApiKey}
+        identity={boundIdentity}
+        isRotating={false}
+        onRotate={onRotate}
+        linkAction={null}
       />,
     );
 
-    expect(screen.getByDisplayValue(`act_${"x".repeat(43)}`)).toBeTruthy();
-    expect(screen.getByText("act_abcdefgh")).toBeTruthy();
-    expect(screen.getByText("event:write")).toBeTruthy();
-    fireEvent.change(screen.getByLabelText("Source API Key name"), {
-      target: { value: "Staging gateway" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: "Create Source API Key" }));
-    fireEvent.click(screen.getByRole("button", { name: "Revoke Production" }));
+    expect(screen.getByText("Linked on-chain to feedback.near")).toBeTruthy();
+    expect(screen.getByText(shortenKey(boundIdentity.publicKey))).toBeTruthy();
+    expect(screen.queryByText(/Master key/)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Rotate key" }));
+    expect(onRotate).toHaveBeenCalled();
+  });
+});
 
-    await waitFor(() => {
-      expect(onCreateApiKey).toHaveBeenCalledWith("Staging gateway");
-      expect(onRevokeApiKey).toHaveBeenCalledWith("key-1");
-    });
+describe("ActivityApiKeysPanel", () => {
+  it("asks for the on-chain link before offering keys", () => {
+    render(
+      <ActivityApiKeysPanel
+        apiKeys={[]}
+        isLinked={false}
+        revealedApiKey={null}
+        isSubmitting={false}
+        onCreateApiKey={vi.fn()}
+        onRevokeApiKey={vi.fn()}
+        onDismissReveal={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/Link the signing key on-chain first/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Create key" })).toBeNull();
+  });
+
+  it("lists active keys with safe metadata and hides revoked ones", () => {
+    const onRevoke = vi.fn();
+    render(
+      <ActivityApiKeysPanel
+        apiKeys={[activeKey, { ...activeKey, id: "key-2", revokedAt: "2026-09-26T00:00:00.000Z" }]}
+        isLinked
+        revealedApiKey={null}
+        isSubmitting={false}
+        onCreateApiKey={vi.fn()}
+        onRevokeApiKey={onRevoke}
+        onDismissReveal={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("act_Uw9Het6B…")).toBeTruthy();
+    expect(screen.getByText(/Created Sep 25, 2026 · Never used/)).toBeTruthy();
+    expect(screen.getByText("1 revoked key hidden.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Revoke Production" }));
+    expect(onRevoke).toHaveBeenCalledWith("key-1");
+  });
+
+  it("creates a named key and reveals the secret once", async () => {
+    const onCreate = vi.fn().mockResolvedValue(undefined);
+    const { rerender } = render(
+      <ActivityApiKeysPanel
+        apiKeys={[]}
+        isLinked
+        revealedApiKey={null}
+        isSubmitting={false}
+        onCreateApiKey={onCreate}
+        onRevokeApiKey={vi.fn()}
+        onDismissReveal={vi.fn()}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("New key name"), { target: { value: "Staging" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create key" }));
+    await waitFor(() => expect(onCreate).toHaveBeenCalledWith("Staging"));
+
+    rerender(
+      <ActivityApiKeysPanel
+        apiKeys={[activeKey]}
+        isLinked
+        revealedApiKey={{ secret: "act_secret", apiKeyId: "key-1" }}
+        isSubmitting={false}
+        onCreateApiKey={onCreate}
+        onRevokeApiKey={vi.fn()}
+        onDismissReveal={vi.fn()}
+      />,
+    );
+    expect((screen.getByLabelText("New API key") as HTMLInputElement).value).toBe("act_secret");
   });
 });

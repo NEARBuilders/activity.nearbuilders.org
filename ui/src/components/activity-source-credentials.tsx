@@ -1,268 +1,268 @@
 import {
+  CheckCircleIcon as CheckCircle,
   CopyIcon as Copy,
-  KeyIcon as KeyRound,
-  LinkIcon as Link2,
-  ArrowsClockwiseIcon as RefreshCw,
+  KeyIcon as Key,
   ArrowClockwiseIcon as RotateCw,
-  ShieldCheckIcon as ShieldCheck,
 } from "@phosphor-icons/react/ssr";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import type {
   ActivitySigningIdentityView,
   ActivitySourceApiKeyView,
 } from "@/components/activity-sources-model";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-const BINDING_POLL_INTERVAL_MS = 2000;
-const BINDING_POLL_ATTEMPTS = 15;
+const dateFormat = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  timeZone: "UTC",
+});
 
-interface ActivitySourceCredentialsProps {
-  sourceId: string;
-  nearAccountId: string;
-  identity: ActivitySigningIdentityView | null;
-  apiKeys: ActivitySourceApiKeyView[];
-  revealedApiKey?: { secret: string; apiKeyId: string } | null;
-  isSubmitting: boolean;
-  onCreateIdentity: () => void | Promise<void>;
-  onBind: () => void | Promise<void>;
-  onConfirmBinding: () => void | Promise<void>;
-  onRotate: () => void | Promise<void>;
-  onCreateApiKey: (name: string) => void | Promise<void>;
-  onRevokeApiKey: (apiKeyId: string) => void | Promise<void>;
-  onDismissReveal?: () => void;
+function formatDate(value: string) {
+  return dateFormat.format(new Date(value));
 }
 
-export function ActivitySourceCredentials({
-  sourceId,
+export function shortenKey(value: string) {
+  return value.length > 16 ? `${value.slice(0, 8)}…${value.slice(-6)}` : value;
+}
+
+async function copyToClipboard(value: string, label: string) {
+  try {
+    await navigator.clipboard.writeText(value);
+    toast.success(`${label} copied`);
+  } catch {
+    toast.error(`Failed to copy ${label.toLowerCase()}`);
+  }
+}
+
+export function ActivitySigningKeyPanel({
   nearAccountId,
   identity,
+  isRotating,
+  onRotate,
+  linkAction,
+}: {
+  nearAccountId: string;
+  identity: ActivitySigningIdentityView | null;
+  isRotating: boolean;
+  onRotate: () => void;
+  linkAction: ReactNode;
+}) {
+  if (identity?.bindingStatus !== "bound") {
+    return (
+      <div className="space-y-4">
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-foreground">Not linked on-chain yet</p>
+          <p className="text-sm text-muted-foreground">
+            Approve one transaction from {nearAccountId} to prove this source belongs to it. API
+            keys only work once the source is linked.
+          </p>
+        </div>
+        {linkAction}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start gap-3">
+        <CheckCircle className="mt-0.5 size-5 shrink-0 text-brand-accent" weight="fill" />
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-foreground">
+            Linked on-chain to {identity.boundNearAccountId ?? nearAccountId}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Activity signs every event from this source with this key. Its private half is encrypted
+            and never leaves Activity.
+            {identity.boundAt && ` Linked ${formatDate(identity.boundAt)}.`}
+          </p>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-medium text-muted-foreground">Public key</span>
+        <code className="rounded-md bg-muted px-2 py-1 font-mono text-xs text-foreground">
+          {shortenKey(identity.publicKey)}
+        </code>
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => copyToClipboard(identity.publicKey, "Public key")}
+        >
+          <Copy />
+          Copy
+        </Button>
+      </div>
+
+      <div className="flex flex-col gap-3 border-t border-border pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <p className="text-sm font-medium text-foreground">Rotate key</p>
+          <p className="text-sm text-muted-foreground">
+            Replace the key if you think it has been exposed. You approve one new transaction, and
+            your API keys work again once it is linked.
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="shrink-0 self-start sm:self-auto"
+          onClick={onRotate}
+          disabled={isRotating}
+        >
+          <RotateCw />
+          {isRotating ? "Rotating..." : "Rotate key"}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+export function ActivityApiKeysPanel({
   apiKeys,
+  isLinked,
   revealedApiKey,
   isSubmitting,
-  onCreateIdentity,
-  onBind,
-  onConfirmBinding,
-  onRotate,
   onCreateApiKey,
   onRevokeApiKey,
   onDismissReveal,
-}: ActivitySourceCredentialsProps) {
-  const [apiKeyName, setApiKeyName] = useState("");
-  const [isPolling, setIsPolling] = useState(false);
-  const [pollExpired, setPollExpired] = useState(false);
-  const confirmBindingRef = useRef(onConfirmBinding);
-  confirmBindingRef.current = onConfirmBinding;
-  const bindingStatus = identity?.bindingStatus ?? null;
+}: {
+  apiKeys: ActivitySourceApiKeyView[];
+  isLinked: boolean;
+  revealedApiKey: { secret: string; apiKeyId: string } | null;
+  isSubmitting: boolean;
+  onCreateApiKey: (name: string) => void | Promise<void>;
+  onRevokeApiKey: (apiKeyId: string) => void | Promise<void>;
+  onDismissReveal: () => void;
+}) {
+  const [name, setName] = useState("");
+  const activeKeys = apiKeys.filter((apiKey) => !apiKey.revokedAt);
+  const revokedKeys = apiKeys.filter((apiKey) => apiKey.revokedAt);
 
-  useEffect(() => {
-    if (!isPolling) return;
-    if (bindingStatus !== "pending") {
-      setIsPolling(false);
-      return;
-    }
-
-    let attempts = 0;
-    const timer = setInterval(() => {
-      attempts += 1;
-      void Promise.resolve(confirmBindingRef.current()).catch(() => {});
-      if (attempts >= BINDING_POLL_ATTEMPTS) {
-        setIsPolling(false);
-        setPollExpired(true);
-      }
-    }, BINDING_POLL_INTERVAL_MS);
-
-    return () => clearInterval(timer);
-  }, [isPolling, bindingStatus]);
-
-  const authorizeBinding = async () => {
-    setPollExpired(false);
-    await onBind();
-    setIsPolling(true);
-  };
-
-  const createApiKey = async () => {
-    const name = apiKeyName.trim();
-    if (!name) return;
-    await onCreateApiKey(name);
-    setApiKeyName("");
-  };
-
-  const copySecret = async () => {
-    if (!revealedApiKey) return;
-    try {
-      await navigator.clipboard.writeText(revealedApiKey.secret);
-      toast.success("Source API Key copied");
-    } catch {
-      toast.error("Failed to copy Source API Key");
-    }
-  };
+  if (!isLinked) {
+    return (
+      <p className="rounded-lg bg-muted p-4 text-sm text-muted-foreground">
+        Link the signing key on-chain first. API keys only work for a linked source.
+      </p>
+    );
+  }
 
   return (
-    <div className="mt-5 space-y-4 border-t border-border pt-4">
-      <div className="flex items-center gap-2 text-xs font-semibold text-foreground">
-        <ShieldCheck className="size-4" />
-        Gateway credentials
-      </div>
-
-      {!identity ? (
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">
-            Create an encrypted Nostr identity for {sourceId}. Only its public key is shown.
-          </p>
-          <Button type="button" size="sm" onClick={onCreateIdentity} disabled={isSubmitting}>
-            <KeyRound />
-            Create Signing Identity
-          </Button>
-        </div>
-      ) : (
-        <div className="space-y-3">
+    <div className="space-y-6">
+      {revealedApiKey && (
+        <div className="space-y-3 rounded-lg border border-brand-accent/40 bg-brand-accent/5 p-4">
           <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge variant="secondary">
-                {identity.bindingStatus === "bound" ? "NEAR bound" : "Binding required"}
-              </Badge>
-              <span className="text-xs text-muted-foreground">
-                Master key {identity.keyVersion}
-              </span>
-            </div>
-            <p className="break-all font-mono text-xs text-foreground">{identity.publicKey}</p>
+            <p className="text-sm font-medium text-foreground">Copy your new key now</p>
+            <p className="text-xs text-muted-foreground">
+              It is not shown again. Store it in your server's secret manager.
+            </p>
           </div>
-
-          {identity.bindingStatus === "pending" ? (
-            <div className="space-y-2">
-              <p className="text-xs text-muted-foreground">
-                Authorize the binding transaction from {nearAccountId}. Your wallet will ask you to
-                approve an on-chain transaction, which is separate from signing in. Binding usually
-                confirms within a few seconds.
-              </p>
-              {isPolling && (
-                <p className="text-xs text-muted-foreground">
-                  Waiting for the transaction to be indexed. This checks automatically.
-                </p>
-              )}
-              {pollExpired && (
-                <p className="text-xs text-muted-foreground">
-                  Still not confirmed. The transaction may be slow to index — use Check binding to
-                  try again.
-                </p>
-              )}
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={authorizeBinding}
-                  disabled={isSubmitting || isPolling}
-                >
-                  <Link2 />
-                  Authorize with NEAR
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={onConfirmBinding}
-                  disabled={isSubmitting || isPolling}
-                >
-                  <RefreshCw />
-                  {isPolling ? "Checking..." : "Check binding"}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                <div className="space-y-1">
-                  <Label htmlFor={`api-key-name-${sourceId}`}>Source API Key name</Label>
-                  <Input
-                    id={`api-key-name-${sourceId}`}
-                    value={apiKeyName}
-                    onChange={(event) => setApiKeyName(event.target.value)}
-                    placeholder="Production gateway"
-                  />
-                </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="self-end"
-                  onClick={createApiKey}
-                  disabled={isSubmitting || apiKeyName.trim().length === 0}
-                >
-                  Create Source API Key
-                </Button>
-              </div>
-
-              {revealedApiKey && (
-                <div className="space-y-2 rounded-lg bg-muted p-3">
-                  <p className="text-xs font-medium text-foreground">
-                    Copy this secret now. It will not be shown again.
-                  </p>
-                  <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
-                    <Input readOnly value={revealedApiKey.secret} className="font-mono text-xs" />
-                    <Button type="button" size="sm" variant="outline" onClick={copySecret}>
-                      <Copy />
-                      Copy
-                    </Button>
-                    {onDismissReveal && (
-                      <Button type="button" size="sm" variant="outline" onClick={onDismissReveal}>
-                        Dismiss
-                      </Button>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                {apiKeys.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No Source API Keys yet.</p>
-                ) : (
-                  apiKeys.map((apiKey) => (
-                    <div
-                      key={apiKey.id}
-                      className="flex flex-wrap items-center justify-between gap-2 border-t border-border py-3 text-xs"
-                    >
-                      <div className="space-y-1">
-                        <div className="font-medium text-foreground">{apiKey.name}</div>
-                        <div className="flex flex-wrap gap-2 font-mono text-muted-foreground">
-                          <span>{apiKey.prefix}</span>
-                          <span>{apiKey.permissions[0]}</span>
-                          {apiKey.revokedAt && <span>revoked</span>}
-                        </div>
-                      </div>
-                      {!apiKey.revokedAt && (
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="outline"
-                          onClick={() => onRevokeApiKey(apiKey.id)}
-                          disabled={isSubmitting}
-                          aria-label={`Revoke ${apiKey.name}`}
-                        >
-                          Revoke
-                        </Button>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={onRotate}
-            disabled={isSubmitting}
-          >
-            <RotateCw />
-            Rotate identity
-          </Button>
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+            <Input
+              readOnly
+              aria-label="New API key"
+              value={revealedApiKey.secret}
+              className="bg-background font-mono text-xs"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => copyToClipboard(revealedApiKey.secret, "API key")}
+            >
+              <Copy />
+              Copy
+            </Button>
+            <Button type="button" onClick={onDismissReveal}>
+              I saved it
+            </Button>
+          </div>
         </div>
       )}
+
+      <div className="space-y-2">
+        {activeKeys.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No active API keys.</p>
+        ) : (
+          <ul className="divide-y divide-border rounded-lg border border-border">
+            {activeKeys.map((apiKey) => (
+              <ApiKeyRow
+                key={apiKey.id}
+                apiKey={apiKey}
+                isSubmitting={isSubmitting}
+                onRevoke={onRevokeApiKey}
+              />
+            ))}
+          </ul>
+        )}
+        {revokedKeys.length > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {revokedKeys.length} revoked {revokedKeys.length === 1 ? "key" : "keys"} hidden.
+          </p>
+        )}
+      </div>
+
+      <form
+        className="flex flex-col gap-2 border-t border-border pt-5 sm:flex-row sm:items-end"
+        onSubmit={async (event) => {
+          event.preventDefault();
+          const trimmed = name.trim();
+          if (!trimmed) return;
+          await onCreateApiKey(trimmed);
+          setName("");
+        }}
+      >
+        <div className="space-y-1.5 sm:w-72">
+          <Label htmlFor="new-api-key-name">New key name</Label>
+          <Input
+            id="new-api-key-name"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Production"
+          />
+        </div>
+        <Button type="submit" disabled={isSubmitting || name.trim().length === 0}>
+          <Key />
+          Create key
+        </Button>
+      </form>
     </div>
+  );
+}
+
+function ApiKeyRow({
+  apiKey,
+  isSubmitting,
+  onRevoke,
+}: {
+  apiKey: ActivitySourceApiKeyView;
+  isSubmitting: boolean;
+  onRevoke: (apiKeyId: string) => void | Promise<void>;
+}) {
+  return (
+    <li className="flex flex-wrap items-center justify-between gap-3 px-4 py-3">
+      <div className="min-w-0 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-foreground">{apiKey.name}</span>
+          <code className="font-mono text-xs text-muted-foreground">{apiKey.prefix}…</code>
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Created {formatDate(apiKey.createdAt)} ·{" "}
+          {apiKey.lastUsedAt ? `Last used ${formatDate(apiKey.lastUsedAt)}` : "Never used"}
+        </p>
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        onClick={() => onRevoke(apiKey.id)}
+        disabled={isSubmitting}
+        aria-label={`Revoke ${apiKey.name}`}
+      >
+        Revoke
+      </Button>
+    </li>
   );
 }

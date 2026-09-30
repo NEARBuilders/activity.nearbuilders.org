@@ -20,6 +20,7 @@ interface ContractCall {
 export interface ActivityBindingWallet {
   switchToMainnet: () => void;
   connect: () => Promise<boolean>;
+  disconnect: () => Promise<void>;
   getActiveAccount: () => { accountId: string | null; network: string } | null;
   callContract: (call: ContractCall) => Promise<{ txHash: string | null }>;
 }
@@ -27,6 +28,7 @@ export interface ActivityBindingWallet {
 interface BetterNearWalletClient {
   setNetwork: (network: "mainnet" | "testnet") => void;
   ensureConnected: () => Promise<boolean>;
+  disconnect: () => Promise<void>;
   getState: () => { accountId: string | null; networkId: string } | null;
   getNearClient: () => Pick<Near, "transaction">;
 }
@@ -35,6 +37,7 @@ export function createActivityBindingWallet(near: BetterNearWalletClient): Activ
   return {
     switchToMainnet: () => near.setNetwork("mainnet"),
     connect: () => near.ensureConnected(),
+    disconnect: () => near.disconnect(),
     getActiveAccount: () => {
       const state = near.getState();
       if (!state) return null;
@@ -73,6 +76,13 @@ export async function submitActivityBindingTransaction({
     }
   }
 
+  if (wallet.getActiveAccount()?.accountId !== nearAccountId) {
+    await wallet.disconnect();
+    const connected = await wallet.connect();
+    if (!connected) {
+      throw new Error(`Connect ${nearAccountId} on NEAR mainnet to continue.`);
+    }
+  }
   assertSourceAccount(wallet, nearAccountId);
 
   const call = {

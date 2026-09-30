@@ -126,7 +126,26 @@ describe("Activity source credentials", () => {
 
     await expect(
       otherNearAccount.prepareActivitySigningIdentityBinding({ sourceId: "binding-source" }),
-    ).rejects.toThrow(/^Only .+ can link this source\. You are signed in as /);
+    ).rejects.toThrow(/^Only .+ can link this source\. Link that NEAR account/);
+
+    const ownerWithSecondaryAccount = orgOwnerContext(
+      "binding-owner-secondary",
+      "org-binding",
+      "primary-owner.near",
+    );
+    const secondaryNear = ownerWithSecondaryAccount.near as {
+      linkedAccounts: Array<Record<string, unknown>>;
+    };
+    secondaryNear.linkedAccounts.push({
+      accountId: "binding-source.near",
+      network: "mainnet",
+      publicKey: `ed25519:${"2".repeat(64)}`,
+      isPrimary: false,
+    });
+    const secondaryOwner = await getPluginClient(ownerWithSecondaryAccount);
+    await expect(
+      secondaryOwner.prepareActivitySigningIdentityBinding({ sourceId: "binding-source" }),
+    ).resolves.toMatchObject({ key: "nostr/binding-source.near" });
 
     const prepared = await owner.prepareActivitySigningIdentityBinding({
       sourceId: "binding-source",
