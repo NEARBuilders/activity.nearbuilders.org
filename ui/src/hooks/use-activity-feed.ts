@@ -202,7 +202,7 @@ export function useActivityFeed(
   };
 }
 
-function mergeLiveActivityEvent(
+export function mergeLiveActivityEvent(
   current: readonly ActivityFeedEventView[],
   incoming: ActivityFeedEventView,
 ): ActivityFeedEventView[] {

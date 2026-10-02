@@ -79,7 +79,7 @@ function AppHeader() {
     <header className="sticky top-0 z-20 border-b bg-background/95 shadow-elevation-sm backdrop-blur">
       <div className="mx-auto flex h-16 max-w-screen-2xl items-center gap-x-4 px-4 sm:px-6">
         <Link
-          to="/activity"
+          to="/"
           aria-label="NEAR Builders Activity home"
           className="flex shrink-0 items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >

@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { createFileRoute, Navigate, redirect, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Navigate, redirect, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { getAppName, sessionQueryOptions, useAuthClient } from "@/app";
@@ -103,6 +103,13 @@ function LoginPage() {
             <h1 className="text-xl font-semibold tracking-tight text-foreground">
               Welcome to Activity
             </h1>
+            <p className="mx-auto max-w-xs text-sm text-muted-foreground">
+              Sign in with your NEAR wallet to register a project, manage its sources, and endorse
+              activity.{" "}
+              <Link to="/" className="underline underline-offset-2 hover:text-foreground">
+                What is Activity?
+              </Link>
+            </p>
           </div>
 
           <div className="w-full border-b border-border pb-6 sm:p-8 space-y-5">

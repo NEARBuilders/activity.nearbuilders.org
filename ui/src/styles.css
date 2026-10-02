@@ -51,6 +51,7 @@ code {
   --brand-accent-light: #CCFBEA;
   --brand-accent-border: #99F7D5;
   --brand-accent-foreground: #042f24;
+  --brand-accent-strong: #00916d;
   --status-danger-bg: #FFE3E2;
   --status-danger-border: #FD9AAE;
   --status-danger-fg: #D21B14;
@@ -104,6 +105,7 @@ code {
   --brand-accent-light: #14532d;
   --brand-accent-border: #166534;
   --brand-accent-foreground: #042f24;
+  --brand-accent-strong: #00D9A3;
   --status-danger-bg: #451a1a;
   --status-danger-border: #dc2626;
   --status-danger-fg: #fca5a5;
@@ -157,6 +159,7 @@ code {
   --color-brand-accent-light: var(--brand-accent-light);
   --color-brand-accent-border: var(--brand-accent-border);
   --color-brand-accent-foreground: var(--brand-accent-foreground);
+  --color-brand-accent-strong: var(--brand-accent-strong);
   --color-status-danger-bg: var(--status-danger-bg);
   --color-status-danger-border: var(--status-danger-border);
   --color-status-danger-fg: var(--status-danger-fg);
@@ -276,4 +279,162 @@ code {
 
 .animate-subtitle-cycle {
   animation: subtitle-cycle 4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+.landing-grid {
+  background-image: radial-gradient(
+    color-mix(in oklab, var(--foreground) 14%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 24px 24px;
+  mask-image: radial-gradient(ellipse 80% 70% at 70% 45%, black 30%, transparent 75%);
+}
+
+.bento-dots {
+  background-image: radial-gradient(
+    color-mix(in oklab, var(--foreground) 10%, transparent) 1px,
+    transparent 1px
+  );
+  background-size: 16px 16px;
+  mask-image: radial-gradient(ellipse 75% 75% at 50% 50%, black 40%, transparent 90%);
+}
+
+.landing-signal {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  overflow: hidden;
+  background: color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
+.landing-signal::after {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 18%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in oklab, var(--brand-accent) 85%, transparent),
+    transparent
+  );
+  transform: translateX(-120%);
+  animation: landing-signal-travel var(--signal-duration, 7s) linear var(--signal-delay, 0s) infinite;
+}
+
+@keyframes landing-signal-travel {
+  from {
+    transform: translateX(-120%);
+  }
+  to {
+    transform: translateX(560%);
+  }
+}
+
+.landing-glow {
+  background: radial-gradient(
+    closest-side,
+    color-mix(in oklab, var(--brand-accent) 22%, transparent),
+    transparent
+  );
+  animation: landing-glow-breathe 6s ease-in-out infinite;
+}
+
+@keyframes landing-glow-breathe {
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes landing-event-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-landing-event-arrive {
+  animation: landing-event-arrive 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@theme {
+  --animate-marquee: marquee var(--duration) infinite linear;
+  --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
+}
+
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(calc(-100% - var(--gap)));
+  }
+}
+
+@keyframes marquee-vertical {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(calc(-100% - var(--gap)));
+  }
+}
+
+@keyframes landing-bar {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.landing-bar {
+  animation: landing-bar 2.4s ease-in-out infinite;
+}
+
+@keyframes landing-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.landing-pop {
+  display: inline-block;
+  animation: landing-pop 0.45s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-signal::after,
+  .landing-glow,
+  .landing-bar,
+  .landing-pop,
+  .animate-marquee,
+  .animate-marquee-vertical,
+  .animate-landing-event-arrive {
+    animation: none;
+  }
+  .landing-signal::after {
+    transform: translateX(200%);
+  }
 }
