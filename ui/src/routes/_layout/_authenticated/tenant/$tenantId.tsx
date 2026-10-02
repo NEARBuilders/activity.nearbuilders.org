@@ -212,7 +212,7 @@ function TenantDetail() {
     onSuccess: () => {
       toast.success("Tenant queued for deletion");
       setDeleteOpen(false);
-      router.navigate({ to: "/" });
+      router.navigate({ to: "/tenants" });
     },
     onError: (error: Error) => toast.error(error.message || "Failed to delete tenant"),
   });

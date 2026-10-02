@@ -18,6 +18,7 @@ import { Route as LayoutAboutRouteImport } from './routes/_layout/about'
 import { Route as LayoutAuthenticatedRouteImport } from './routes/_layout/_authenticated'
 import { Route as LayoutDocsIndexRouteImport } from './routes/_layout/docs/index'
 import { Route as LayoutDocsSlugRouteImport } from './routes/_layout/docs/$slug'
+import { Route as LayoutAuthenticatedTenantsRouteImport } from './routes/_layout/_authenticated/tenants'
 import { Route as LayoutAuthenticatedSettingsRouteImport } from './routes/_layout/_authenticated/settings'
 import { Route as LayoutAuthenticatedHomeRouteImport } from './routes/_layout/_authenticated/home'
 import { Route as LayoutAuthenticatedAdminRouteImport } from './routes/_layout/_authenticated/admin'
@@ -76,6 +77,12 @@ const LayoutDocsSlugRoute = LayoutDocsSlugRouteImport.update({
   path: '/docs/$slug',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutAuthenticatedTenantsRoute =
+  LayoutAuthenticatedTenantsRouteImport.update({
+    id: '/tenants',
+    path: '/tenants',
+    getParentRoute: () => LayoutAuthenticatedRoute,
+  } as any)
 const LayoutAuthenticatedSettingsRoute =
   LayoutAuthenticatedSettingsRouteImport.update({
     id: '/settings',
@@ -170,6 +177,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof LayoutAuthenticatedAdminRoute
   '/home': typeof LayoutAuthenticatedHomeRoute
   '/settings': typeof LayoutAuthenticatedSettingsRouteWithChildren
+  '/tenants': typeof LayoutAuthenticatedTenantsRoute
   '/docs/$slug': typeof LayoutDocsSlugRoute
   '/docs/': typeof LayoutDocsIndexRoute
   '/accept-invitation/$id': typeof LayoutAuthenticatedAcceptInvitationIdRoute
@@ -192,6 +200,7 @@ export interface FileRoutesByTo {
   '/activity-sources': typeof LayoutAuthenticatedActivitySourcesRoute
   '/admin': typeof LayoutAuthenticatedAdminRoute
   '/home': typeof LayoutAuthenticatedHomeRoute
+  '/tenants': typeof LayoutAuthenticatedTenantsRoute
   '/docs/$slug': typeof LayoutDocsSlugRoute
   '/docs': typeof LayoutDocsIndexRoute
   '/accept-invitation/$id': typeof LayoutAuthenticatedAcceptInvitationIdRoute
@@ -218,6 +227,7 @@ export interface FileRoutesById {
   '/_layout/_authenticated/admin': typeof LayoutAuthenticatedAdminRoute
   '/_layout/_authenticated/home': typeof LayoutAuthenticatedHomeRoute
   '/_layout/_authenticated/settings': typeof LayoutAuthenticatedSettingsRouteWithChildren
+  '/_layout/_authenticated/tenants': typeof LayoutAuthenticatedTenantsRoute
   '/_layout/docs/$slug': typeof LayoutDocsSlugRoute
   '/_layout/docs/': typeof LayoutDocsIndexRoute
   '/_layout/_authenticated/accept-invitation/$id': typeof LayoutAuthenticatedAcceptInvitationIdRoute
@@ -243,6 +253,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/home'
     | '/settings'
+    | '/tenants'
     | '/docs/$slug'
     | '/docs/'
     | '/accept-invitation/$id'
@@ -265,6 +276,7 @@ export interface FileRouteTypes {
     | '/activity-sources'
     | '/admin'
     | '/home'
+    | '/tenants'
     | '/docs/$slug'
     | '/docs'
     | '/accept-invitation/$id'
@@ -290,6 +302,7 @@ export interface FileRouteTypes {
     | '/_layout/_authenticated/admin'
     | '/_layout/_authenticated/home'
     | '/_layout/_authenticated/settings'
+    | '/_layout/_authenticated/tenants'
     | '/_layout/docs/$slug'
     | '/_layout/docs/'
     | '/_layout/_authenticated/accept-invitation/$id'
@@ -372,6 +385,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/docs/$slug'
       preLoaderRoute: typeof LayoutDocsSlugRouteImport
       parentRoute: typeof LayoutRoute
+    }
+    '/_layout/_authenticated/tenants': {
+      id: '/_layout/_authenticated/tenants'
+      path: '/tenants'
+      fullPath: '/tenants'
+      preLoaderRoute: typeof LayoutAuthenticatedTenantsRouteImport
+      parentRoute: typeof LayoutAuthenticatedRoute
     }
     '/_layout/_authenticated/settings': {
       id: '/_layout/_authenticated/settings'
@@ -503,6 +523,7 @@ interface LayoutAuthenticatedRouteChildren {
   LayoutAuthenticatedAdminRoute: typeof LayoutAuthenticatedAdminRoute
   LayoutAuthenticatedHomeRoute: typeof LayoutAuthenticatedHomeRoute
   LayoutAuthenticatedSettingsRoute: typeof LayoutAuthenticatedSettingsRouteWithChildren
+  LayoutAuthenticatedTenantsRoute: typeof LayoutAuthenticatedTenantsRoute
   LayoutAuthenticatedAcceptInvitationIdRoute: typeof LayoutAuthenticatedAcceptInvitationIdRoute
   LayoutAuthenticatedOrganizationsSlugRoute: typeof LayoutAuthenticatedOrganizationsSlugRoute
   LayoutAuthenticatedOrganizationsNewRoute: typeof LayoutAuthenticatedOrganizationsNewRoute
@@ -518,6 +539,7 @@ const LayoutAuthenticatedRouteChildren: LayoutAuthenticatedRouteChildren = {
   LayoutAuthenticatedHomeRoute: LayoutAuthenticatedHomeRoute,
   LayoutAuthenticatedSettingsRoute:
     LayoutAuthenticatedSettingsRouteWithChildren,
+  LayoutAuthenticatedTenantsRoute: LayoutAuthenticatedTenantsRoute,
   LayoutAuthenticatedAcceptInvitationIdRoute:
     LayoutAuthenticatedAcceptInvitationIdRoute,
   LayoutAuthenticatedOrganizationsSlugRoute:

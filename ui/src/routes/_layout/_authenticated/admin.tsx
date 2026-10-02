@@ -19,7 +19,7 @@ export const Route = createFileRoute("/_layout/_authenticated/admin")({
       tenant = null;
     }
     if (!tenant) {
-      throw redirect({ to: "/" });
+      throw redirect({ to: "/tenants" });
     }
     return { tenant };
   },
