@@ -1,5 +1,73 @@
 # api
 
+## 3.0.0
+
+### Major Changes
+
+- 845ef43: Remove nonfunctional template routes and unused UI scaffolding, and make organization switching update the active workspace consistently across the Activity interface.
+
+### Minor Changes
+
+- b0e5654: Accept an optional `occurredAt` on event submission, so imported history is signed, ordered, and
+  scored at the time the activity happened instead of the time it was received. It must be in the
+  past and within the relay's accepted age, and it forms part of the idempotency key's content. Events
+  dated before their Signing Identity was bound are accepted only when the submission ledger shows
+  this service published them; relay records claiming to predate their identity are still discarded.
+- dca58d9: Add the local Nostr and Redis Activity protocol boundary and NEAR-authenticated Activity Source registration, approval, and review history.
+- a310604: Add exact dynamically weighted weekly, monthly, and all-time Activity leaderboards backed by an idempotent Redis projection.
+- 94397a9: Add Source API Key-authenticated, exactly-once Activity event submission with durable idempotency and relay acknowledgement handling. Keep local relay selection configurable at runtime and disable incompatible optional WebSocket native accelerators in API bundles.
+- 3dde7ad: Add configurable public GitHub polling for merged pull requests and closed issues, including explicit NEAR actor mappings and feed provenance.
+- b3eb6ef: Add administrator-only, auditable Activity event suppression across public feeds and resumable streams without mutating signed relay events.
+- 825c0d2: Add a public, trusted, filtered, cursor-paginated Activity feed API and UI.
+- 96b4c77: Add encrypted Signing Identities, mainnet NEAR binding, and revocable source-scoped API credentials for approved Activity Sources.
+- 0d0aa02: Expose time-scoped cryptographic provenance, auditable source trust weighting, and trust-aware Activity feed and leaderboard presentation.
+
+### Patch Changes
+
+- 0e22728: Add `GET /api/v1/health`, which checks the database, a Redis projection write with projection
+  readiness, and a relay query through the configured transport. It returns `503` with the same
+  report when any check fails, so Railway's deploy health check and the new scheduled
+  `Production health` workflow can gate on the status code.
+- 8a40a5e: Bundle `redis` into the API instead of leaving it external. The production host doesn't ship
+  `redis`, so the deployed API failed to load with `Cannot find package 'redis'` and every API
+  call returned 503. Bundling it needed a JSON rule, because the drizzle migrations plugin forces
+  every module (JSON included) to parse as JavaScript, which broke on `@redis/client`'s
+  `require("../../package.json")`.
+- ea5e852: Invalidate an Activity Source's Binding Proof when its NEAR account changes and reject Source API Keys whose Signing Identity is bound to a different account.
+- c7ad948: Page Activity history past the relay's per-query cap instead of failing. Through the shared Nostr
+  transport, any query matching 500 or more events returned `503`, so the public feed would stop
+  working once the relay held 500 Activity events. A full scan now drops its possibly-partial oldest
+  second and resumes there on the next page, so history of any length pages completely. Only a single
+  second holding a full cap of events still fails. The direct adapter declares the same 500 cap, so
+  it no longer stops early without saying so when a scan is mostly invalid or hidden events.
+- 9e1a376: Add a first-run-friendly master-key generator (`bun run keys:gen`) and a fail-fast check in the API runtime that refuses to boot with an empty `ACTIVITY_SIGNING_MASTER_KEYS` when `NODE_ENV=production`. README and protocol docs gain a "generate, rotate, recover" runbook so the dev path (`bun run keys:gen`) and the production path (operator-provisioned secret) are unambiguous.
+- ffe8d21: Fix local dev onboarding end-to-end and close out issues #29, #30, #33.
+
+  - Add `bun run first-run` / `bun run setup:check` (#30): bootstraps `.env`, mints a local
+    signing keyring only if none exists, wires local relay/redis, brings up infra, never
+    overwrites a real value.
+  - Add `bun run compose:doctor`, wired as a `predev` hook (#29): fails loudly on the
+    `compose.activity.yml` / `docker-compose.yml` port collision instead of silently
+    colliding.
+  - Add `docs/research/nostr-plugin-integration.md` (#33): the Nostr plugin surface study
+    for RFC #32, built from nearbuilders.org PR #225 and this repo's live plugin contract.
+  - Add `bun run seed:demo`: seeds a demo Activity Source, signing identity, and sample
+    events through the real ingestion pipeline for local UI testing.
+  - Fix `api/plugin.dev.ts` loading `.env` relative to `process.cwd()` (`api/` under
+    `bos dev`), which silently broke every local env override regardless of value.
+  - Add `ACTIVITY_LOCAL_RELAY_ONLY` to bypass the shared Nostr plugin's remote RPC for local
+    dev, since that transport is otherwise always used even locally and can't reach a
+    local-only relay URL.
+  - Add `RATE_LIMIT_MAX` and document `ACTIVITY_LOCAL_RELAY_ONLY` in `.env.example`; both
+    were previously undocumented traps for a fresh clone.
+  - Add server-side logging where relay failures were being silently swallowed into a
+    generic "Activity relay is unavailable" with no cause.
+
+- 4e0505d: Add `POST /api/v1/events/{eventId}/retract`, which lets a Source API Key hide an event its own source
+  published, for compensation and revocation. It reuses administrator moderation, so the event leaves
+  the feed, SSE replay, and leaderboard the same way, and the audit records `source:<sourceId>` as the
+  requester. Retracting another source's event returns `403`.
+
 ## 2.8.1
 
 ### Patch Changes
