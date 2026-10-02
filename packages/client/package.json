@@ -1,6 +1,6 @@
 {
   "name": "@nearbuilders/activity-client",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Typed oRPC client for activity.nearbuilders.org",
   "type": "module",
   "sideEffects": false,
