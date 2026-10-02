@@ -3,6 +3,7 @@ import {
   BroadcastIcon,
   HouseIcon,
   ListIcon,
+  PlusIcon,
   PulseIcon,
   ShieldIcon,
 } from "@phosphor-icons/react/ssr";
@@ -147,6 +148,14 @@ function AppHeader() {
             </DropdownMenuContent>
           </DropdownMenu>
           {isLogin && <NetworkToggle />}
+          {!isLogin && !pathname.startsWith("/activity-sources") && (
+            <Button asChild size="sm" className="shrink-0">
+              <Link to="/activity-sources" search={{ setup: "new" }} aria-label="Submit new source">
+                <PlusIcon />
+                <span className="hidden sm:inline">Submit new source</span>
+              </Link>
+            </Button>
+          )}
           <ThemeToggle />
           {!isLogin && <UserNav />}
         </div>
