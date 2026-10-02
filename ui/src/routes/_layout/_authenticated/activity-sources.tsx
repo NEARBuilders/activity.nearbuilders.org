@@ -329,7 +329,9 @@ function ActivitySourcesPage() {
               steps={steps}
               nearAccountId={setupSource?.nearAccountId ?? null}
               action={renderSetupAction()}
-              title={isRegisteringAnother ? "Register another source" : undefined}
+              title={
+                isRegisteringAnother && sources.length > 0 ? "Register another source" : undefined
+              }
               onCancel={isRegisteringAnother ? () => focusSetup() : undefined}
               complete={
                 setupSource ? (
