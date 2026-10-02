@@ -63,7 +63,9 @@ describe("ActivityLeaderboard", () => {
 
     expect(screen.getByRole("heading", { name: "Leaderboard" })).toBeTruthy();
     expect(screen.getByText("alice.near")).toBeTruthy();
-    expect(screen.getByText("25 points")).toBeTruthy();
+    expect(screen.getByText("Rank").parentElement?.textContent).toBe("Rank 1");
+    expect(screen.getByText("25")).toBeTruthy();
+    expect(screen.getByText("+15")).toBeTruthy();
     expect(screen.getByText("4 events")).toBeTruthy();
     expect(screen.getByText(/feedback\.written/)).toBeTruthy();
     expect(screen.getByText(/Feedback rounds/)).toBeTruthy();

@@ -1,4 +1,4 @@
-import { WarningIcon } from "@phosphor-icons/react/ssr";
+import { CaretDownIcon as CaretDown, WarningIcon } from "@phosphor-icons/react/ssr";
 import type { ApiClient } from "@/app";
 import { ActivityTrustBadge } from "@/components/ui/activity-trust-badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -108,42 +108,72 @@ export function ActivityLeaderboard({
         <Card className="gap-0 overflow-hidden py-0">
           <ol className="divide-y divide-border" aria-label="Activity leaderboard rankings">
             {result.data.map((entry) => (
-              <li key={entry.actor} className="p-4">
-                <div className="flex items-center gap-3">
-                  <Avatar>
-                    <AvatarFallback>{getInitials(entry.actor)}</AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{entry.actor}</p>
-                    <p className="mt-0.5 text-xs text-muted-foreground">
-                      {entry.eventCount} {entry.eventCount === 1 ? "event" : "events"}
-                    </p>
-                  </div>
-                  <span className="text-sm font-semibold tabular-nums">
-                    {entry.score} {entry.score === 1 ? "point" : "points"}
-                  </span>
-                </div>
-                <details className="mt-2 ml-11 text-xs text-muted-foreground">
-                  <summary className="cursor-pointer hover:text-foreground">
-                    Score breakdown
+              <li key={entry.actor}>
+                <details className="group">
+                  <summary className="flex cursor-pointer list-none items-center gap-3 px-4 py-3 transition-colors hover:bg-muted/40 [&::-webkit-details-marker]:hidden">
+                    <ActivityRankBadge rank={entry.rank} />
+                    <Avatar className="size-9">
+                      <AvatarFallback className="text-xs">
+                        {getInitials(entry.actor)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-foreground">{entry.actor}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {entry.eventCount} {entry.eventCount === 1 ? "event" : "events"}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-base font-semibold leading-none tabular-nums text-foreground">
+                        {entry.score}
+                      </p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {entry.score === 1 ? "point" : "points"}
+                      </p>
+                    </div>
+                    <CaretDown
+                      aria-hidden="true"
+                      className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+                    />
+                    <span className="sr-only">Show score breakdown</span>
                   </summary>
-                  <ul className="mt-3 space-y-3" aria-label={`${entry.actor} score breakdown`}>
-                    {entry.breakdown.map((item) => (
-                      <li key={`${item.source}:${item.type}`}>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span>{item.sourceDisplayName}</span>
-                          <ActivityTrustBadge
-                            trustStatus={item.trustStatus}
-                            scoreMultiplier={item.scoreMultiplier}
-                          />
-                        </div>
-                        <div className="mt-1">
-                          {item.type}
-                          {` · ${item.eventCount} × ${item.pointValue} × ${item.scoreMultiplier} · ${item.score} points`}
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="px-4 pb-4">
+                    <ul
+                      className="divide-y divide-border rounded-lg border border-border bg-muted/30"
+                      aria-label={`${entry.actor} score breakdown`}
+                    >
+                      {entry.breakdown.map((item) => (
+                        <li
+                          key={`${item.source}:${item.type}`}
+                          className="flex items-center justify-between gap-3 px-3 py-2.5"
+                        >
+                          <div className="min-w-0 space-y-1">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="text-sm text-foreground">
+                                {item.sourceDisplayName}
+                              </span>
+                              <ActivityTrustBadge
+                                trustStatus={item.trustStatus}
+                                scoreMultiplier={item.scoreMultiplier}
+                              />
+                            </div>
+                            <p className="truncate font-mono text-xs text-muted-foreground">
+                              {item.type}
+                            </p>
+                          </div>
+                          <div className="shrink-0 text-right">
+                            <p className="text-sm font-semibold tabular-nums text-foreground">
+                              +{item.score}
+                            </p>
+                            <p className="text-xs tabular-nums text-muted-foreground">
+                              {item.eventCount} × {item.pointValue}
+                              {item.scoreMultiplier !== 1 && ` × ${item.scoreMultiplier}`}
+                            </p>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </details>
               </li>
             ))}
@@ -151,5 +181,19 @@ export function ActivityLeaderboard({
         </Card>
       )}
     </section>
+  );
+}
+
+export function ActivityRankBadge({ rank }: { rank: number }) {
+  return (
+    <span
+      className={cn(
+        "flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold tabular-nums",
+        rank <= 3 ? "bg-brand-accent text-brand-accent-foreground" : "text-muted-foreground",
+      )}
+    >
+      <span className="sr-only">Rank </span>
+      {rank}
+    </span>
   );
 }

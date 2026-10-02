@@ -96,10 +96,10 @@ export function ActivitySourcesDashboard({
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-wrap items-center justify-between gap-3">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-xl font-semibold tracking-tight text-foreground">Activity Sources</h1>
         {showRegistration && canRegisterAnother && onRegisterAnother && (
-          <Button type="button" onClick={onRegisterAnother}>
+          <Button type="button" className="w-full sm:w-auto" onClick={onRegisterAnother}>
             <PlusIcon />
             Register another source
           </Button>

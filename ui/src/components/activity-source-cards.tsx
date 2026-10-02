@@ -58,7 +58,7 @@ export function ActivitySourceCard({
   );
 
   return (
-    <Card className="gap-5 p-5 sm:p-6">
+    <Card className="gap-5 p-4 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <h3 className="text-base font-semibold text-foreground">{source.displayName}</h3>

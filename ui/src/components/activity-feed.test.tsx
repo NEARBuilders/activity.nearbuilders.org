@@ -42,9 +42,10 @@ describe("ActivityFeed", () => {
 
     expect(screen.getByText("alice.near")).toBeTruthy();
     expect(screen.getByText("feedback.submitted")).toBeTruthy();
-    expect(screen.getByText(/feedback-rounds/)).toBeTruthy();
-    expect(screen.getByText(/Useful feedback/)).toBeTruthy();
-    expect(screen.getByText("Feedback rounds")).toBeTruthy();
+    expect(screen.getByTitle("feedback-rounds").textContent).toBe("Feedback rounds");
+    expect(screen.getAllByText(/Useful feedback/).length).toBeGreaterThan(0);
+    expect(screen.getByText("Raw JSON")).toBeTruthy();
+
     expect(screen.getByText("Verified signature")).toBeTruthy();
     expect(screen.getByText("Trusted · 1.5×")).toBeTruthy();
     expect(screen.getByText(/claims are not independently verified/i)).toBeTruthy();

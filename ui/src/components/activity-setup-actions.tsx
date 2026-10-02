@@ -58,7 +58,12 @@ export function ActivityLinkOnChainAction({
             you stay signed in and keep this organization.
           </p>
         </div>
-        <Button type="button" onClick={onLinkAccount} disabled={isLinkingAccount}>
+        <Button
+          type="button"
+          className="w-full sm:w-auto"
+          onClick={onLinkAccount}
+          disabled={isLinkingAccount}
+        >
           <Wallet />
           {isLinkingAccount ? "Waiting for wallet..." : `Add ${requiredAccountId}`}
         </Button>
@@ -76,7 +81,7 @@ export function ActivityLinkOnChainAction({
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-col gap-2 sm:flex-row">
       <Button type="button" onClick={onLink} disabled={isChecking}>
         <Link2 />
         Approve in wallet
@@ -159,7 +164,7 @@ export function ActivitySetupComplete({
   onDismiss: () => void;
 }) {
   const guideLink = (
-    <Button asChild size="sm" variant="outline">
+    <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">
       <Link to="/docs/$slug" params={{ slug: "integration-guide" }}>
         <BookOpen />
         Integration guide
@@ -255,7 +260,7 @@ export function ActivitySetupComplete({
 
       {firstEvent !== undefined && <FirstEventStatus firstEvent={firstEvent} />}
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row">
         <Button type="button" onClick={onDismiss}>
           I saved my key
         </Button>
@@ -294,7 +299,7 @@ function FirstEventStatus({
           {formatRelativeTime(firstEvent.timestamp)}
         </p>
       </div>
-      <Button asChild size="sm" variant="outline">
+      <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">
         <Link to="/activity">View in feed</Link>
       </Button>
     </div>

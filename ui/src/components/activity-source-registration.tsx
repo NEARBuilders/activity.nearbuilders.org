@@ -276,6 +276,7 @@ export function ActivitySourceRegistration({
           type="button"
           variant="outline"
           size="sm"
+          className="w-full sm:w-auto"
           onClick={() => setEventTypes((current) => [...current, emptyEventType()])}
         >
           <Plus />
@@ -284,7 +285,7 @@ export function ActivitySourceRegistration({
       </fieldset>
 
       <div className="flex justify-end border-t border-border pt-6">
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
           Register source
         </Button>
       </div>
