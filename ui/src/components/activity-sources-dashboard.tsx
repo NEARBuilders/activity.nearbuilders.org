@@ -98,7 +98,6 @@ export function ActivitySourcesDashboard({
   return (
     <div className="space-y-8">
       <PageHeader
-        className="mb-0"
         title="Activity Sources"
         description="Register your project, link it on-chain, and manage the keys it uses to send events."
         actions={
