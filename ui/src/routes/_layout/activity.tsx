@@ -2,8 +2,9 @@ import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useApiClient } from "@/app";
 import { ActivityLeaderboard, type ActivityLeaderboardPeriod } from "@/components";
-import { ActivityFeed } from "@/components/activity-feed";
+import { ActivityFeed, LiveStatusPill } from "@/components/activity-feed";
 import { PageContainer } from "@/components/layout/page-container";
+import { PageHeader } from "@/components/layout/page-header";
 import { useActivityFeed } from "@/hooks/use-activity-feed";
 import { activityFeedOptions, activityLeaderboardOptions } from "@/lib/activity-queries";
 
@@ -59,6 +60,11 @@ function ActivityFeedPageContent({ search }: { search: ActivityFeedSearch }) {
   const leaderboardQuery = useQuery(activityLeaderboardOptions(apiClient, search, period));
   return (
     <PageContainer variant="wide">
+      <PageHeader
+        title="Activity"
+        description="Signed events from projects across NEAR, as they happen, and the accounts they credit."
+        actions={feed.liveStatus ? <LiveStatusPill status={feed.liveStatus} /> : undefined}
+      />
       <div className="grid items-start gap-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <ActivityFeed {...feed} />
         <ActivityLeaderboard

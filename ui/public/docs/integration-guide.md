@@ -7,7 +7,7 @@ Accepted events are never edited or deleted.
 
 ## Why integrate
 
-**Reputation stops resetting.** A builder who has proven themselves in another app arrives at yours
+**Reputation stops resetting.** A user who has proven themselves in another app arrives at yours
 with that history intact, and what they do in yours carries forward to the next one. Every project
 integrating makes the record more useful for all of them.
 

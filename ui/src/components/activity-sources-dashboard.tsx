@@ -13,6 +13,7 @@ import type {
   UpdateActivitySourceTrustInput,
 } from "@/components/activity-sources-model";
 import { EmptyState } from "@/components/empty-state";
+import { PageHeader } from "@/components/layout/page-header";
 import { ActivitySourceTrustCard } from "@/components/ui/activity-source-trust-card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -96,15 +97,19 @@ export function ActivitySourcesDashboard({
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Activity Sources</h1>
-        {showRegistration && canRegisterAnother && onRegisterAnother && (
-          <Button type="button" className="w-full sm:w-auto" onClick={onRegisterAnother}>
-            <PlusIcon />
-            Register another source
-          </Button>
-        )}
-      </header>
+      <PageHeader
+        className="mb-0"
+        title="Activity Sources"
+        description="Register your project, link it on-chain, and manage the keys it uses to send events."
+        actions={
+          showRegistration && canRegisterAnother && onRegisterAnother ? (
+            <Button type="button" className="w-full sm:w-auto" onClick={onRegisterAnother}>
+              <PlusIcon />
+              Register another source
+            </Button>
+          ) : undefined
+        }
+      />
 
       {onboarding}
 

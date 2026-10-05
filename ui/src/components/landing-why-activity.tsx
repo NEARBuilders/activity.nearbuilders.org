@@ -23,7 +23,7 @@ import { cn, getInitials } from "@/lib/utils";
 const TICK_MS = 2400;
 const MAX_BUMPS = 8;
 
-const EXAMPLE_BUILDER = "maya.near";
+const EXAMPLE_ACCOUNT = "maya.near";
 
 const EXAMPLE_HISTORY = [
   {
@@ -106,7 +106,7 @@ export function LandingWhyActivity() {
         </h2>
         <p className="text-sm text-muted-foreground sm:text-base">
           Today each NEAR app keeps its own record of who did what. Activity gives every project one
-          place to publish it, and every builder one history that travels with their account.
+          place to publish it, and every user one history that travels with their NEAR account.
         </p>
       </div>
 
@@ -143,7 +143,7 @@ export function LandingWhyActivity() {
         <BentoTile
           className="md:col-span-2"
           title="Endorsed by people"
-          body="Builders endorse work they've seen, so you can tell what others back."
+          body="People endorse activity they've seen, so you can tell what others back."
           visual={
             <EndorseVisual
               endorsers={animate ? 1 + (tick % ENDORSERS.length) : 3}
@@ -224,11 +224,11 @@ function HistoryVisual({ animate, tick }: { animate: boolean; tick: number }) {
       <div className="flex items-center gap-3">
         <Avatar className="size-10">
           <AvatarFallback className="bg-background text-xs">
-            {getInitials(EXAMPLE_BUILDER)}
+            {getInitials(EXAMPLE_ACCOUNT)}
           </AvatarFallback>
         </Avatar>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-foreground">{EXAMPLE_BUILDER}</p>
+          <p className="truncate text-sm font-medium text-foreground">{EXAMPLE_ACCOUNT}</p>
           <p className="text-xs text-muted-foreground">
             {eventCount} events from {rows.length} projects
           </p>
@@ -291,7 +291,7 @@ function HistoryVisual({ animate, tick }: { animate: boolean; tick: number }) {
         </div>
       </div>
 
-      <p className="text-[11px] text-muted-foreground">Example builder. Live data is below.</p>
+      <p className="text-[11px] text-muted-foreground">Example account. Live data is below.</p>
     </div>
   );
 }

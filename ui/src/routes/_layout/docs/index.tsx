@@ -1,9 +1,11 @@
 import {
+  ArrowRightIcon as ArrowRight,
   BookOpenIcon as BookOpen,
   ArrowSquareOutIcon as ExternalLink,
 } from "@phosphor-icons/react/ssr";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageContainer } from "@/components/layout/page-container";
+import { PageHeader } from "@/components/layout/page-header";
 import { Button } from "@/components/ui/button";
 import { type DocSummary, loadDocsManifest } from "@/lib/docs";
 
@@ -29,11 +31,16 @@ function DocCard({ doc }: { doc: DocSummary }) {
     <Link
       to="/docs/$slug"
       params={{ slug: doc.slug }}
-      className="block rounded-[10px] border border-border p-5 transition-colors hover:border-foreground/30 hover:bg-muted/40"
+      className="group flex flex-col gap-2 rounded-xl border border-border bg-card p-5 shadow-elevation-sm transition-colors hover:border-foreground/20 hover:bg-muted/40"
     >
-      <span className="text-xs font-mono text-muted-foreground">{doc.audience}</span>
-      <h2 className="mt-1 text-base font-semibold text-foreground">{doc.title}</h2>
-      <p className="mt-2 text-sm text-muted-foreground">{doc.description}</p>
+      <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        {doc.audience}
+      </span>
+      <h2 className="flex items-center justify-between gap-2 text-base font-semibold text-foreground">
+        {doc.title}
+        <ArrowRight className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+      </h2>
+      <p className="text-sm text-muted-foreground">{doc.description}</p>
     </Link>
   );
 }
@@ -42,33 +49,22 @@ function DocsIndexPage() {
   const { docs } = Route.useLoaderData();
 
   return (
-    <PageContainer variant="default">
-      <div className="space-y-4">
-        <div className="border-b border-border pb-6 space-y-4">
-          <div className="flex items-start justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-foreground text-background">
-                <BookOpen size={18} />
-              </div>
-              <div className="min-w-0">
-                <h1 className="text-base font-semibold text-foreground">Documentation</h1>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Activity is a plain HTTP API. Authenticate with a bearer token and send JSON —
-                  there is nothing to install.
-                </p>
-              </div>
-            </div>
-            <Button variant="outline" asChild>
-              <a href="/api" target="_blank" rel="noopener noreferrer">
-                <ExternalLink size={14} />
-                API reference
-              </a>
-            </Button>
-          </div>
-        </div>
-
+    <PageContainer variant="wide">
+      <PageHeader
+        title="Docs"
+        description="Activity is a plain HTTP API. Authenticate with a bearer token and send JSON. There's nothing to install."
+        actions={
+          <Button variant="outline" asChild>
+            <a href="/api" target="_blank" rel="noopener noreferrer">
+              <ExternalLink size={14} />
+              API reference
+            </a>
+          </Button>
+        }
+      />
+      <div>
         {docs.length > 0 ? (
-          <div className="grid gap-4 py-2 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2">
             {docs.map((doc) => (
               <DocCard key={doc.slug} doc={doc} />
             ))}
