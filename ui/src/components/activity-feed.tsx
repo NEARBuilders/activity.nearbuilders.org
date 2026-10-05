@@ -75,7 +75,6 @@ type ActivityFeedProps = {
 export function ActivityFeed({
   events,
   filters = {},
-  liveStatus,
   status,
   errorMessage,
   skippedInvalid,
@@ -100,29 +99,6 @@ export function ActivityFeed({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold tracking-tight text-foreground">Activity feed</h1>
-        {liveStatus && (
-          <span
-            className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground capitalize"
-            role="status"
-          >
-            <span
-              aria-hidden="true"
-              className={cn(
-                "size-1.5 rounded-full",
-                liveStatus === "live"
-                  ? "bg-brand-accent"
-                  : liveStatus === "connecting"
-                    ? "animate-pulse bg-muted-foreground"
-                    : "bg-muted-foreground",
-              )}
-            />
-            {liveStatus}
-          </span>
-        )}
-      </header>
-
       <div className="space-y-3">
         <form
           className="flex flex-col gap-2 rounded-xl border border-border bg-card p-2 sm:flex-row sm:items-center sm:gap-0"
@@ -497,4 +473,26 @@ function eventSummary(payload: unknown, type: string): string {
     }
   }
   return type.replace(/[._]/g, " ");
+}
+
+export function LiveStatusPill({ status }: { status: "connecting" | "live" | "unavailable" }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground capitalize"
+      role="status"
+    >
+      <span
+        aria-hidden="true"
+        className={cn(
+          "size-1.5 rounded-full",
+          status === "live"
+            ? "bg-brand-accent"
+            : status === "connecting"
+              ? "animate-pulse bg-muted-foreground"
+              : "bg-muted-foreground",
+        )}
+      />
+      {status}
+    </span>
+  );
 }

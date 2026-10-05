@@ -4,6 +4,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { sessionQueryOptions, useApiClient, useAuthClient } from "@/app";
 import { ActivityTimestamp } from "@/components/activity-timestamp";
 import { PageContainer } from "@/components/layout/page-container";
+import { PageHeader } from "@/components/layout/page-header";
 import { ActivityRankBadge } from "@/components/ui/activity-leaderboard";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -42,12 +43,14 @@ function Home() {
   );
   return (
     <PageContainer variant="wide">
-      <header className="mb-8 space-y-1">
-        <h1 className="text-xl font-semibold tracking-tight">Overview</h1>
-        {session?.user.name && (
-          <p className="text-sm text-muted-foreground">Welcome back, {session.user.name}</p>
-        )}
-      </header>
+      <PageHeader
+        title="Overview"
+        description={
+          session?.user.name
+            ? `Welcome back, ${session.user.name}. Here's the latest activity across NEAR.`
+            : "The latest activity across NEAR."
+        }
+      />
       <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] lg:gap-8">
         <section className="min-w-0 space-y-3" aria-labelledby="recent-activity">
           <div className="flex items-center justify-between gap-4">
@@ -152,9 +155,9 @@ function Home() {
               </Button>
             </nav>
           </Card>
-          <section className="space-y-3" aria-labelledby="weekly-builders">
+          <section className="space-y-3" aria-labelledby="weekly-leaders">
             <div className="flex items-center justify-between gap-4">
-              <h2 id="weekly-builders" className="text-base font-semibold">
+              <h2 id="weekly-leaders" className="text-base font-semibold">
                 Leading this week
               </h2>
               <Link

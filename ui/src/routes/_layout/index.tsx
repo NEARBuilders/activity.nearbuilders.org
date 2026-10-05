@@ -106,7 +106,7 @@ export const Route = createFileRoute("/_layout/")({
       {
         name: "description",
         content:
-          "A shared activity and reputation layer for NEAR. Projects publish signed records of what builders do, and that history follows each builder across apps.",
+          "A shared activity layer for every project on NEAR. Publish signed records of what your users do, and their history follows them to every app.",
       },
     ],
   }),
@@ -254,13 +254,12 @@ function Hero({
         </p>
         <div className="space-y-4">
           <h1 className="text-4xl font-semibold tracking-tight text-balance text-foreground sm:text-5xl">
-            Activity that follows builders across{" "}
+            Activity that follows your users across{" "}
             <span className="text-brand-accent-strong">NEAR</span>
           </h1>
           <p className="max-w-xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Projects publish signed records of what people build, review and ship. Each record is
-            credited to a NEAR account, so a builder's history goes with them to every app that
-            reads it.
+            Publish signed records of what your users do in your app. Each record is credited to
+            their NEAR account, so their history goes with them to every app on NEAR that reads it.
           </p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row">
@@ -385,11 +384,11 @@ function HeroEventStack({
 type LeaderboardEntry = Awaited<ReturnType<ApiClient["getActivityLeaderboard"]>>["data"][number];
 
 function ProofStrip({ allTime }: { allTime?: LeaderboardEntry[] }) {
-  const builders = allTime?.length ?? 0;
-  const truncated = builders >= 100;
+  const accounts = allTime?.length ?? 0;
+  const truncated = accounts >= 100;
   const eventsCredited = (allTime ?? []).reduce((sum, entry) => sum + entry.eventCount, 0);
   const stats: Array<{ label: string; value?: number; suffix?: string; text?: string }> = [
-    { label: "builders credited", value: builders, suffix: truncated ? "+" : "" },
+    { label: "accounts credited", value: accounts, suffix: truncated ? "+" : "" },
     { label: "events on the leaderboard", value: eventsCredited, suffix: truncated ? "+" : "" },
     { label: "of events signed at the source", value: 100, suffix: "%" },
     { label: "updates as events land", text: "Live" },
@@ -518,7 +517,7 @@ function LiveNow({
 
         <Card className="gap-0 overflow-hidden py-0">
           <div className="flex items-center justify-between border-b border-border px-4 py-3">
-            <span className="text-sm font-medium">Top builders</span>
+            <span className="text-sm font-medium">Top accounts</span>
             <span className="text-xs text-muted-foreground">
               {useWeekly ? "This week" : "All time"}
             </span>
@@ -609,7 +608,7 @@ function ForProjects({ isSignedIn }: { isSignedIn: boolean }) {
               number={1}
               icon={<PencilSimpleLine />}
               title="Register your project"
-              body="Pick a Source ID and declare the kinds of events you'll send, each with a point value. A NEAR Builders admin reviews it."
+              body="Pick a Source ID and declare the kinds of events you'll send, each with a point value. An admin reviews it."
               meta="A few minutes"
             />
             <Step
@@ -678,7 +677,7 @@ function FinalCta({ isSignedIn }: { isSignedIn: boolean }) {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground">
-          Free to use · about 0.0001 NEAR once to link · reviewed by NEAR Builders
+          Free to use · about 0.0001 NEAR once to link · reviewed by an admin
         </p>
       </div>
     </section>

@@ -64,17 +64,13 @@ function AppHeader() {
   const isLogin = pathname === "/login";
   const activeOrgId = liveSession?.session?.activeOrganizationId;
   const isTenantMember = !!tenant && !!activeOrgId && activeOrgId === tenant.orgId;
+  const isSignedIn = Boolean(liveSession?.user);
   const items = [
+    ...(isSignedIn ? [{ icon: HouseIcon, label: "Overview", to: "/home" }] : []),
     { icon: PulseIcon, label: "Activity", to: "/activity" },
-    // Signed out too: integrators arrive here before they have an account.
+    ...(isSignedIn ? [{ icon: BroadcastIcon, label: "Sources", to: "/activity-sources" }] : []),
     { icon: BookOpenIcon, label: "Docs", to: "/docs" },
-    ...(liveSession?.user
-      ? [
-          { icon: HouseIcon, label: "Overview", to: "/home" },
-          { icon: BroadcastIcon, label: "Sources", to: "/activity-sources" },
-          ...(isTenantMember ? [{ icon: ShieldIcon, label: "Admin", to: "/admin" }] : []),
-        ]
-      : []),
+    ...(isSignedIn && isTenantMember ? [{ icon: ShieldIcon, label: "Admin", to: "/admin" }] : []),
   ];
   return (
     <header className="sticky top-0 z-20 border-b bg-background/95 shadow-elevation-sm backdrop-blur">

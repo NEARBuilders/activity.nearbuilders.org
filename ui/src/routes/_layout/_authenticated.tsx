@@ -14,14 +14,13 @@ interface AuthContext {
   isBanned: boolean;
 }
 
+const ACTIVE_ROLE_STALE_MS = 60 * 1000;
+
 export const Route = createFileRoute("/_layout/_authenticated")({
   beforeLoad: async ({ context, location }) => {
     const { queryClient, authClient } = context;
 
-    const session = await queryClient.fetchQuery({
-      ...sessionQueryOptions(authClient),
-      staleTime: 0,
-    });
+    const session = await queryClient.fetchQuery(sessionQueryOptions(authClient));
 
     if (!session?.user) {
       throw redirect({
@@ -42,11 +41,16 @@ export const Route = createFileRoute("/_layout/_authenticated")({
     const activeOrganizationId = session.session?.activeOrganizationId ?? null;
     const activeOrganization = await resolveActiveOrganizationMembership({
       activeOrganizationId,
-      getActiveMemberRole: async () => {
-        const { data, error } = await authClient.organization.getActiveMember();
-        if (error) throw new Error(error.message || "Failed to read the active workspace role");
-        return { role: data?.role ?? null };
-      },
+      getActiveMemberRole: () =>
+        queryClient.fetchQuery({
+          queryKey: ["active-organization-role", activeOrganizationId],
+          queryFn: async () => {
+            const { data, error } = await authClient.organization.getActiveMember();
+            if (error) throw new Error(error.message || "Failed to read the active workspace role");
+            return { role: data?.role ?? null };
+          },
+          staleTime: ACTIVE_ROLE_STALE_MS,
+        }),
     });
 
     const auth: AuthContext = {
