@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
 import { toast } from "sonner";
-import { sessionQueryOptions, useApiClient, useAuthClient } from "@/app";
+import { useApiClient, useAuthClient } from "@/app";
 import {
   type ActivityGithubConfigurationInput,
   ActivityGithubIntegration,
@@ -26,11 +27,13 @@ import {
   type UpdateActivitySourceTrustInput,
 } from "@/components/activity-sources-dashboard";
 import { PageContainer } from "@/components/layout/page-container";
-import { useActivitySourceCredentials } from "@/hooks/use-activity-source-credentials";
-import { useIsClient } from "@/hooks/use-client";
+import { useActivitySetupAccess } from "@/hooks/use-activity-setup-access";
+import {
+  credentialQueryKey,
+  useActivitySourceCredentials,
+} from "@/hooks/use-activity-source-credentials";
 import { useLatestSourceEvent } from "@/hooks/use-latest-source-event";
 import { getActivityOnboardingSteps, pickOnboardingSource } from "@/lib/activity-onboarding";
-import { getActivitySourceRegistrationAccess } from "@/lib/activity-source-permissions";
 import { formatRelativeTime } from "@/lib/relative-time";
 
 const activitySourcesQueryKey = ["activity-sources"] as const;
@@ -82,45 +85,13 @@ function ActivitySourcesPage() {
   const { auth } = Route.useRouteContext();
   const { setup: setupSearch } = Route.useSearch();
   const navigate = Route.useNavigate();
-  const nearState = authClient.useNearState();
-  const isClient = useIsClient();
-
-  const { data: linkedNearAccounts, isPending: linkedNearAccountsPending } = useQuery({
-    queryKey: ["near-linked-accounts"],
-    queryFn: async () => {
-      const { data, error } = await authClient.near.listAccounts();
-      if (error) throw new Error(error.message || "Failed to read linked NEAR accounts");
-      return data?.accounts ?? [];
-    },
-    staleTime: 30_000,
-  });
-
-  const hasNearAccount =
-    linkedNearAccounts !== undefined
-      ? linkedNearAccounts.length > 0
-      : isClient
-        ? Boolean(nearState?.accountId) || auth.hasNearAccount
-        : auth.hasNearAccount;
-
-  const { data: liveSession } = useQuery(sessionQueryOptions(authClient));
-  const activeOrganizationId =
-    !isClient || liveSession === undefined
-      ? auth.activeOrganizationId
-      : (liveSession?.session?.activeOrganizationId ?? null);
-  const activeOrganizationIdStale = activeOrganizationId !== auth.activeOrganizationId;
-
-  const { data: liveActiveMember } = useQuery({
-    queryKey: ["active-organization-member", activeOrganizationId],
-    queryFn: async () => {
-      const { data, error } = await authClient.organization.getActiveMember();
-      if (error) throw new Error(error.message || "Failed to read the active workspace role");
-      return data;
-    },
-    enabled: activeOrganizationIdStale && Boolean(activeOrganizationId),
-  });
-  const activeOrganizationRole = activeOrganizationIdStale
-    ? (liveActiveMember?.role ?? null)
-    : auth.activeOrganizationRole;
+  const {
+    hasNearAccount,
+    activeOrganizationId,
+    activeOrganizationRole,
+    registrationAccess,
+    linkedNearAccountIds,
+  } = useActivitySetupAccess(auth);
 
   const { data: sources = [] } = useQuery({
     queryKey: [...activitySourcesQueryKey, auth.user?.id, activeOrganizationId],
@@ -149,6 +120,29 @@ function ActivitySourcesPage() {
     },
     onError: (error: Error) => {
       toast.error(error.message || "Failed to register Activity Source");
+    },
+  });
+
+  const [editingSourceId, setEditingSourceId] = useState<string | null>(null);
+
+  const updateSource = useMutation({
+    mutationFn: (input: CreateActivitySourceInput) =>
+      apiClient.updateActivitySource({
+        sourceId: input.sourceId,
+        displayName: input.displayName,
+        nearAccountId: input.nearAccountId,
+        eventTypes: input.eventTypes,
+      }),
+    onSuccess: async (source) => {
+      toast.success("Source info saved");
+      setEditingSourceId(null);
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: activitySourcesQueryKey }),
+        queryClient.invalidateQueries({ queryKey: credentialQueryKey(source.sourceId) }),
+      ]);
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || "Failed to save source info");
     },
   });
 
@@ -185,14 +179,6 @@ function ActivitySourcesPage() {
     },
   });
 
-  const resolvedAccess = getActivitySourceRegistrationAccess({
-    activeOrganizationId,
-    organizationRole: activeOrganizationRole,
-    hasNearAccount,
-  });
-  const registrationAccess =
-    linkedNearAccountsPending && resolvedAccess === "near-required" ? null : resolvedAccess;
-
   const isOrganizationOwner = Boolean(activeOrganizationId) && activeOrganizationRole === "owner";
   const isRegisteringAnother = setupSearch === "new";
   const focusedSource = sources.find(({ sourceId }) => sourceId === setupSearch);
@@ -200,9 +186,10 @@ function ActivitySourcesPage() {
     isOrganizationOwner && !isRegisteringAnother
       ? (focusedSource ?? pickOnboardingSource(sources))
       : null;
+  const isEditingInfo = setupSource !== null && editingSourceId === setupSource.sourceId;
   const focusSetup = (setup?: string) =>
     navigate({ search: setup ? { setup } : {}, replace: true });
-  const setupCredentialsEnabled = setupSource?.approvalStatus === "approved";
+  const setupCredentialsEnabled = setupSource !== null && setupSource.approvalStatus !== "rejected";
   const setup = useActivitySourceCredentials(setupSource, setupCredentialsEnabled);
   const steps = getActivityOnboardingSteps({
     hasNearAccount,
@@ -227,9 +214,6 @@ function ActivitySourcesPage() {
     Date.parse(latestSetupEvent.data.timestamp) >= Date.parse(revealedKeyCreatedAt)
       ? latestSetupEvent.data
       : null;
-  const linkedNearAccountIds = (linkedNearAccounts ?? [])
-    .filter(({ network }) => network === "mainnet")
-    .map(({ accountId }) => accountId);
   const sourceNearAccountIds = new Set(sources.map(({ nearAccountId }) => nearAccountId));
   const defaultNearAccountId =
     linkedNearAccountIds.find((accountId) => !sourceNearAccountIds.has(accountId)) ?? "";
@@ -257,6 +241,7 @@ function ActivitySourcesPage() {
       access="allowed"
       embedded
       defaultNearAccountId={defaultNearAccountId}
+      onImportProject={(reference) => apiClient.lookupNearbuildersProject({ reference })}
       isSubmitting={createSource.isPending}
       onCreate={async (input) => {
         await createSource.mutateAsync(input);
@@ -272,8 +257,6 @@ function ActivitySourcesPage() {
       case "organization":
         return <ActivitySourceRegistrationAction access={registrationAccess} />;
       case "register":
-        return registrationForm;
-      case "approval":
         if (currentStep.status === "blocked") {
           return (
             <div className="space-y-4">
@@ -284,11 +267,7 @@ function ActivitySourcesPage() {
             </div>
           );
         }
-        return (
-          <p className="font-mono text-xs text-muted-foreground">
-            Submitted: {setupSource?.sourceId} · {setupSource?.nearAccountId}
-          </p>
-        );
+        return registrationForm;
       case "binding":
         return (
           <ActivityLinkOnChainAction
@@ -328,7 +307,35 @@ function ActivitySourcesPage() {
             <ActivityOnboardingProgress
               steps={steps}
               nearAccountId={setupSource?.nearAccountId ?? null}
-              action={renderSetupAction()}
+              action={
+                isEditingInfo && setupSource ? (
+                  <ActivitySourceRegistration
+                    key={setupSource.sourceId}
+                    access="allowed"
+                    embedded
+                    mode="edit"
+                    defaults={{
+                      sourceId: setupSource.sourceId,
+                      displayName: setupSource.displayName,
+                      nearAccountId: setupSource.nearAccountId,
+                      eventTypes: setupSource.eventTypes,
+                    }}
+                    isSubmitting={updateSource.isPending}
+                    onCreate={async (input) => {
+                      await updateSource.mutateAsync(input);
+                    }}
+                    onCancel={() => setEditingSourceId(null)}
+                  />
+                ) : (
+                  renderSetupAction()
+                )
+              }
+              editingStepId={isEditingInfo ? "register" : null}
+              onEditStep={
+                setupSource && !isRegisteringAnother
+                  ? () => setEditingSourceId(setupSource.sourceId)
+                  : undefined
+              }
               title={
                 isRegisteringAnother && sources.length > 0 ? "Register another source" : undefined
               }
@@ -340,6 +347,7 @@ function ActivitySourcesPage() {
                     eventType={setupSource.eventTypes.find(({ enabled }) => enabled)?.name ?? null}
                     actor={setupSource.nearAccountId}
                     firstEvent={setup.revealedApiKey ? firstEventAfterKey : undefined}
+                    underReview={setupSource.approvalStatus === "pending"}
                     onDismiss={setup.dismissRevealedApiKey}
                   />
                 ) : null
@@ -364,12 +372,12 @@ function ActivitySourcesPage() {
         }}
         setupSourceId={setupComplete ? null : (setupSource?.sourceId ?? null)}
         renderHealth={(source) =>
-          source.approvalStatus === "approved" ? (
+          source.approvalStatus !== "rejected" ? (
             <ActivitySourceHealth sourceId={source.sourceId} />
           ) : null
         }
         renderTabs={(source) =>
-          source.approvalStatus === "approved" &&
+          source.approvalStatus !== "rejected" &&
           isOrganizationOwner &&
           (setupComplete || source.sourceId !== setupSource?.sourceId)
             ? [

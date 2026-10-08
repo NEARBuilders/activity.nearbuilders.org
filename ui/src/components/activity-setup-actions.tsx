@@ -155,14 +155,19 @@ export function ActivitySetupComplete({
   eventType,
   actor,
   firstEvent,
+  underReview = false,
   onDismiss,
 }: {
   revealedSecret: string | null;
   eventType: string | null;
   actor: string;
   firstEvent?: { type: string; timestamp: string } | null;
+  underReview?: boolean;
   onDismiss: () => void;
 }) {
+  const reviewNotice = underReview
+    ? "Your source is under review. Events are accepted now and count on the leaderboard once it is approved."
+    : null;
   const guideLink = (
     <Button asChild size="sm" variant="outline" className="w-full sm:w-auto">
       <Link to="/docs/$slug" params={{ slug: "integration-guide" }}>
@@ -182,6 +187,7 @@ export function ActivitySetupComplete({
             <p className="text-xs text-muted-foreground">
               Send events to the API with your Source API Key.
             </p>
+            {reviewNotice && <p className="text-xs text-muted-foreground">{reviewNotice}</p>}
           </div>
         </div>
         {guideLink}
@@ -203,6 +209,7 @@ export function ActivitySetupComplete({
           <p className="text-sm text-muted-foreground">
             Copy your API key now. It is not shown again after you leave this page.
           </p>
+          {reviewNotice && <p className="text-sm text-muted-foreground">{reviewNotice}</p>}
         </div>
       </div>
 

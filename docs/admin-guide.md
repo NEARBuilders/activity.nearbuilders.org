@@ -62,8 +62,11 @@ Sources appear in the **Source review queue** on `/activity-sources`, visible on
 administrators. Each pending source shows its source ID, display name, NEAR account, owning
 organization, and declared Event Types.
 
-Approving is what lets a source ingest events at all: `canIngest` follows `approvalStatus` exactly.
-It is separate from trust, which only affects scoring.
+A pending source can already ingest: its events are published, marked **Under review** in the feed,
+kept off leaderboards, and limited to 500 per day. Approving puts the source's events, including
+earlier ones, on leaderboards and lifts the limit. Rejecting stops ingestion and removes the
+source's events from the feed. `canIngest` is `false` only for rejected sources. All of this is
+separate from trust, which only affects scoring.
 
 Every decision needs a written reason (1–1000 characters). Reasons are kept in an append-only
 history with the administrator and timestamp, and are visible to the source owner.
@@ -79,8 +82,10 @@ Two rules to know:
 > asking the owner to revoke the key. Confirm the source and its owner before granting approval.
 - **Editing a source sends it back to the queue.** If an owner changes the display name, NEAR
   account, or Event Types, the source returns to `pending` and its previous review is cleared, so
-  it stops ingesting until it is reviewed again. Changing the NEAR account additionally unbinds the
-  Signing Identity, so the owner must re-authorize it on-chain before publishing resumes.
+  it drops off leaderboards and its events are marked **Under review** until it is reviewed again.
+  Changing the NEAR account additionally unbinds the Signing Identity, so the owner must
+  re-authorize it on-chain before publishing resumes. Editing a rejected source leaves it rejected;
+  the owner registers a new source instead.
 
 Before approving, confirm the NEAR account really belongs to the project, because it is the account
 that will have to sign the on-chain binding, and events are attributed to that source afterwards.
@@ -89,7 +94,7 @@ that will have to sign the on-chain binding, and events are attributed to that s
 
 The **Source trust controls** section on the same page designates a source `standard` or `trusted`
 and sets its score multiplier. Trust is independent of approval: a pending source can be designated
-in advance, and a trusted source still cannot ingest until it is approved.
+in advance, and a trusted source still stays off leaderboards until it is approved.
 
 | Designation | Multiplier | Meaning |
 | --- | --- | --- |

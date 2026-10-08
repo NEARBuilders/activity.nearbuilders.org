@@ -1,10 +1,4 @@
-export type ActivityOnboardingStepId =
-  | "near"
-  | "organization"
-  | "register"
-  | "approval"
-  | "binding"
-  | "api-key";
+export type ActivityOnboardingStepId = "near" | "organization" | "register" | "binding" | "api-key";
 
 export type ActivityOnboardingStepStatus =
   | "complete"
@@ -46,8 +40,7 @@ export function getActivityOnboardingSteps(
   const done: Array<[ActivityOnboardingStepId, boolean]> = [
     ["near", input.hasNearAccount],
     ["organization", input.isOrganizationOwner],
-    ["register", input.source !== null],
-    ["approval", input.source?.approvalStatus === "approved"],
+    ["register", input.source !== null && input.source.approvalStatus !== "rejected"],
     ["binding", input.identity?.bindingStatus === "bound"],
     ["api-key", input.hasApiKey],
   ];
@@ -56,10 +49,7 @@ export function getActivityOnboardingSteps(
   return done.map(([id, isDone], index) => {
     if (isDone) return { id, status: "complete" };
     if (index !== currentIndex) return { id, status: "upcoming" };
-    if (id === "approval" && input.source?.approvalStatus === "pending") {
-      return { id, status: "waiting" };
-    }
-    if (id === "approval" && input.source?.approvalStatus === "rejected") {
+    if (id === "register" && input.source?.approvalStatus === "rejected") {
       return { id, status: "blocked" };
     }
     return { id, status: "current" };

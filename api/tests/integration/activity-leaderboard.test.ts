@@ -86,6 +86,19 @@ describe("Activity leaderboard", () => {
         },
       ],
     });
+    await expect(
+      publicClient.getActivityLeaderboard({
+        period: "all-time",
+        source: "leaderboard-source",
+        limit: 10,
+      }),
+    ).resolves.toMatchObject({ data: [] });
+    const reviewer = await getPluginClient(adminContext("leaderboard-reviewer"));
+    await reviewer.reviewActivitySource({
+      sourceId: "leaderboard-source",
+      decision: "approved",
+      reason: "Reweighted event types reviewed",
+    });
     const reweighted = await publicClient.getActivityLeaderboard({
       period: "all-time",
       source: "leaderboard-source",

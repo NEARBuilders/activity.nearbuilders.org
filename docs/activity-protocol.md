@@ -152,11 +152,11 @@ connected feed cards without one request per card or a page refresh.
 
 ## GitHub repository polling
 
-An approved Source Owner can configure public GitHub repositories at
+A Source Owner can configure public GitHub repositories at
 `PUT /api/activity/sources/{sourceId}/github`, enable merged pull-request and closed-issue event
 types independently, and explicitly map GitHub logins to NEAR accounts. The Activity Source must
 have the corresponding `github.pr.merged` or `github.issue.closed` Event Type enabled. The source
-must also have an approved, NEAR-bound Signing Identity because polled records enter the same
+must also have a NEAR-bound Signing Identity and must not be rejected, because polled records enter the same
 signed, idempotent ingestion path as direct gateway submissions.
 
 The worker reads GitHub's public repository Events API without authentication by default. A
@@ -198,7 +198,7 @@ contract includes the required streaming lifecycle.
 
 ## Source credentials and signing
 
-Each approved Activity Source has one active Signing Identity. Its 32-byte Nostr private key is
+Each Activity Source that is not rejected can have one active Signing Identity. Its 32-byte Nostr private key is
 encrypted with AES-256-GCM; the stored record contains ciphertext, a unique IV, an authentication
 tag, and the version of the master key that encrypted it. The plaintext key is produced only inside
 the signing operation and its buffer is cleared afterwards. API responses, errors, and safe history
@@ -236,11 +236,12 @@ path.
 Source API keys contain 256 random bits and are persisted only as SHA-256 digests. They belong to
 exactly one Activity Source and always carry the single `event:write` permission. The full secret is
 returned by the creation response once; list and revoke responses contain safe metadata only. The
-ingestion authentication boundary rejects revoked keys, unapproved sources, and sources without a
+ingestion authentication boundary rejects revoked keys, rejected sources, and sources without a
 bound active Signing Identity.
 
-Source approval and source trust are independent controls. Approval alone determines whether the
-source can ingest. A Platform Administrator can separately set `standard` or `trusted` weighting and
+Source approval and source trust are independent controls. A pending source can ingest, up to a
+daily limit, and its events carry `provenance.approvalStatus: "pending"`; only approved sources count
+on leaderboards, and rejected sources cannot ingest. A Platform Administrator can separately set `standard` or `trusted` weighting and
 a current score multiplier through `POST /api/activity/sources/{sourceId}/trust`. Every change records
 the administrator, old and new values, reason, and timestamp in an append-only audit history.
 
@@ -253,6 +254,31 @@ dropped and the next cursor resumes at its start; later pages read it whole. Onl
 that alone fills the cap fails loudly, instead of returning a cursor that could silently omit
 same-second events. Relay reads have a six-second gateway deadline around the relay client's
 five-second wait.
+
+## Agent binding sessions
+
+A binding session lets a coding agent prepare a source while a person proves NEAR ownership.
+`POST /api/v1/binding-sessions` needs no authentication. It stores a draft (Source ID, display name,
+NEAR account, Event Types, and an optional nearbuilders.org project resolved through the public
+nearbuilders.org API) and returns three secrets with different holders:
+
+- the **session token** inside the `/binding` link, which the person opens while signed in;
+- the **poll token**, which only the agent holds and which authenticates
+  `POST /api/v1/binding-sessions/{sessionId}/claim`;
+- the **match code**, shown by both the agent and the page so the person can confirm they are
+  completing their own agent's session rather than a link someone else sent them.
+
+Both tokens are 256-bit random values persisted only as SHA-256 digests. The person registers the
+source and links it on-chain through the ordinary owner routes, then completes the session, which
+requires the source to belong to their active organization and its Signing Identity to be bound.
+The Source API Key is created only when the agent claims it: one conditional update reserves the
+claim, so the secret is returned exactly once and never stored or shown on the page. Sessions must
+be completed within 30 minutes and claimed within 24 hours. Starting sessions is limited per caller
+(10 per 10 minutes, keyed by a digest of the nearest proxy-reported client address) and globally
+(300 per 10 minutes).
+
+A source records the nearbuilders.org project it was registered from, and each project can be linked
+to only one source.
 
 ## Verification workflow
 

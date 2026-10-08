@@ -14,7 +14,7 @@ import { provisionIngestionSource } from "./activity-test-helpers";
 afterAll(teardown);
 
 describe("Activity source credentials", () => {
-  it("creates a Signing Identity only for an approved Source Owner", async () => {
+  it("creates a Signing Identity for a pending source but not a rejected one", async () => {
     const owner = await getPluginClient(orgOwnerContext("credential-owner", "org-credentials"));
     await owner.createActivitySource({
       sourceId: "credential-source",
@@ -28,17 +28,6 @@ describe("Activity source credentials", () => {
           pointValue: 1,
         },
       ],
-    });
-
-    await expect(
-      owner.createActivitySigningIdentity({ sourceId: "credential-source" }),
-    ).rejects.toThrow("Activity Source is not approved");
-
-    const administrator = await getPluginClient(adminContext());
-    await administrator.reviewActivitySource({
-      sourceId: "credential-source",
-      decision: "approved",
-      reason: "Credential test source",
     });
 
     const identity = await owner.createActivitySigningIdentity({
@@ -96,6 +85,29 @@ describe("Activity source credentials", () => {
         rotated,
       ]),
     );
+
+    await owner.createActivitySource({
+      sourceId: "rejected-credential-source",
+      displayName: "Rejected Credential Source",
+      nearAccountId: "rejected-credential.near",
+      eventTypes: [
+        {
+          name: "credential.event",
+          description: "An event authenticated with source credentials",
+          enabled: true,
+          pointValue: 1,
+        },
+      ],
+    });
+    const administrator = await getPluginClient(adminContext());
+    await administrator.reviewActivitySource({
+      sourceId: "rejected-credential-source",
+      decision: "rejected",
+      reason: "Credential test rejection",
+    });
+    await expect(
+      owner.createActivitySigningIdentity({ sourceId: "rejected-credential-source" }),
+    ).rejects.toThrow("Activity Source was rejected");
   });
 
   it("prepares a NEAR-authorized binding only for the source account", async () => {
@@ -203,7 +215,7 @@ describe("Activity source credentials", () => {
     }
   });
 
-  it("reveals source API keys once and rejects revoked or unapproved keys", async () => {
+  it("reveals source API keys once, keeps pending keys working, and rejects revoked or rejected keys", async () => {
     const owner = await getPluginClient(orgOwnerContext("api-key-source", "org-api-key"));
     await owner.createActivitySource({
       sourceId: "api-key-source",
@@ -306,8 +318,17 @@ describe("Activity source credentials", () => {
       sourceId: "api-key-source",
       displayName: "API Key Source Updated",
     });
+    await expect(credentials.authenticateEventWriteKey(pendingKey.secret)).resolves.toMatchObject({
+      sourceId: "api-key-source",
+    });
+
+    await administrator.reviewActivitySource({
+      sourceId: "api-key-source",
+      decision: "rejected",
+      reason: "API key test rejection",
+    });
     await expect(credentials.authenticateEventWriteKey(pendingKey.secret)).rejects.toThrow(
-      "Activity Source is not approved for ingestion",
+      "Activity Source was rejected",
     );
   });
 

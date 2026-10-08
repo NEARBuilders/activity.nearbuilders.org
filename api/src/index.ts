@@ -22,6 +22,7 @@ import { createActivitySseStream } from "./lib/activity-sse";
 import { createAuthMiddleware } from "./lib/auth";
 import { ContextSchema } from "./lib/context";
 import type { PluginsClient } from "./lib/plugins-types.gen";
+import { ActivityBindingSessionsService } from "./services/activity-binding-sessions";
 import { ActivityCredentialsLive, ActivityCredentialsTag } from "./services/activity-credentials";
 import { ActivityEndorsementsService } from "./services/activity-endorsements";
 import {
@@ -44,6 +45,7 @@ import {
   DatabaseActivityModerationStore,
 } from "./services/activity-moderation";
 import { ActivitySourcesLive, ActivitySourcesTag } from "./services/activity-sources";
+import { NearbuildersProjectsClient } from "./services/nearbuilders-projects";
 import { TenantsLive, TenantsTag } from "./services/tenants";
 
 const SUBDOMAIN_SEGMENT_REGEX = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
@@ -88,6 +90,24 @@ function validateAccountId(accountId: string): void {
   }
 }
 
+function requestOrigin(headers: Headers | undefined): string {
+  const host = headers?.get("x-forwarded-host") ?? headers?.get("host");
+  if (!host) return "https://activity.nearbuilders.org";
+  const protocol =
+    headers?.get("x-forwarded-proto")?.split(",")[0]?.trim() ??
+    (/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host) ? "http" : "https");
+  return `${protocol}://${host}`;
+}
+
+function requestClientKey(headers: Headers | undefined): string {
+  const forwarded = headers
+    ?.get("x-forwarded-for")
+    ?.split(",")
+    .map((address) => address.trim())
+    .filter(Boolean);
+  return forwarded?.at(-1) || headers?.get("x-real-ip") || "unknown";
+}
+
 function mainnetNearAccountIds(
   linkedAccounts: Array<{ accountId: string; network: string }>,
 ): string[] {
@@ -103,6 +123,8 @@ export default createPlugin.withPlugins<PluginsClient>()({
     activityNostrKvApiUrl: z.string().default("https://kv.main.fastnear.com"),
     activityRelayUrl: z.string().default("wss://relay.nearbuilders.org"),
     activityNostrRpcUrl: z.string().optional(),
+    activityPendingSourceDailyEventLimit: z.number().int().positive().default(500),
+    nearbuildersApiUrl: z.string().default("https://nearbuilders.org/api"),
   }),
 
   secrets: z.object({
@@ -177,6 +199,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activitySourcesService,
         activityRelay,
         activityLeaderboard,
+        { pendingSourceDailyEventLimit: config.variables.activityPendingSourceDailyEventLimit },
       );
       const activityGithubService = new ActivityGithubService({
         db: database,
@@ -196,6 +219,14 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityLeaderboard,
       );
       const activityEndorsementsService = new ActivityEndorsementsService(database);
+      const nearbuildersProjects = new NearbuildersProjectsClient(
+        config.variables.nearbuildersApiUrl,
+      );
+      const activityBindingSessionsService = new ActivityBindingSessionsService(
+        database,
+        activityCredentialsService,
+        { resolveProject: (reference) => nearbuildersProjects.resolve(reference) },
+      );
       const activityLeaderboardHistory = new DatabaseActivityLeaderboardHistory(
         database,
         activityFeedService,
@@ -233,6 +264,8 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityGithub: activityGithubService,
         activityFeed: activityFeedService,
         activityEndorsements: activityEndorsementsService,
+        activityBindingSessions: activityBindingSessionsService,
+        nearbuildersProjects,
         activityModeration: activityModerationService,
         activityLeaderboard,
         activityRelay,
@@ -625,6 +658,46 @@ export default createPlugin.withPlugins<PluginsClient>()({
             context.organization.activeOrganizationId,
             input.sourceId,
           ),
+        ),
+
+      createActivityBindingSession: builder.createActivityBindingSession.handler(
+        async ({ input, context }) => {
+          return services.activityBindingSessions.create(
+            input,
+            requestOrigin(context.reqHeaders),
+            requestClientKey(context.reqHeaders),
+          );
+        },
+      ),
+
+      claimActivityBindingSession: builder.claimActivityBindingSession.handler(
+        async ({ input, context }) => {
+          const authorization = context.reqHeaders?.get("authorization");
+          const pollToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+          if (!pollToken) {
+            throw new ORPCError("UNAUTHORIZED", { message: "Binding session poll token required" });
+          }
+          return services.activityBindingSessions.claim(input.sessionId, pollToken);
+        },
+      ),
+
+      lookupNearbuildersProject: builder.lookupNearbuildersProject
+        .use(requireAuth)
+        .handler(async ({ input }) => services.nearbuildersProjects.resolve(input.reference)),
+
+      getActivityBindingSession: builder.getActivityBindingSession
+        .use(requireAuth)
+        .handler(async ({ input }) => services.activityBindingSessions.lookup(input.sessionToken)),
+
+      completeActivityBindingSession: builder.completeActivityBindingSession
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) =>
+          services.activityBindingSessions.complete({
+            sessionToken: input.sessionToken,
+            organizationId: context.organization.activeOrganizationId,
+            sourceId: input.sourceId,
+            actorId: context.userId,
+          }),
         ),
 
       submitActivityEvent: builder.submitActivityEvent.handler(async ({ input, context }) => {

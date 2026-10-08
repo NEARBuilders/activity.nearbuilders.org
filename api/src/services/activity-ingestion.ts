@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, eq, isNull } from "drizzle-orm";
+import { and, count, eq, gte, isNull } from "drizzle-orm";
 import { ORPCError } from "every-plugin/orpc";
 import { type Event, validateEvent, verifyEvent } from "nostr-tools/pure";
 import { ACTIVITY_EVENT_KIND, type ActivityRelay } from "../activity/activity-relay";
@@ -26,12 +26,21 @@ export interface ActivityEventSubmission {
 
 export const ACTIVITY_EVENT_PAYLOAD_MAX_BYTES = 16 * 1_024;
 
+export const PENDING_SOURCE_DAILY_EVENT_LIMIT = 500;
+
+export interface ActivityIngestionOptions {
+  pendingSourceDailyEventLimit?: number;
+  now?: () => Date;
+}
+
 export class ActivityIngestionService {
   readonly #db: Database;
   readonly #credentials: ActivityCredentialsService;
   readonly #sources: ActivitySourcesService;
   readonly #relay: ActivityRelay;
   readonly #leaderboard: ActivityLeaderboard;
+  readonly #pendingSourceDailyEventLimit: number;
+  readonly #now: () => Date;
 
   constructor(
     db: Database,
@@ -39,12 +48,16 @@ export class ActivityIngestionService {
     sources: ActivitySourcesService,
     relay: ActivityRelay,
     leaderboard: ActivityLeaderboard,
+    options: ActivityIngestionOptions = {},
   ) {
     this.#db = db;
     this.#credentials = credentials;
     this.#sources = sources;
     this.#relay = relay;
     this.#leaderboard = leaderboard;
+    this.#pendingSourceDailyEventLimit =
+      options.pendingSourceDailyEventLimit ?? PENDING_SOURCE_DAILY_EVENT_LIMIT;
+    this.#now = options.now ?? (() => new Date());
   }
 
   async submit(apiKey: string, input: ActivityEventSubmission): Promise<{ eventId: string }> {
@@ -60,6 +73,35 @@ export class ActivityIngestionService {
     return this.#submitWithCredential(credential, input);
   }
 
+  async #enforcePendingSourceLimit(sourceRecordId: string, idempotencyKey: string) {
+    const [existing] = await this.#db
+      .select({ id: submissionsTable.id })
+      .from(submissionsTable)
+      .where(
+        and(
+          eq(submissionsTable.sourceRecordId, sourceRecordId),
+          eq(submissionsTable.idempotencyKey, idempotencyKey),
+        ),
+      )
+      .limit(1);
+    if (existing) return;
+    const since = new Date(this.#now().getTime() - 24 * 60 * 60 * 1_000);
+    const [recent] = await this.#db
+      .select({ total: count() })
+      .from(submissionsTable)
+      .where(
+        and(
+          eq(submissionsTable.sourceRecordId, sourceRecordId),
+          gte(submissionsTable.createdAt, since),
+        ),
+      );
+    if ((recent?.total ?? 0) >= this.#pendingSourceDailyEventLimit) {
+      throw new ORPCError("TOO_MANY_REQUESTS", {
+        message: `Activity Sources under review may submit up to ${this.#pendingSourceDailyEventLimit} events per day`,
+      });
+    }
+  }
+
   async #submitWithCredential(
     credential: ActivityEventWriteCredential,
     input: ActivityEventSubmission,
@@ -71,7 +113,7 @@ export class ActivityIngestionService {
       });
     }
     const occurredAt = input.occurredAt ? resolveOccurredAt(input.occurredAt) : null;
-    const source = await this.#sources.getApprovedSourceForIngestion(credential.sourceId);
+    const source = await this.#sources.getSourceForIngestion(credential.sourceId);
     const eventType = source.eventTypes.find(({ name }) => name === input.eventType);
     if (!eventType?.enabled) {
       throw new ORPCError("BAD_REQUEST", {
@@ -86,6 +128,9 @@ export class ActivityIngestionService {
       .limit(1);
     if (!sourceRow) {
       throw new ORPCError("NOT_FOUND", { message: "Activity Source not found" });
+    }
+    if (source.approvalStatus === "pending") {
+      await this.#enforcePendingSourceLimit(sourceRow.id, input.idempotencyKey);
     }
     const requestHash = hashSubmission(input);
     const [created] = await this.#db

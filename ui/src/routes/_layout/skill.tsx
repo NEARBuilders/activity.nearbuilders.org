@@ -12,8 +12,6 @@ import { PageContainer } from "@/components/layout/page-container";
 import { Button } from "@/components/ui/button";
 import { Markdown } from "@/components/ui/markdown";
 
-const INTENT_REGISTRY_URL = "https://tanstack.com/intent/registry/everything-dev";
-
 export const Route = createFileRoute("/_layout/skill")({
   loader: async ({ context }) => {
     const runtimeConfig = context.runtimeConfig;
@@ -31,7 +29,6 @@ export const Route = createFileRoute("/_layout/skill")({
     return {
       runtimeConfig,
       skill,
-      intentRegistryUrl: INTENT_REGISTRY_URL,
     };
   },
   head: () => ({
@@ -39,7 +36,7 @@ export const Route = createFileRoute("/_layout/skill")({
       { title: "Skill | NEAR Builders Activity" },
       {
         name: "description",
-        content: "Agent-oriented instructions for running, editing, and publishing this runtime.",
+        content: "Instructions a coding agent follows to add Activity to a project.",
       },
     ],
   }),
@@ -47,7 +44,7 @@ export const Route = createFileRoute("/_layout/skill")({
 });
 
 function SkillPage() {
-  const { skill, runtimeConfig, intentRegistryUrl } = Route.useLoaderData();
+  const { skill, runtimeConfig } = Route.useLoaderData();
   const runtime = getActiveRuntime(runtimeConfig);
   const account = getAccount(runtimeConfig);
   const appName = getAppName(runtimeConfig);
@@ -83,8 +80,7 @@ function SkillPage() {
                   <span className="text-base font-semibold text-foreground">{appName}</span>
                 </div>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Agent-ready prompt for TanStack Intent, local development, UI changes, and publish
-                  flow.
+                  Instructions a coding agent follows to add Activity to a project.
                 </p>
               </div>
             </div>
@@ -100,18 +96,12 @@ function SkillPage() {
                   raw skill.md
                 </a>
               </Button>
-              <Button asChild>
-                <a href={intentRegistryUrl} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink size={14} />
-                  TanStack Intent
-                </a>
-              </Button>
             </div>
           </div>
 
           <div className="border-t border-border py-4 text-sm text-muted-foreground">
-            Best entry points: `npx @tanstack/intent@latest load everything-dev`, `/skill.md`, and
-            the registry page above.
+            Ask your coding agent to "integrate activity.nearbuilders.org" and point it at
+            `/skill.md`, or copy the prompt above.
           </div>
         </div>
 

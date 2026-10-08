@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 
 const statusLabel: Record<ActivitySourceView["approvalStatus"], string> = {
-  pending: "Pending approval",
+  pending: "Under review",
   approved: "Approved",
   rejected: "Rejected",
 };
@@ -46,7 +46,9 @@ export function ActivitySourceCard({
         >
           <div className="min-w-0 space-y-0.5">
             <p className="font-mono text-sm text-foreground">{eventType.name}</p>
-            <p className="text-xs text-muted-foreground">{eventType.description}</p>
+            {eventType.description && (
+              <p className="text-xs text-muted-foreground">{eventType.description}</p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {!eventType.enabled && <Badge variant="outline">Disabled</Badge>}
@@ -79,10 +81,10 @@ export function ActivitySourceCard({
 
       {source.approvalStatus === "pending" && showPendingNotice && (
         <div className="rounded-lg bg-muted p-4">
-          <p className="text-sm font-medium text-foreground">Waiting on a Platform Administrator</p>
+          <p className="text-sm font-medium text-foreground">Under review</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            They approve or reject it with a written reason. This is separate from your
-            organization's roles, so owners cannot approve their own sources.
+            You can already send events. They appear in the feed marked "Under review" and start
+            counting on the leaderboard once a Platform Administrator approves this source.
           </p>
         </div>
       )}

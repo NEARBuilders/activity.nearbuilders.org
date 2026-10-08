@@ -1,6 +1,7 @@
 import {
   CheckIcon as Check,
   HourglassIcon as Hourglass,
+  PencilSimpleIcon as PencilSimple,
   XIcon as X,
 } from "@phosphor-icons/react/ssr";
 import type { ReactNode } from "react";
@@ -16,8 +17,7 @@ import { cn } from "@/lib/utils";
 const stepLabel: Record<ActivityOnboardingStepId, string> = {
   near: "Connect NEAR",
   organization: "Organization",
-  register: "Register",
-  approval: "Approval",
+  register: "Info",
   binding: "Link on-chain",
   "api-key": "API key",
 };
@@ -41,12 +41,7 @@ const stepGuide: Record<ActivityOnboardingStepId, StepGuide> = {
   register: {
     title: "Register your source",
     description: () =>
-      "Tell us what your source is and which events it will send. An administrator reviews it next.",
-  },
-  approval: {
-    title: "Waiting for approval",
-    description: () =>
-      "A Platform Administrator reviews every new source. There is nothing to do until then; this page updates on its own once it is approved.",
+      "Tell us what your source is and which events it will send. An administrator reviews it in the background, so you can keep going.",
   },
   binding: {
     title: "Link your source on-chain",
@@ -58,6 +53,16 @@ const stepGuide: Record<ActivityOnboardingStepId, StepGuide> = {
     description: () =>
       "Your app uses this key to send events. The secret is shown once, so have somewhere safe to keep it.",
   },
+};
+
+const hiddenSteps = new Set<ActivityOnboardingStepId>(["near", "organization"]);
+
+const editableSteps = new Set<ActivityOnboardingStepId>(["register"]);
+
+const editGuide: StepGuide = {
+  title: "Edit your source info",
+  description: () =>
+    "The Source ID is permanent. Changing the NEAR account means linking the source on-chain again.",
 };
 
 const rejectedGuide: StepGuide = {
@@ -73,6 +78,8 @@ export function ActivityOnboardingProgress({
   complete,
   title,
   onCancel,
+  editingStepId = null,
+  onEditStep,
 }: {
   steps: ActivityOnboardingStep[];
   nearAccountId: string | null;
@@ -80,26 +87,56 @@ export function ActivityOnboardingProgress({
   complete?: ReactNode;
   title?: string;
   onCancel?: () => void;
+  editingStepId?: ActivityOnboardingStepId | null;
+  onEditStep?: (id: ActivityOnboardingStepId) => void;
 }) {
-  const activeIndex = steps.findIndex((step) => step.status !== "complete");
+  const activeStep = steps.find((step) => step.status !== "complete");
 
-  if (activeIndex === -1) {
+  if (!activeStep && !editingStepId) {
     return complete ?? null;
   }
 
-  const activeStep = steps[activeIndex];
-  const guide = activeStep.status === "blocked" ? rejectedGuide : stepGuide[activeStep.id];
+  const visibleSteps = steps.filter((step) => !hiddenSteps.has(step.id));
+  const focusIndex = Math.max(
+    0,
+    visibleSteps.findIndex((step) =>
+      editingStepId ? step.id === editingStepId : step.status !== "complete",
+    ),
+  );
+  const focusStep = visibleSteps[focusIndex];
+  const guide = editingStepId
+    ? editGuide
+    : activeStep?.status === "blocked"
+      ? rejectedGuide
+      : stepGuide[activeStep?.id ?? "register"];
+  const editableStep =
+    onEditStep && !editingStepId
+      ? visibleSteps.find((step) => step.status === "complete" && editableSteps.has(step.id))
+      : undefined;
+  const displayStatus = (step: ActivityOnboardingStep): ActivityOnboardingStepStatus =>
+    step.id === editingStepId ? "current" : step.status;
 
   return (
     <Card className="gap-4 p-4 sm:p-5" aria-label="Setup progress">
       <div className="flex items-center justify-between gap-3">
         <p className="text-xs font-medium text-muted-foreground">
-          Setup · Step {activeIndex + 1} of {steps.length}
+          Setup · Step {focusIndex + 1} of {visibleSteps.length}
         </p>
         <div className="flex items-center gap-2">
           <p className="text-xs font-medium text-foreground md:hidden">
-            {stepLabel[activeStep.id]}
+            {focusStep ? stepLabel[focusStep.id] : null}
           </p>
+          {editableStep && (
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => onEditStep?.(editableStep.id)}
+            >
+              <PencilSimple />
+              Edit {stepLabel[editableStep.id].toLowerCase()}
+            </Button>
+          )}
           {onCancel && (
             <Button type="button" size="sm" variant="ghost" onClick={onCancel}>
               <X />
@@ -110,47 +147,68 @@ export function ActivityOnboardingProgress({
       </div>
 
       <div className="flex gap-1 md:hidden" aria-hidden="true">
-        {steps.map((step) => (
+        {visibleSteps.map((step) => (
           <div
             key={step.id}
-            className={cn("h-1.5 flex-1 rounded-full", segmentClass[step.status])}
+            className={cn("h-1.5 flex-1 rounded-full", segmentClass[displayStatus(step)])}
           />
         ))}
       </div>
 
       <ol className="hidden items-start md:flex">
-        {steps.map((step, index) => (
-          <li
-            key={step.id}
-            aria-current={index === activeIndex ? "step" : undefined}
-            className="relative flex flex-1 flex-col items-center gap-2 text-center"
-          >
-            {index > 0 && (
+        {visibleSteps.map((step, index) => {
+          const status = displayStatus(step);
+          const label = (
+            <>
+              <StepMarker status={status} index={index} />
               <span
-                aria-hidden="true"
                 className={cn(
-                  "absolute top-3.5 right-1/2 h-px w-full",
-                  steps[index - 1].status === "complete" ? "bg-brand-accent" : "bg-border",
+                  "text-xs",
+                  status === "upcoming" ? "text-muted-foreground" : "text-foreground",
+                  index === focusIndex && "font-semibold",
                 )}
-              />
-            )}
-            <StepMarker status={step.status} index={index} />
-            <span
-              className={cn(
-                "text-xs",
-                step.status === "upcoming" ? "text-muted-foreground" : "text-foreground",
-                index === activeIndex && "font-semibold",
-              )}
+              >
+                {stepLabel[step.id]}
+              </span>
+            </>
+          );
+          return (
+            <li
+              key={step.id}
+              aria-current={index === focusIndex ? "step" : undefined}
+              className="relative flex flex-1 flex-col items-center gap-2 text-center"
             >
-              {stepLabel[step.id]}
-            </span>
-          </li>
-        ))}
+              {index > 0 && (
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    "absolute top-3.5 right-1/2 h-px w-full",
+                    visibleSteps[index - 1].status === "complete" ? "bg-brand-accent" : "bg-border",
+                  )}
+                />
+              )}
+              {editableStep?.id === step.id ? (
+                <button
+                  type="button"
+                  onClick={() => onEditStep?.(step.id)}
+                  aria-label={`Edit ${stepLabel[step.id].toLowerCase()}`}
+                  className="relative z-10 flex flex-col items-center gap-2 rounded-md hover:opacity-80"
+                >
+                  {label}
+                </button>
+              ) : (
+                label
+              )}
+            </li>
+          );
+        })}
       </ol>
 
       <div className="space-y-4 sm:rounded-lg sm:bg-muted sm:p-4">
         <div className="space-y-1">
-          <h2 className="text-base font-semibold text-foreground">{title ?? guide.title}</h2>
+          <h2 className="text-base font-semibold text-foreground">
+            {editingStepId ? guide.title : (title ?? guide.title)}
+          </h2>
           <p className="text-sm text-muted-foreground">{guide.description(nearAccountId)}</p>
         </div>
         {action}

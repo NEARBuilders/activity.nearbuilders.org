@@ -35,6 +35,13 @@ const registrationBlocker: Record<
 
 const SOURCE_ID_PATTERN = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
 
+export interface ActivityProjectImport {
+  project: { id: string; title: string; url: string };
+  sourceId?: string;
+  displayName: string;
+  nearAccountId?: string;
+}
+
 type RegistrationField = "sourceId" | "nearAccountId";
 
 function fieldForError(message: string): RegistrationField | null {
@@ -57,6 +64,10 @@ export function ActivitySourceRegistration({
   registrationAction,
   embedded = false,
   defaultNearAccountId = "",
+  defaults,
+  onImportProject,
+  mode = "create",
+  onCancel,
 }: {
   access: ActivitySourceRegistrationAccess | null;
   isSubmitting: boolean;
@@ -64,12 +75,27 @@ export function ActivitySourceRegistration({
   registrationAction?: ReactNode;
   embedded?: boolean;
   defaultNearAccountId?: string;
+  defaults?: Partial<CreateActivitySourceInput>;
+  onImportProject?: (reference: string) => Promise<ActivityProjectImport>;
+  mode?: "create" | "edit";
+  onCancel?: () => void;
 }) {
-  const [sourceId, setSourceId] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [nearAccountId, setNearAccountId] = useState(defaultNearAccountId);
+  const isEditing = mode === "edit";
+  const [sourceId, setSourceId] = useState(defaults?.sourceId ?? "");
+  const [displayName, setDisplayName] = useState(defaults?.displayName ?? "");
+  const [nearAccountId, setNearAccountId] = useState(
+    defaults?.nearAccountId ?? defaultNearAccountId,
+  );
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<RegistrationField, string>>>({});
-  const [eventTypes, setEventTypes] = useState<ActivityEventTypeView[]>([emptyEventType()]);
+  const [eventTypes, setEventTypes] = useState<ActivityEventTypeView[]>(
+    defaults?.eventTypes?.length ? defaults.eventTypes : [emptyEventType()],
+  );
+  const [projectReference, setProjectReference] = useState("");
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [importedProject, setImportedProject] = useState<ActivityProjectImport["project"] | null>(
+    null,
+  );
 
   if (access === null) {
     return <Card className="h-24 animate-pulse p-5" />;
@@ -85,6 +111,26 @@ export function ActivitySourceRegistration({
     );
   }
 
+  const importProject = async () => {
+    const reference = projectReference.trim();
+    if (!onImportProject || !reference) return;
+    setIsImporting(true);
+    setImportError(null);
+    try {
+      const imported = await onImportProject(reference);
+      if (imported.sourceId) setSourceId(imported.sourceId);
+      setDisplayName(imported.displayName);
+      if (imported.nearAccountId) setNearAccountId(imported.nearAccountId);
+      setImportedProject(imported.project);
+      setFieldErrors({});
+    } catch (error) {
+      setImportedProject(null);
+      setImportError(error instanceof Error ? error.message : "Could not import that project");
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
   const updateEventType = (index: number, update: Partial<ActivityEventTypeView>) => {
     setEventTypes((current) =>
       current.map((eventType, eventTypeIndex) =>
@@ -96,8 +142,17 @@ export function ActivitySourceRegistration({
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (sourceIdFormatError) return;
+    const nearbuildersProjectId = isEditing
+      ? undefined
+      : (importedProject?.id ?? defaults?.nearbuildersProjectId);
     try {
-      await onCreate({ sourceId, displayName, nearAccountId, eventTypes });
+      await onCreate({
+        sourceId,
+        displayName,
+        nearAccountId,
+        eventTypes,
+        ...(nearbuildersProjectId && { nearbuildersProjectId }),
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : "";
       const field = fieldForError(message);
@@ -105,6 +160,9 @@ export function ActivitySourceRegistration({
       return;
     }
     setFieldErrors({});
+    if (isEditing) return;
+    setImportedProject(null);
+    setProjectReference("");
     setSourceId("");
     setDisplayName("");
     setNearAccountId(defaultNearAccountId);
@@ -118,19 +176,72 @@ export function ActivitySourceRegistration({
 
   const form = (
     <form className="space-y-8" onSubmit={handleSubmit}>
+      {onImportProject && !isEditing && (
+        <div className="space-y-2 rounded-lg border border-border p-4">
+          <Label htmlFor="project-reference">Import from nearbuilders.org</Label>
+          <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+            <Input
+              id="project-reference"
+              value={projectReference}
+              onChange={(event) => setProjectReference(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  void importProject();
+                }
+              }}
+              placeholder="https://nearbuilders.org/projects/your-project"
+              className="bg-background"
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => void importProject()}
+              disabled={isImporting || !projectReference.trim()}
+            >
+              {isImporting ? "Filling…" : "Fill from project"}
+            </Button>
+          </div>
+          {importError ? (
+            <p className="text-xs text-destructive">{importError}</p>
+          ) : importedProject ? (
+            <p className="text-xs text-muted-foreground">
+              Filled from{" "}
+              <a
+                href={importedProject.url}
+                target="_blank"
+                rel="noreferrer"
+                className="text-foreground underline underline-offset-2"
+              >
+                {importedProject.title}
+              </a>
+              . The NEAR account is the project's creator; change it if another account will sign.
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Paste a project link, slug, or name to fill in the details below.
+            </p>
+          )}
+        </div>
+      )}
       <fieldset className="space-y-4">
         <legend className="mb-4 text-sm font-semibold text-foreground">About your source</legend>
         <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
           <FormField
             label="Source ID"
             htmlFor="source-id"
-            description="Permanent and public on every event. It cannot be changed later."
+            description={
+              isEditing
+                ? "Permanent, so it cannot be changed."
+                : "Permanent and public on every event. It cannot be changed later."
+            }
             error={sourceIdFormatError ?? fieldErrors.sourceId}
           >
             <Input
               id="source-id"
               name="sourceId"
               value={sourceId}
+              readOnly={isEditing}
               aria-invalid={Boolean(sourceIdFormatError ?? fieldErrors.sourceId)}
               onChange={(event) => {
                 setSourceId(event.target.value);
@@ -259,13 +370,15 @@ export function ActivitySourceRegistration({
                   />
                 </FormField>
               </div>
-              <FormField label="Description" htmlFor={`event-type-description-${index.toString()}`}>
+              <FormField
+                label="Description (optional)"
+                htmlFor={`event-type-description-${index.toString()}`}
+              >
                 <Input
                   id={`event-type-description-${index.toString()}`}
                   value={eventType.description}
                   onChange={(event) => updateEventType(index, { description: event.target.value })}
                   placeholder="A project was published"
-                  required
                 />
               </FormField>
             </div>
@@ -284,9 +397,14 @@ export function ActivitySourceRegistration({
         </Button>
       </fieldset>
 
-      <div className="flex justify-end border-t border-border pt-6">
+      <div className="flex flex-col-reverse gap-2 border-t border-border pt-6 sm:flex-row sm:justify-end">
+        {onCancel && (
+          <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={onCancel}>
+            Cancel
+          </Button>
+        )}
         <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
-          Register source
+          {isEditing ? "Save changes" : "Register source"}
         </Button>
       </div>
     </form>

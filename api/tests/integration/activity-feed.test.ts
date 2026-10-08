@@ -80,6 +80,7 @@ describe("Activity event feed", () => {
           sourceDisplayName: "feed-source Source",
           integration: null,
           trustStatus: "standard",
+          approvalStatus: "approved",
           scoreMultiplier: 1,
           payloadClaimsVerified: false,
         },

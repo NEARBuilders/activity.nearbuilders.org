@@ -103,7 +103,7 @@ describe("Activity sources", () => {
       nearAccountId: "catalog.near",
       organizationId: "org-owner-1",
       approvalStatus: "pending",
-      canIngest: false,
+      canIngest: true,
       eventTypes: [
         {
           name: "catalog.project.published",
@@ -168,7 +168,7 @@ describe("Activity sources", () => {
       displayName: "NEAR Builder Directory",
       organizationId: "org-owner-2",
       approvalStatus: "pending",
-      canIngest: false,
+      canIngest: true,
       eventTypes: [
         {
           name: "builder.profile.created",
@@ -274,7 +274,7 @@ describe("Activity sources", () => {
     });
     expect(resubmitted).toMatchObject({
       approvalStatus: "pending",
-      canIngest: false,
+      canIngest: true,
       reviewHistory: [
         {
           decision: "approved",
@@ -284,9 +284,20 @@ describe("Activity sources", () => {
         },
       ],
     });
+
+    await expect(
+      owner.updateActivitySource({
+        sourceId: "unverified-source",
+        displayName: "Unverified Source Updated",
+      }),
+    ).resolves.toMatchObject({
+      approvalStatus: "rejected",
+      canIngest: false,
+      reviewReason: "NEAR account ownership could not be verified",
+    });
   });
 
-  it("lets only a platform administrator designate source trust without granting ingestion", async () => {
+  it("lets only a platform administrator designate source trust without changing approval", async () => {
     const owner = await getPluginClient(orgOwnerContext("trust-owner", "org-trust"));
     await owner.createActivitySource({
       sourceId: "trust-source",
@@ -321,7 +332,7 @@ describe("Activity sources", () => {
 
     expect(trusted).toMatchObject({
       approvalStatus: "pending",
-      canIngest: false,
+      canIngest: true,
       trustStatus: "trusted",
       scoreMultiplier: 1.5,
       trustHistory: [
@@ -334,5 +345,50 @@ describe("Activity sources", () => {
         },
       ],
     });
+  });
+
+  it("accepts event types without a description", async () => {
+    const owner = await getPluginClient(
+      orgOwnerContext("no-description-owner", "org-no-description", "no-description.near"),
+    );
+    const source = await owner.createActivitySource({
+      sourceId: "no-description-source",
+      displayName: "No Description Source",
+      nearAccountId: "no-description.near",
+      eventTypes: [{ name: "plain.event", enabled: true, pointValue: 1 }],
+    });
+
+    expect(source.eventTypes).toEqual([
+      expect.objectContaining({ name: "plain.event", description: "" }),
+    ]);
+  });
+
+  it("links a source to one nearbuilders.org project at most", async () => {
+    const first = await getPluginClient(
+      orgOwnerContext("project-link-owner", "org-project-link", "project-link.near"),
+    );
+    const linked = await first.createActivitySource({
+      sourceId: "project-link-source",
+      displayName: "Project Link Source",
+      nearAccountId: "project-link.near",
+      nearbuildersProjectId: "proj_linked_example",
+      eventTypes: [{ name: "linked.event", enabled: true, pointValue: 1 }],
+    });
+    expect(linked.nearbuildersProjectId).toBe("proj_linked_example");
+
+    const second = await getPluginClient(
+      orgOwnerContext("project-copy-owner", "org-project-copy", "project-copy.near"),
+    );
+    await expect(
+      second.createActivitySource({
+        sourceId: "project-copy-source",
+        displayName: "Project Copy Source",
+        nearAccountId: "project-copy.near",
+        nearbuildersProjectId: "proj_linked_example",
+        eventTypes: [{ name: "copy.event", enabled: true, pointValue: 1 }],
+      }),
+    ).rejects.toThrow(
+      "This nearbuilders.org project already has an Activity Source: project-link-source",
+    );
   });
 });

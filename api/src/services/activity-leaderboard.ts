@@ -17,6 +17,7 @@ export type ActivityPointValue = {
   type: string;
   pointValue: number;
   trustStatus?: "standard" | "trusted";
+  approvalStatus?: "pending" | "approved" | "rejected";
   scoreMultiplier?: number;
 };
 
@@ -62,6 +63,7 @@ export class DatabaseActivityPointValueProvider implements ActivityPointValuePro
         type: eventTypesTable.name,
         pointValue: eventTypesTable.pointValue,
         trustStatus: sourcesTable.trustStatus,
+        approvalStatus: sourcesTable.approvalStatus,
         scoreMultiplierBps: sourcesTable.scoreMultiplierBps,
       })
       .from(eventTypesTable)
@@ -411,6 +413,10 @@ export class ActivityLeaderboard {
     const dimensions = (await this.#projection.listDimensions(bucket))
       .filter(({ source }) => !input.source || source === input.source)
       .filter(({ type }) => !input.type || type === input.type)
+      .filter(({ source, type }) => {
+        const approvalStatus = pointValues.get(dimensionKey(source, type))?.approvalStatus;
+        return approvalStatus === undefined || approvalStatus === "approved";
+      })
       .map(({ source, type }) => {
         const configured = pointValues.get(dimensionKey(source, type));
         return {

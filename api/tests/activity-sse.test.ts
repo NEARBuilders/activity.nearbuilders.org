@@ -17,6 +17,7 @@ const event: ActivityFeedEvent = {
     sourceDisplayName: "Feedback rounds",
     integration: null,
     trustStatus: "standard",
+    approvalStatus: "approved",
     scoreMultiplier: 1,
     payloadClaimsVerified: false,
   },

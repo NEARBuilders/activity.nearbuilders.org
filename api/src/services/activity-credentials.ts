@@ -263,9 +263,9 @@ export const ActivityCredentialsLive = (
               if (!source) {
                 throw new ORPCError("NOT_FOUND", { message: "Activity Source not found" });
               }
-              if (source.approvalStatus !== "approved") {
+              if (source.approvalStatus === "rejected") {
                 throw new ORPCError("FORBIDDEN", {
-                  message: "Activity Source is not approved",
+                  message: "Activity Source was rejected",
                 });
               }
               const [existing] = await tx
@@ -299,8 +299,8 @@ export const ActivityCredentialsLive = (
         prepareSigningIdentityBinding: async (organizationId, sourceId, linkedNearAccountIds) => {
           try {
             const result = await findActiveIdentity(organizationId, sourceId);
-            if (result.source.approvalStatus !== "approved") {
-              throw new ORPCError("FORBIDDEN", { message: "Activity Source is not approved" });
+            if (result.source.approvalStatus === "rejected") {
+              throw new ORPCError("FORBIDDEN", { message: "Activity Source was rejected" });
             }
             const nearAccountId = requireLinkedSourceAccount(
               result.source.nearAccountId,
@@ -392,8 +392,8 @@ export const ActivityCredentialsLive = (
         confirmSigningIdentityBinding: async (organizationId, sourceId, linkedNearAccountIds) => {
           try {
             const result = await findActiveIdentity(organizationId, sourceId);
-            if (result.source.approvalStatus !== "approved") {
-              throw new ORPCError("FORBIDDEN", { message: "Activity Source is not approved" });
+            if (result.source.approvalStatus === "rejected") {
+              throw new ORPCError("FORBIDDEN", { message: "Activity Source was rejected" });
             }
             const nearAccountId = requireLinkedSourceAccount(
               result.source.nearAccountId,
@@ -449,8 +449,8 @@ export const ActivityCredentialsLive = (
         createApiKey: async (organizationId, sourceId, name) => {
           try {
             const result = await findActiveIdentity(organizationId, sourceId);
-            if (result.source.approvalStatus !== "approved") {
-              throw new ORPCError("FORBIDDEN", { message: "Activity Source is not approved" });
+            if (result.source.approvalStatus === "rejected") {
+              throw new ORPCError("FORBIDDEN", { message: "Activity Source was rejected" });
             }
             if (!hasCurrentBinding(result.source, result.identity)) {
               throw new ORPCError("FORBIDDEN", {
@@ -550,9 +550,9 @@ export const ActivityCredentialsLive = (
             if (!result || result.apiKey.revokedAt || result.apiKey.permission !== "event:write") {
               throw new ORPCError("UNAUTHORIZED", { message: "Invalid Source API Key" });
             }
-            if (result.source.approvalStatus !== "approved") {
+            if (result.source.approvalStatus === "rejected") {
               throw new ORPCError("FORBIDDEN", {
-                message: "Activity Source is not approved for ingestion",
+                message: "Activity Source was rejected",
               });
             }
             if (!hasCurrentBinding(result.source, result.identity)) {
@@ -590,9 +590,9 @@ export const ActivityCredentialsLive = (
               )
               .where(eq(sourcesTable.sourceId, sourceId))
               .limit(1);
-            if (!result || result.source.approvalStatus !== "approved") {
+            if (!result || result.source.approvalStatus === "rejected") {
               throw new ORPCError("FORBIDDEN", {
-                message: "Activity Source is not approved for ingestion",
+                message: "Activity Source is not available for ingestion",
               });
             }
             if (!hasCurrentBinding(result.source, result.identity)) {
@@ -637,8 +637,8 @@ export const ActivityCredentialsLive = (
                   message: "Active Activity Source signing identity not found",
                 });
               }
-              if (result.source.approvalStatus !== "approved") {
-                throw new ORPCError("FORBIDDEN", { message: "Activity Source is not approved" });
+              if (result.source.approvalStatus === "rejected") {
+                throw new ORPCError("FORBIDDEN", { message: "Activity Source was rejected" });
               }
 
               await tx
@@ -697,9 +697,9 @@ export const ActivityCredentialsLive = (
               )
               .where(eq(sourcesTable.sourceId, credential.sourceId))
               .limit(1);
-            if (!result || result.source.approvalStatus !== "approved") {
+            if (!result || result.source.approvalStatus === "rejected") {
               throw new ORPCError("FORBIDDEN", {
-                message: "Activity Source is not approved for signing",
+                message: "Activity Source is not available for signing",
               });
             }
             if (!hasCurrentBinding(result.source, result.identity)) {

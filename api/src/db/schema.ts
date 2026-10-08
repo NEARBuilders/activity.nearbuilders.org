@@ -65,6 +65,7 @@ export const activitySources = pgTable(
     sourceId: text("source_id").notNull().unique(),
     displayName: text("display_name").notNull(),
     nearAccountId: text("near_account_id").notNull().unique(),
+    nearbuildersProjectId: text("nearbuilders_project_id").unique(),
     organizationId: text("organization_id").notNull(),
     approvalStatus: activitySourceApprovalStatus("approval_status").default("pending").notNull(),
     trustStatus: activitySourceTrustStatus("trust_status").default("standard").notNull(),
@@ -366,5 +367,37 @@ export const activityEventModerationRequests = pgTable(
       table.eventId,
       table.requestedAt,
     ),
+  }),
+);
+
+export const activityBindingSessions = pgTable(
+  "activity_binding_sessions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    sessionTokenHash: text("session_token_hash").notNull(),
+    pollTokenHash: text("poll_token_hash").notNull(),
+    matchCode: text("match_code").notNull(),
+    draftJson: text("draft_json").notNull(),
+    requesterKeyHash: text("requester_key_hash"),
+    sourceRecordId: uuid("source_record_id").references(() => activitySources.id, {
+      onDelete: "cascade",
+    }),
+    completedBy: text("completed_by"),
+    completedAt: timestamp("completed_at", { mode: "date", withTimezone: true }),
+    keyClaimedAt: timestamp("key_claimed_at", { mode: "date", withTimezone: true }),
+    expiresAt: timestamp("expires_at", { mode: "date", withTimezone: true }).notNull(),
+    claimExpiresAt: timestamp("claim_expires_at", { mode: "date", withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    sessionTokenIdx: uniqueIndex("activity_binding_sessions_session_token_idx").on(
+      table.sessionTokenHash,
+    ),
+    pollTokenIdx: uniqueIndex("activity_binding_sessions_poll_token_idx").on(table.pollTokenHash),
+    requesterCreatedIdx: index("activity_binding_sessions_requester_created_idx").on(
+      table.requesterKeyHash,
+      table.createdAt,
+    ),
+    createdAtIdx: index("activity_binding_sessions_created_at_idx").on(table.createdAt),
   }),
 );
