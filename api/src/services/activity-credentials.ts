@@ -20,6 +20,7 @@ import {
   activitySigningIdentities as identitiesTable,
   activitySources as sourcesTable,
 } from "../db/schema";
+import { requireAvailableSource, requireSourceNotRejected } from "./activity-source-access";
 
 export interface ActivitySigningIdentityRecord {
   publicKey: string;
@@ -211,6 +212,57 @@ function toOrpcError(error: unknown): ORPCError<string, unknown> {
     : new ORPCError("INTERNAL_SERVER_ERROR", { message: "Activity credential operation failed" });
 }
 
+export function activitySourceBindingKey(sourceId: string): string {
+  return `activity/${sourceId}`;
+}
+
+function legacyNostrBindingKey(nearAccountId: string): string {
+  return `nostr/${nearAccountId}`;
+}
+
+type OnChainBinding = { npub?: unknown; bound_at?: unknown; sourceId?: unknown };
+
+async function readOnChainBinding(
+  config: { kvApiUrl: string; contractId: string },
+  nearAccountId: string,
+  key: string,
+): Promise<OnChainBinding | null> {
+  const keyPath = key.split("/").map(encodeURIComponent).join("/");
+  const url = `${config.kvApiUrl.replace(/\/$/, "")}/v0/latest/${encodeURIComponent(config.contractId)}/${encodeURIComponent(nearAccountId)}/${keyPath}`;
+  let response: Response;
+  try {
+    response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+  const data = (await response.json().catch(() => null)) as {
+    entries?: Array<{ value?: unknown }>;
+  } | null;
+  const raw = data?.entries?.[0]?.value;
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as OnChainBinding;
+    } catch {
+      return null;
+    }
+  }
+  return raw && typeof raw === "object" ? (raw as OnChainBinding) : null;
+}
+
+type BindingTarget = { source: { sourceId: string }; identity: { publicKey: string } };
+
+function sourceBindingMatches(
+  binding: OnChainBinding | null,
+  target: BindingTarget,
+): binding is OnChainBinding {
+  return binding?.npub === target.identity.publicKey && binding.sourceId === target.source.sourceId;
+}
+
+function legacyBindingMatches(binding: OnChainBinding | null, target: BindingTarget): boolean {
+  return binding?.npub === target.identity.publicKey;
+}
+
 export const ActivityCredentialsLive = (
   masterKeys: ActivityMasterKeys,
   bindingConfig: ActivityBindingConfig,
@@ -263,11 +315,7 @@ export const ActivityCredentialsLive = (
               if (!source) {
                 throw new ORPCError("NOT_FOUND", { message: "Activity Source not found" });
               }
-              if (source.approvalStatus !== "approved") {
-                throw new ORPCError("FORBIDDEN", {
-                  message: "Activity Source is not approved",
-                });
-              }
+              requireSourceNotRejected(source);
               const [existing] = await tx
                 .select({ id: identitiesTable.id })
                 .from(identitiesTable)
@@ -299,15 +347,13 @@ export const ActivityCredentialsLive = (
         prepareSigningIdentityBinding: async (organizationId, sourceId, linkedNearAccountIds) => {
           try {
             const result = await findActiveIdentity(organizationId, sourceId);
-            if (result.source.approvalStatus !== "approved") {
-              throw new ORPCError("FORBIDDEN", { message: "Activity Source is not approved" });
-            }
+            requireSourceNotRejected(result.source);
             const nearAccountId = requireLinkedSourceAccount(
               result.source.nearAccountId,
               linkedNearAccountIds,
             );
             const now = Math.floor(Date.now() / 1_000);
-            const challenge = `bind:${nearAccountId}:${now + 300}:near-nostr-bindings`;
+            const challenge = `bind:${nearAccountId}:${sourceId}:${now + 300}:activity-source`;
             const privateKey = decryptActivitySecret(
               {
                 ciphertext: result.identity.encryptedPrivateKey,
@@ -333,9 +379,11 @@ export const ActivityCredentialsLive = (
                 eventId: event.id,
                 verifiedBy: nearAccountId,
                 verifiedAt: now,
+                sourceId,
               });
-              const key = `nostr/${nearAccountId}`;
+              const key = activitySourceBindingKey(sourceId);
               const value = JSON.stringify({
+                sourceId,
                 npub: event.pubkey,
                 relay: bindingConfig.relay,
                 proof,
@@ -392,37 +440,34 @@ export const ActivityCredentialsLive = (
         confirmSigningIdentityBinding: async (organizationId, sourceId, linkedNearAccountIds) => {
           try {
             const result = await findActiveIdentity(organizationId, sourceId);
-            if (result.source.approvalStatus !== "approved") {
-              throw new ORPCError("FORBIDDEN", { message: "Activity Source is not approved" });
-            }
+            requireSourceNotRejected(result.source);
             const nearAccountId = requireLinkedSourceAccount(
               result.source.nearAccountId,
               linkedNearAccountIds,
             );
-            const accountPath = encodeURIComponent(nearAccountId);
-            const bindingUrl = `${bindingConfig.kvApiUrl.replace(/\/$/, "")}/v0/latest/${encodeURIComponent(bindingConfig.contractId)}/${accountPath}/nostr/${accountPath}`;
-            let response: Response;
-            try {
-              response = await fetch(bindingUrl, { signal: AbortSignal.timeout(5_000) });
-            } catch {
+            const sourceBinding = await readOnChainBinding(
+              bindingConfig,
+              nearAccountId,
+              activitySourceBindingKey(result.source.sourceId),
+            );
+            const binding = sourceBindingMatches(sourceBinding, result)
+              ? sourceBinding
+              : await readOnChainBinding(
+                  bindingConfig,
+                  nearAccountId,
+                  legacyNostrBindingKey(nearAccountId),
+                );
+            if (
+              !binding ||
+              !(binding === sourceBinding
+                ? sourceBindingMatches(binding, result)
+                : legacyBindingMatches(binding, result))
+            ) {
               throw new ORPCError("BAD_REQUEST", {
-                message: "The NEAR-to-Nostr binding is not available yet",
-              });
-            }
-            if (!response.ok) {
-              throw new ORPCError("BAD_REQUEST", {
-                message: "The NEAR-to-Nostr binding is not available yet",
-              });
-            }
-            const data = (await response.json()) as { entries?: Array<{ value?: unknown }> };
-            const rawBinding = data.entries?.[0]?.value;
-            const binding =
-              typeof rawBinding === "string"
-                ? (JSON.parse(rawBinding) as { npub?: unknown; bound_at?: unknown })
-                : (rawBinding as { npub?: unknown; bound_at?: unknown } | undefined);
-            if (!binding || binding.npub !== result.identity.publicKey) {
-              throw new ORPCError("BAD_REQUEST", {
-                message: "The NEAR-to-Nostr binding does not match this signing identity",
+                message:
+                  sourceBinding === null && binding === null
+                    ? "The NEAR-to-Nostr binding is not available yet"
+                    : "The NEAR-to-Nostr binding does not match this signing identity",
               });
             }
 
@@ -449,9 +494,7 @@ export const ActivityCredentialsLive = (
         createApiKey: async (organizationId, sourceId, name) => {
           try {
             const result = await findActiveIdentity(organizationId, sourceId);
-            if (result.source.approvalStatus !== "approved") {
-              throw new ORPCError("FORBIDDEN", { message: "Activity Source is not approved" });
-            }
+            requireSourceNotRejected(result.source);
             if (!hasCurrentBinding(result.source, result.identity)) {
               throw new ORPCError("FORBIDDEN", {
                 message: "Bind the Activity Source signing identity before creating an API key",
@@ -550,11 +593,7 @@ export const ActivityCredentialsLive = (
             if (!result || result.apiKey.revokedAt || result.apiKey.permission !== "event:write") {
               throw new ORPCError("UNAUTHORIZED", { message: "Invalid Source API Key" });
             }
-            if (result.source.approvalStatus !== "approved") {
-              throw new ORPCError("FORBIDDEN", {
-                message: "Activity Source is not approved for ingestion",
-              });
-            }
+            requireSourceNotRejected(result.source);
             if (!hasCurrentBinding(result.source, result.identity)) {
               throw new ORPCError("FORBIDDEN", {
                 message: "Activity Source signing identity is not bound",
@@ -590,11 +629,7 @@ export const ActivityCredentialsLive = (
               )
               .where(eq(sourcesTable.sourceId, sourceId))
               .limit(1);
-            if (!result || result.source.approvalStatus !== "approved") {
-              throw new ORPCError("FORBIDDEN", {
-                message: "Activity Source is not approved for ingestion",
-              });
-            }
+            requireAvailableSource(result, "ingestion");
             if (!hasCurrentBinding(result.source, result.identity)) {
               throw new ORPCError("FORBIDDEN", {
                 message: "Activity Source signing identity is not bound",
@@ -637,9 +672,7 @@ export const ActivityCredentialsLive = (
                   message: "Active Activity Source signing identity not found",
                 });
               }
-              if (result.source.approvalStatus !== "approved") {
-                throw new ORPCError("FORBIDDEN", { message: "Activity Source is not approved" });
-              }
+              requireSourceNotRejected(result.source);
 
               await tx
                 .update(identitiesTable)
@@ -697,11 +730,7 @@ export const ActivityCredentialsLive = (
               )
               .where(eq(sourcesTable.sourceId, credential.sourceId))
               .limit(1);
-            if (!result || result.source.approvalStatus !== "approved") {
-              throw new ORPCError("FORBIDDEN", {
-                message: "Activity Source is not approved for signing",
-              });
-            }
+            requireAvailableSource(result, "signing");
             if (!hasCurrentBinding(result.source, result.identity)) {
               throw new ORPCError("FORBIDDEN", {
                 message: "Activity Source signing identity is not bound",

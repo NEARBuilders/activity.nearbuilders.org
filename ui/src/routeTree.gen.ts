@@ -21,6 +21,7 @@ import { Route as LayoutDocsSlugRouteImport } from './routes/_layout/docs/$slug'
 import { Route as LayoutAuthenticatedTenantsRouteImport } from './routes/_layout/_authenticated/tenants'
 import { Route as LayoutAuthenticatedSettingsRouteImport } from './routes/_layout/_authenticated/settings'
 import { Route as LayoutAuthenticatedHomeRouteImport } from './routes/_layout/_authenticated/home'
+import { Route as LayoutAuthenticatedBindingRouteImport } from './routes/_layout/_authenticated/binding'
 import { Route as LayoutAuthenticatedAdminRouteImport } from './routes/_layout/_authenticated/admin'
 import { Route as LayoutAuthenticatedActivitySourcesRouteImport } from './routes/_layout/_authenticated/activity-sources'
 import { Route as LayoutAuthenticatedSettingsIndexRouteImport } from './routes/_layout/_authenticated/settings/index'
@@ -94,6 +95,12 @@ const LayoutAuthenticatedHomeRoute = LayoutAuthenticatedHomeRouteImport.update({
   path: '/home',
   getParentRoute: () => LayoutAuthenticatedRoute,
 } as any)
+const LayoutAuthenticatedBindingRoute =
+  LayoutAuthenticatedBindingRouteImport.update({
+    id: '/binding',
+    path: '/binding',
+    getParentRoute: () => LayoutAuthenticatedRoute,
+  } as any)
 const LayoutAuthenticatedAdminRoute =
   LayoutAuthenticatedAdminRouteImport.update({
     id: '/admin',
@@ -175,6 +182,7 @@ export interface FileRoutesByFullPath {
   '/skill': typeof LayoutSkillRoute
   '/activity-sources': typeof LayoutAuthenticatedActivitySourcesRoute
   '/admin': typeof LayoutAuthenticatedAdminRoute
+  '/binding': typeof LayoutAuthenticatedBindingRoute
   '/home': typeof LayoutAuthenticatedHomeRoute
   '/settings': typeof LayoutAuthenticatedSettingsRouteWithChildren
   '/tenants': typeof LayoutAuthenticatedTenantsRoute
@@ -199,6 +207,7 @@ export interface FileRoutesByTo {
   '/skill': typeof LayoutSkillRoute
   '/activity-sources': typeof LayoutAuthenticatedActivitySourcesRoute
   '/admin': typeof LayoutAuthenticatedAdminRoute
+  '/binding': typeof LayoutAuthenticatedBindingRoute
   '/home': typeof LayoutAuthenticatedHomeRoute
   '/tenants': typeof LayoutAuthenticatedTenantsRoute
   '/docs/$slug': typeof LayoutDocsSlugRoute
@@ -225,6 +234,7 @@ export interface FileRoutesById {
   '/_layout/': typeof LayoutIndexRoute
   '/_layout/_authenticated/activity-sources': typeof LayoutAuthenticatedActivitySourcesRoute
   '/_layout/_authenticated/admin': typeof LayoutAuthenticatedAdminRoute
+  '/_layout/_authenticated/binding': typeof LayoutAuthenticatedBindingRoute
   '/_layout/_authenticated/home': typeof LayoutAuthenticatedHomeRoute
   '/_layout/_authenticated/settings': typeof LayoutAuthenticatedSettingsRouteWithChildren
   '/_layout/_authenticated/tenants': typeof LayoutAuthenticatedTenantsRoute
@@ -251,6 +261,7 @@ export interface FileRouteTypes {
     | '/skill'
     | '/activity-sources'
     | '/admin'
+    | '/binding'
     | '/home'
     | '/settings'
     | '/tenants'
@@ -275,6 +286,7 @@ export interface FileRouteTypes {
     | '/skill'
     | '/activity-sources'
     | '/admin'
+    | '/binding'
     | '/home'
     | '/tenants'
     | '/docs/$slug'
@@ -300,6 +312,7 @@ export interface FileRouteTypes {
     | '/_layout/'
     | '/_layout/_authenticated/activity-sources'
     | '/_layout/_authenticated/admin'
+    | '/_layout/_authenticated/binding'
     | '/_layout/_authenticated/home'
     | '/_layout/_authenticated/settings'
     | '/_layout/_authenticated/tenants'
@@ -405,6 +418,13 @@ declare module '@tanstack/react-router' {
       path: '/home'
       fullPath: '/home'
       preLoaderRoute: typeof LayoutAuthenticatedHomeRouteImport
+      parentRoute: typeof LayoutAuthenticatedRoute
+    }
+    '/_layout/_authenticated/binding': {
+      id: '/_layout/_authenticated/binding'
+      path: '/binding'
+      fullPath: '/binding'
+      preLoaderRoute: typeof LayoutAuthenticatedBindingRouteImport
       parentRoute: typeof LayoutAuthenticatedRoute
     }
     '/_layout/_authenticated/admin': {
@@ -521,6 +541,7 @@ const LayoutAuthenticatedSettingsRouteWithChildren =
 interface LayoutAuthenticatedRouteChildren {
   LayoutAuthenticatedActivitySourcesRoute: typeof LayoutAuthenticatedActivitySourcesRoute
   LayoutAuthenticatedAdminRoute: typeof LayoutAuthenticatedAdminRoute
+  LayoutAuthenticatedBindingRoute: typeof LayoutAuthenticatedBindingRoute
   LayoutAuthenticatedHomeRoute: typeof LayoutAuthenticatedHomeRoute
   LayoutAuthenticatedSettingsRoute: typeof LayoutAuthenticatedSettingsRouteWithChildren
   LayoutAuthenticatedTenantsRoute: typeof LayoutAuthenticatedTenantsRoute
@@ -536,6 +557,7 @@ const LayoutAuthenticatedRouteChildren: LayoutAuthenticatedRouteChildren = {
   LayoutAuthenticatedActivitySourcesRoute:
     LayoutAuthenticatedActivitySourcesRoute,
   LayoutAuthenticatedAdminRoute: LayoutAuthenticatedAdminRoute,
+  LayoutAuthenticatedBindingRoute: LayoutAuthenticatedBindingRoute,
   LayoutAuthenticatedHomeRoute: LayoutAuthenticatedHomeRoute,
   LayoutAuthenticatedSettingsRoute:
     LayoutAuthenticatedSettingsRouteWithChildren,

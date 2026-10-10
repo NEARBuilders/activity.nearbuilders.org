@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNotNull } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, ne } from "drizzle-orm";
 import { type Event, getEventHash, validateEvent, verifyEvent } from "nostr-tools/pure";
 import {
   ACTIVITY_EVENT_KIND,
@@ -25,6 +25,7 @@ export type BoundActivityIdentity = {
   sourceDisplayName?: string;
   integration?: "github" | null;
   trustStatus?: "standard" | "trusted";
+  approvalStatus?: "pending" | "approved";
   scoreMultiplier?: number;
   publicKey: string;
   activeFrom?: string;
@@ -94,6 +95,7 @@ export class DatabaseActivityIdentityStore implements ActivityIdentityStore {
         sourceDisplayName: sourcesTable.displayName,
         githubIntegrationId: githubIntegrationsTable.id,
         trustStatus: sourcesTable.trustStatus,
+        approvalStatus: sourcesTable.approvalStatus,
         scoreMultiplierBps: sourcesTable.scoreMultiplierBps,
         publicKey: identitiesTable.publicKey,
         activeFrom: identitiesTable.boundAt,
@@ -110,17 +112,31 @@ export class DatabaseActivityIdentityStore implements ActivityIdentityStore {
           ? and(
               eq(identitiesTable.bindingStatus, "bound"),
               isNotNull(identitiesTable.boundAt),
+              ne(sourcesTable.approvalStatus, "rejected"),
               eq(sourcesTable.sourceId, source),
             )
-          : and(eq(identitiesTable.bindingStatus, "bound"), isNotNull(identitiesTable.boundAt)),
+          : and(
+              eq(identitiesTable.bindingStatus, "bound"),
+              isNotNull(identitiesTable.boundAt),
+              ne(sourcesTable.approvalStatus, "rejected"),
+            ),
       )
       .then((identities) =>
         identities.flatMap(
-          ({ scoreMultiplierBps, activeFrom, retiredAt, githubIntegrationId, ...identity }) =>
+          ({
+            scoreMultiplierBps,
+            activeFrom,
+            retiredAt,
+            githubIntegrationId,
+            approvalStatus,
+            ...identity
+          }) =>
             activeFrom
               ? [
                   {
                     ...identity,
+                    approvalStatus:
+                      approvalStatus === "pending" ? ("pending" as const) : ("approved" as const),
                     integration: githubIntegrationId ? ("github" as const) : null,
                     scoreMultiplier: scoreMultiplierBps / 10_000,
                     activeFrom: toIso(activeFrom),
@@ -433,6 +449,7 @@ function parseActivityFeedEvent(
       sourceDisplayName: identity.sourceDisplayName ?? source,
       integration: identity.integration ?? null,
       trustStatus: identity.trustStatus ?? "standard",
+      approvalStatus: identity.approvalStatus ?? "approved",
       scoreMultiplier: identity.scoreMultiplier ?? 1,
       payloadClaimsVerified: false,
     },

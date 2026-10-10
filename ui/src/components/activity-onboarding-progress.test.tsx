@@ -28,7 +28,7 @@ describe("ActivityOnboardingProgress", () => {
       />,
     );
 
-    expect(screen.getByText("Setup · Step 5 of 6")).toBeTruthy();
+    expect(screen.getByText("Setup · Step 2 of 3")).toBeTruthy();
     expect(screen.getByText("Link your source on-chain")).toBeTruthy();
     expect(screen.getByText(/Approve one transaction from catalog\.near/)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Approve in wallet" })).toBeTruthy();
@@ -76,9 +76,58 @@ describe("ActivityOnboardingProgress", () => {
       />,
     );
 
-    expect(screen.getByText("Setup · Step 3 of 6")).toBeTruthy();
+    expect(screen.getByText("Setup · Step 1 of 3")).toBeTruthy();
     expect(screen.getByText("Register another source")).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onCancel).toHaveBeenCalled();
+  });
+
+  it("shows only Info, Link on-chain, and API key, while still guiding a missing NEAR wallet", () => {
+    render(
+      <ActivityOnboardingProgress
+        steps={getActivityOnboardingSteps({
+          ...approvedSource,
+          hasNearAccount: false,
+          isOrganizationOwner: false,
+          source: null,
+        })}
+        nearAccountId={null}
+      />,
+    );
+
+    expect(screen.getByText("Setup · Step 1 of 3")).toBeTruthy();
+    expect(screen.getByText("Connect your NEAR wallet")).toBeTruthy();
+    expect(screen.getAllByText("Info").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Connect NEAR")).toBeNull();
+    expect(screen.queryByText("Organization")).toBeNull();
+  });
+
+  it("lets a registered source go back and edit its info", () => {
+    const onEditStep = vi.fn();
+    const { rerender } = render(
+      <ActivityOnboardingProgress
+        steps={getActivityOnboardingSteps(approvedSource)}
+        nearAccountId="catalog.near"
+        onEditStep={onEditStep}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Edit info" })[0]);
+    expect(onEditStep).toHaveBeenCalledWith("register");
+
+    rerender(
+      <ActivityOnboardingProgress
+        steps={getActivityOnboardingSteps(approvedSource)}
+        nearAccountId="catalog.near"
+        onEditStep={onEditStep}
+        editingStepId="register"
+        action={<p>Edit form</p>}
+      />,
+    );
+
+    expect(screen.getByText("Setup · Step 1 of 3")).toBeTruthy();
+    expect(screen.getByText("Edit your source info")).toBeTruthy();
+    expect(screen.getByText("Edit form")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Edit info" })).toBeNull();
   });
 });

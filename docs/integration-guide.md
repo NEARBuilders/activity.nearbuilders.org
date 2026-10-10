@@ -22,8 +22,8 @@ what you report is a verifiable reference rather than a claim.
 ## What it costs
 
 A plain HTTP request per event. No library to install, no infrastructure to run. Registration takes
-an administrator's approval and one on-chain transaction that costs about **0.0001 NEAR** in gas,
-with no deposit; after that you are sending events.
+one on-chain transaction that costs about **0.0001 NEAR** in gas, with no deposit; after that you are
+sending events. An administrator reviews the source in the background, so you never wait on them.
 
 ---
 
@@ -41,22 +41,24 @@ You will need:
 
 - A **mainnet NEAR account** for the source. One on-chain transaction from this exact account links
   it to the source's signing key. It attaches no deposit and costs about **0.0001 NEAR** in gas, so
-  any account holding **0.01 NEAR** has plenty. Each NEAR account can own only one source.
+  any account holding **0.01 NEAR** has plenty. One NEAR account can own up to 10 sources, each
+  linked separately.
 - An **organization** in Activity that you own.
-- A **Platform Administrator** to approve the source.
 
 Budget for this realistically. Sending your first event once you hold an API key takes a couple of
-minutes, but two steps before that are not instant:
+minutes:
 
 | Step | Who | How long |
 | --- | --- | --- |
 | Register the source | You | Minutes |
-| Approve the source | A Platform Administrator | Until a human gets to it |
 | Link the source on-chain | You, from the source's NEAR account | One wallet approval, then seconds |
 | Create an API key and publish | You | Minutes |
+| Review the source | A Platform Administrator | In the background; it does not block you |
 
-> **Publishing returns `403` until the source is both approved and bound.** Arrange approval before
-> you plan a demo.
+> **Events are accepted before approval.** Until a Platform Administrator approves the source, its
+> events appear in the feed marked **Under review**, do not count on leaderboards, and are limited to
+> 500 per day. Approval lifts the limit and counts earlier events too. A rejected source cannot
+> publish, and its events leave the feed.
 
 Once you are publishing, this is what happens to an event:
 
@@ -78,6 +80,68 @@ Once you are publishing, this is what happens to an event:
 Activity never edits or deletes an accepted event. Everything you read back later — the feed, the
 live stream, the leaderboard — is derived from that signed record.
 
+## Set it up with a coding agent
+
+The fastest path is to ask your coding agent: *"Integrate activity.nearbuilders.org in this project,
+it's https://nearbuilders.org/projects/your-project."* Point it at
+[`/skill.md`](https://activity.nearbuilders.org/skill.md) if it does not find it on its own. The
+agent prepares everything; you sign in and approve one wallet transaction.
+
+**What you do:**
+
+1. Your agent shows you a link to `/binding?sessionToken=…` and a short match code such as
+   `7VQ-9SP`.
+2. Open the link and sign in with your NEAR wallet. Check that the page shows the **same match
+   code**. If it does not, close the page: someone else started that session.
+3. If you do not own an organization yet, choose **Create "<project>"** to make one named after the
+   project.
+4. Check the details the agent filled in, adjust anything, and register the source.
+5. Approve the link transaction in your wallet. The page then says **Return to your agent**.
+
+**What the agent does:** it starts a binding session, waits while you finish, receives the Source
+API Key, stores it as a server-side secret, writes the integration, and sends a test event. The key
+goes straight to the agent and is never shown on the page.
+
+### Binding session API
+
+Start a session. Every field is optional; `project.reference` accepts a nearbuilders.org project
+link, slug, `proj_…` id, or name, and fills in the Source ID, display name, and NEAR account from
+the project. Fields you send yourself take precedence over the project's.
+
+```bash
+curl -sS -X POST https://activity.nearbuilders.org/api/v1/binding-sessions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "project": { "reference": "https://nearbuilders.org/projects/your-project" },
+    "eventTypes": [
+      { "name": "task.completed", "description": "A user completed a task", "enabled": true, "pointValue": 5 }
+    ]
+  }'
+```
+
+The response contains `url` (give it to the person), `matchCode` (show it to them), `pollToken`
+(keep it private), `sessionId`, `expiresAt`, and the resolved `draft`. The person has 30 minutes to
+finish. A caller can start 10 sessions per 10 minutes; more return `429`. An ambiguous project name
+returns `400` listing the matching project links, and an unknown project returns `404`.
+
+Claim the key with the poll token:
+
+```bash
+curl -sS -X POST "https://activity.nearbuilders.org/api/v1/binding-sessions/$SESSION_ID/claim" \
+  -H "Authorization: Bearer $POLL_TOKEN" -H 'Content-Type: application/json' -d '{}'
+```
+
+| `status` | Meaning | Next step |
+| --- | --- | --- |
+| `waiting` | The person has not finished yet | Poll again in a few seconds. |
+| `ready` | Finished; the response includes `secret` (the `act_…` key), `apiKeyId`, and `sourceId` | Store the secret now. It is returned only this once. |
+| `claimed` | The key was already returned | Use the stored key, or create a new one on `/activity-sources`. |
+| `expired` | The person did not finish in time, or the key was not claimed within 24 hours | Start a new session. |
+
+A wrong or missing poll token returns `404` or `401`. The source starts **Under review**: its events
+are accepted and appear in the feed straight away, and count on leaderboards once a Platform
+Administrator approves it.
+
 ## 1. Register a source
 
 Everything in this section happens in the browser, and it is the only part that needs a NEAR
@@ -85,24 +149,33 @@ wallet. Before starting, have the **mainnet NEAR account that will own the sourc
 least **0.01 NEAR**; the one transaction below costs about 0.0001 NEAR.
 
 `/activity-sources` walks you through these steps with a setup panel at the top of the page. It
-shows which step you are on and puts that step's button or form right inside it.
+shows which step you are on (**Info**, **Link on-chain**, **API key**) and puts that step's button
+or form right inside it. Once the source is registered, **Edit info** takes you back to change its
+details; the Source ID stays fixed.
 
 1. **Sign in** with that NEAR account.
 2. **Select or create an organization** in the workspace menu. You must be its **owner**: members
    cannot register sources or manage credentials. A source belongs to one organization permanently.
-3. **Register the source** on `/activity-sources`:
+3. **Register the source** on `/activity-sources`. Search for your project in **Find your project on
+   nearbuilders.org**, or paste its link, and pick it to fill in the first three fields; projects you
+   own are marked **Owned**. Not on nearbuilders.org? Choose **Enter manually**. A nearbuilders.org
+   project can have only one source, and only the project owner's NEAR account (or the project's
+   linked app account) can register it, signed in as that account.
    - **Source ID** — lowercase, permanent, and shown publicly on every event, such as
      `github.nearbuilders.org`. It cannot be changed later.
    - **Display name** — shown on feed cards.
    - **NEAR account** — the exact mainnet account that will sign the on-chain link in step 5. It
-     defaults to the account you signed in with, and each account can own only one source.
+     must be linked to your profile, and **Register source** stays disabled until it is. For a
+     nearbuilders.org project it is filled with the project owner's account. One account can own up
+     to 10 sources.
    - **Event Types** — at least one, lowercase, such as `feedback.submitted`. Each carries a point
-     value used for scoring, and can be enabled or disabled. Add every type you expect to publish;
-     submitting a type that is missing or disabled returns `400`.
-4. **Wait for approval.** A Platform Administrator approves or rejects with a written reason, which
-   you can see on the source. Approval is what allows publishing at all. The separate `standard` or
-   `trusted` designation only affects scoring weight, and you do not need `trusted` to start. The
-   page checks for approval on its own, so you can leave it open.
+     value used for scoring, an optional description, and can be enabled or disabled. Add every
+     type you expect to publish; submitting a type that is missing or disabled returns `400`.
+4. **Keep going while it is reviewed.** A Platform Administrator approves or rejects with a written
+   reason, which you can see on the source. You do not wait for it: until approval, your events are
+   accepted and marked **Under review**. Approval is what puts them on leaderboards. The separate
+   `standard` or `trusted` designation only affects scoring weight, and you do not need `trusted` to
+   start.
 5. **Link on-chain.** Choose **Approve in wallet** and approve the mainnet transaction **from the
    source's exact NEAR account**; if you are signed in as a different account, the panel tells you
    which one to use. Activity first creates the source's signing identity, a Nostr keypair whose
@@ -119,9 +192,10 @@ shows which step you are on and puts that step's button or form right inside it.
 > issue bodies, `.env.example`, or a committed `.env`.
 
 > **Editing a source later sends it back for review.** Changing the display name, NEAR account, or
-> Event Types returns the source to `pending`, and it stops ingesting until an administrator
-> reviews it again. Changing the NEAR account also unbinds the Signing Identity, so step 5 has to
-> be repeated from the new account. Plan your Event Types up front where you can.
+> Event Types returns the source to `pending`: it keeps ingesting, but its events are marked
+> **Under review** and leave leaderboards until an administrator reviews it again. Changing the NEAR
+> account also unbinds the Signing Identity, so step 5 has to be repeated from the new account.
+> Plan your Event Types up front where you can.
 
 ### Polling GitHub instead of publishing
 
@@ -250,8 +324,9 @@ a relay outage is Activity's problem, not yours.
 | --- | --- | --- |
 | `400` | Invalid actor, Event Type, payload, filter, cursor, or resume ID | Fix the request; do not retry unchanged. |
 | `401` | Missing, invalid, or revoked Source API Key | Stop publishing and replace the secret. |
-| `403` | Source is unapproved, disabled, or lacks a bound Signing Identity | Repair source approval/binding before retrying. |
+| `403` | Source was rejected, or lacks a bound Signing Identity | Repair the source or its binding before retrying. |
 | `409` | The idempotency key was already used with different content | Generate a new key for the new logical event. |
+| `429` | A source under review reached its daily event limit | Retry tomorrow, or wait for approval, which lifts the limit. |
 | `503` | Relay or Redis cannot complete the operation safely | Retry with backoff and the exact same idempotency key and body. |
 
 The gateway reserves and signs a submission before publishing it. If relay acknowledgement is lost,

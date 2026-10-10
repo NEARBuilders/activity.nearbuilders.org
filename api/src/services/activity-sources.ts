@@ -1,6 +1,8 @@
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { Context, Effect, Layer } from "every-plugin/effect";
 import { ORPCError } from "every-plugin/orpc";
+import { MAX_ACTIVITY_SOURCES_PER_NEAR_ACCOUNT } from "../contract";
+import type { Database } from "../db";
 import { DatabaseTag } from "../db/layer";
 import {
   type activitySourceApprovalStatus,
@@ -11,6 +13,7 @@ import {
   activitySources as sourcesTable,
   activitySourceTrustChanges as trustChangesTable,
 } from "../db/schema";
+import { requireSourceNotRejected } from "./activity-source-access";
 
 export type ActivitySourceApprovalStatus =
   (typeof activitySourceApprovalStatus)["enumValues"][number];
@@ -27,6 +30,7 @@ export interface ActivitySourceInput {
   sourceId: string;
   displayName: string;
   nearAccountId: string;
+  nearbuildersProjectId?: string;
   organizationId: string;
   eventTypes: ActivityEventTypeInput[];
 }
@@ -35,6 +39,7 @@ export interface ActivitySourceRecord {
   sourceId: string;
   displayName: string;
   nearAccountId: string;
+  nearbuildersProjectId: string | null;
   organizationId: string;
   approvalStatus: ActivitySourceApprovalStatus;
   canIngest: boolean;
@@ -67,8 +72,12 @@ export interface ActivitySourceTrustChangeRecord {
 
 export interface ActivitySourcesService {
   createSource(input: ActivitySourceInput): Promise<ActivitySourceRecord>;
-  getApprovedSourceForIngestion(sourceId: string): Promise<ActivitySourceRecord>;
+  getSourceForIngestion(sourceId: string): Promise<ActivitySourceRecord>;
   listSourcesByOrganization(organizationId: string): Promise<ActivitySourceRecord[]>;
+  getSourceAccount(
+    organizationId: string,
+    sourceId: string,
+  ): Promise<{ nearAccountId: string; nearbuildersProjectId: string | null } | null>;
   updateSource(
     organizationId: string,
     sourceId: string,
@@ -116,9 +125,10 @@ function toRecord(
     sourceId: source.sourceId,
     displayName: source.displayName,
     nearAccountId: source.nearAccountId,
+    nearbuildersProjectId: source.nearbuildersProjectId,
     organizationId: source.organizationId,
     approvalStatus: source.approvalStatus,
-    canIngest: source.approvalStatus === "approved",
+    canIngest: source.approvalStatus !== "rejected",
     trustStatus: source.trustStatus,
     scoreMultiplier: source.scoreMultiplierBps / 10_000,
     eventTypes: eventTypes.map(({ name, description, enabled, pointValue }) => ({
@@ -158,6 +168,23 @@ function toOrpcError(error: unknown): ORPCError<string, unknown> {
       });
 }
 
+async function requireSourceCapacity(
+  tx: Pick<Database, "select" | "execute">,
+  nearAccountId: string,
+): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${nearAccountId}))`);
+  const [row] = await tx
+    .select({ total: count() })
+    .from(sourcesTable)
+    .where(eq(sourcesTable.nearAccountId, nearAccountId));
+  if ((row?.total ?? 0) >= MAX_ACTIVITY_SOURCES_PER_NEAR_ACCOUNT) {
+    throw new ORPCError("CONFLICT", {
+      message: `The NEAR account ${nearAccountId} already owns the maximum of ${MAX_ACTIVITY_SOURCES_PER_NEAR_ACCOUNT} Activity Sources. Use another NEAR account for this one.`,
+      data: { field: "nearAccountId" },
+    });
+  }
+}
+
 export const ActivitySourcesLive = Layer.effect(
   ActivitySourcesTag,
   Effect.gen(function* () {
@@ -194,12 +221,14 @@ export const ActivitySourcesLive = Layer.effect(
       createSource: async (input) => {
         try {
           const source = await db.transaction(async (tx) => {
+            await requireSourceCapacity(tx, input.nearAccountId);
             const [created] = await tx
               .insert(sourcesTable)
               .values({
                 sourceId: input.sourceId,
                 displayName: input.displayName,
                 nearAccountId: input.nearAccountId,
+                nearbuildersProjectId: input.nearbuildersProjectId ?? null,
                 organizationId: input.organizationId,
               })
               .onConflictDoNothing()
@@ -210,10 +239,22 @@ export const ActivitySourcesLive = Layer.effect(
                 .from(sourcesTable)
                 .where(eq(sourcesTable.sourceId, input.sourceId))
                 .limit(1);
+              const [projectSource] = input.nearbuildersProjectId
+                ? await tx
+                    .select({ sourceId: sourcesTable.sourceId })
+                    .from(sourcesTable)
+                    .where(eq(sourcesTable.nearbuildersProjectId, input.nearbuildersProjectId))
+                    .limit(1)
+                : [];
               throw new ORPCError("CONFLICT", {
+                ...((existing || projectSource) && {
+                  data: { field: existing ? "sourceId" : "project" },
+                }),
                 message: existing
                   ? `The Source ID ${input.sourceId} is already taken`
-                  : `The NEAR account ${input.nearAccountId} already owns an Activity Source`,
+                  : projectSource
+                    ? `This nearbuilders.org project already has an Activity Source: ${projectSource.sourceId}`
+                    : "This Activity Source conflicts with an existing one",
               });
             }
             await tx.insert(eventTypesTable).values(
@@ -231,7 +272,7 @@ export const ActivitySourcesLive = Layer.effect(
         }
       },
 
-      getApprovedSourceForIngestion: async (sourceId) => {
+      getSourceForIngestion: async (sourceId) => {
         try {
           const [source] = await db
             .select()
@@ -241,14 +282,31 @@ export const ActivitySourcesLive = Layer.effect(
           if (!source) {
             throw new ORPCError("NOT_FOUND", { message: "Activity Source not found" });
           }
-          if (source.approvalStatus !== "approved") {
-            throw new ORPCError("FORBIDDEN", {
-              message: "Activity Source is not approved for ingestion",
-            });
-          }
+          requireSourceNotRejected(source);
           const eventTypes = await eventTypesFor([source.id]);
           const reviews = await reviewsFor([source.id]);
           return toRecord(source, eventTypes, reviews);
+        } catch (error) {
+          throw toOrpcError(error);
+        }
+      },
+
+      getSourceAccount: async (organizationId, sourceId) => {
+        try {
+          const [source] = await db
+            .select({
+              nearAccountId: sourcesTable.nearAccountId,
+              nearbuildersProjectId: sourcesTable.nearbuildersProjectId,
+            })
+            .from(sourcesTable)
+            .where(
+              and(
+                eq(sourcesTable.sourceId, sourceId),
+                eq(sourcesTable.organizationId, organizationId),
+              ),
+            )
+            .limit(1);
+          return source ?? null;
         } catch (error) {
           throw toOrpcError(error);
         }
@@ -295,16 +353,21 @@ export const ActivitySourcesLive = Layer.effect(
             }
             const nearAccountChanged =
               input.nearAccountId !== undefined && input.nearAccountId !== existing.nearAccountId;
+            if (nearAccountChanged && input.nearAccountId) {
+              await requireSourceCapacity(tx, input.nearAccountId);
+            }
 
             const [updated] = await tx
               .update(sourcesTable)
               .set({
                 ...(input.displayName !== undefined && { displayName: input.displayName }),
                 ...(input.nearAccountId !== undefined && { nearAccountId: input.nearAccountId }),
-                approvalStatus: "pending",
-                reviewedBy: null,
-                reviewReason: null,
-                reviewedAt: null,
+                ...(existing.approvalStatus !== "rejected" && {
+                  approvalStatus: "pending" as const,
+                  reviewedBy: null,
+                  reviewReason: null,
+                  reviewedAt: null,
+                }),
                 updatedAt: new Date(),
               })
               .where(eq(sourcesTable.id, existing.id))

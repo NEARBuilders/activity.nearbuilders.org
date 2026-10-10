@@ -1,15 +1,17 @@
-import { PlusIcon as Plus, TrashIcon as Trash2 } from "@phosphor-icons/react/ssr";
 import { type ReactNode, useState } from "react";
+import { ActivityEventTypesEditor, emptyEventType } from "@/components/activity-event-types-editor";
+import { ActivityFormField } from "@/components/activity-form-field";
+import {
+  ActivityProjectSearch,
+  type ActivityProjectSearchResult,
+} from "@/components/activity-project-search";
 import type {
   ActivityEventTypeView,
   CreateActivitySourceInput,
 } from "@/components/activity-sources-model";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { FieldDescription } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import type { ActivitySourceRegistrationAccess } from "@/lib/activity-source-permissions";
 
 const registrationBlocker: Record<
@@ -34,21 +36,30 @@ const registrationBlocker: Record<
 };
 
 const SOURCE_ID_PATTERN = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
+const EVENT_TYPE_NAME_PATTERN = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
+
+export interface ActivityProjectImport {
+  project: { id: string; title: string; url: string };
+  sourceId?: string;
+  displayName: string;
+  nearAccountId?: string;
+}
 
 type RegistrationField = "sourceId" | "nearAccountId";
 
-function fieldForError(message: string): RegistrationField | null {
-  if (/Source ID/.test(message)) return "sourceId";
-  if (/NEAR account/.test(message)) return "nearAccountId";
-  return null;
+function fieldForError(error: unknown): RegistrationField | "project" | null {
+  const field =
+    typeof error === "object" && error !== null && "data" in error
+      ? (error.data as { field?: unknown } | undefined)?.field
+      : undefined;
+  return field === "sourceId" || field === "nearAccountId" || field === "project" ? field : null;
 }
 
-const emptyEventType = (): ActivityEventTypeView => ({
-  name: "",
-  description: "",
-  enabled: true,
-  pointValue: 0,
-});
+interface ImportedProject {
+  project: ActivityProjectImport["project"];
+  logoUrl: string | null;
+  ownerAccountId: string | null;
+}
 
 export function ActivitySourceRegistration({
   access,
@@ -57,6 +68,12 @@ export function ActivitySourceRegistration({
   registrationAction,
   embedded = false,
   defaultNearAccountId = "",
+  defaults,
+  onImportProject,
+  onSearchProjects,
+  ownedAccountIds,
+  mode = "create",
+  onCancel,
 }: {
   access: ActivitySourceRegistrationAccess | null;
   isSubmitting: boolean;
@@ -64,12 +81,28 @@ export function ActivitySourceRegistration({
   registrationAction?: ReactNode;
   embedded?: boolean;
   defaultNearAccountId?: string;
+  defaults?: Partial<CreateActivitySourceInput>;
+  onImportProject?: (reference: string) => Promise<ActivityProjectImport>;
+  onSearchProjects?: (query: string) => Promise<ActivityProjectSearchResult[]>;
+  ownedAccountIds?: string[];
+  mode?: "create" | "edit";
+  onCancel?: () => void;
 }) {
-  const [sourceId, setSourceId] = useState("");
-  const [displayName, setDisplayName] = useState("");
-  const [nearAccountId, setNearAccountId] = useState(defaultNearAccountId);
+  const isEditing = mode === "edit";
+  const [sourceId, setSourceId] = useState(defaults?.sourceId ?? "");
+  const [displayName, setDisplayName] = useState(defaults?.displayName ?? "");
+  const [nearAccountId, setNearAccountId] = useState(
+    defaults?.nearAccountId ?? defaultNearAccountId,
+  );
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<RegistrationField, string>>>({});
-  const [eventTypes, setEventTypes] = useState<ActivityEventTypeView[]>([emptyEventType()]);
+  const [eventTypes, setEventTypes] = useState<ActivityEventTypeView[]>(
+    defaults?.eventTypes?.length ? defaults.eventTypes : [emptyEventType()],
+  );
+  const [imported, setImported] = useState<ImportedProject | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const [isManualEntry, setIsManualEntry] = useState(false);
+  const [searchKey, setSearchKey] = useState(0);
 
   if (access === null) {
     return <Card className="h-24 animate-pulse p-5" />;
@@ -85,210 +118,246 @@ export function ActivitySourceRegistration({
     );
   }
 
-  const updateEventType = (index: number, update: Partial<ActivityEventTypeView>) => {
-    setEventTypes((current) =>
-      current.map((eventType, eventTypeIndex) =>
-        eventTypeIndex === index ? { ...eventType, ...update } : eventType,
-      ),
-    );
+  const importProject = async (reference: string, logoUrl: string | null = null) => {
+    if (!onImportProject || !reference) return;
+    setIsImporting(true);
+    setImportError(null);
+    try {
+      const result = await onImportProject(reference);
+      if (result.sourceId) setSourceId(result.sourceId);
+      setDisplayName(result.displayName);
+      if (result.nearAccountId) setNearAccountId(result.nearAccountId);
+      setImported({
+        project: result.project,
+        logoUrl,
+        ownerAccountId: result.nearAccountId ?? null,
+      });
+      setFieldErrors({});
+    } catch (error) {
+      setImported(null);
+      setImportError(error instanceof Error ? error.message : "Could not import that project");
+    } finally {
+      setIsImporting(false);
+    }
   };
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (sourceIdFormatError) return;
-    try {
-      await onCreate({ sourceId, displayName, nearAccountId, eventTypes });
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "";
-      const field = fieldForError(message);
-      if (field) setFieldErrors({ [field]: message });
-      return;
-    }
-    setFieldErrors({});
-    setSourceId("");
-    setDisplayName("");
-    setNearAccountId(defaultNearAccountId);
-    setEventTypes([emptyEventType()]);
-  };
+  const signedInAccountIds = ownedAccountIds ?? [];
+  const ownerSignInAccountId =
+    imported?.ownerAccountId &&
+    nearAccountId.trim() === imported.ownerAccountId &&
+    !signedInAccountIds.includes(imported.ownerAccountId)
+      ? imported.ownerAccountId
+      : null;
+
+  const hasDraftDefaults = Boolean(defaults?.sourceId || defaults?.displayName);
+  const showDetails =
+    !onImportProject || isEditing || isManualEntry || hasDraftDefaults || imported !== null;
 
   const sourceIdFormatError =
     sourceId.length > 0 && !SOURCE_ID_PATTERN.test(sourceId)
       ? "Use lowercase letters and numbers, separated by single dots, dashes, or underscores."
       : null;
 
+  const eventTypeNames = eventTypes.map(({ name }) => name.trim());
+  const nearAccount = nearAccountId.trim();
+  const submitBlocker = (() => {
+    if (!sourceId.trim()) return "Add a Source ID.";
+    if (sourceIdFormatError) return "Fix the Source ID format.";
+    if (!displayName.trim()) return "Add a display name.";
+    if (!nearAccount) return "Add the NEAR account that will sign.";
+    if (!isEditing && ownedAccountIds !== undefined) {
+      if (ownedAccountIds.length === 0) {
+        return "Link a NEAR account to your profile to register a source.";
+      }
+      if (!ownedAccountIds.includes(nearAccount)) {
+        return `Sign in with ${nearAccount} to register this source.`;
+      }
+    }
+    if (fieldErrors.sourceId || fieldErrors.nearAccountId) {
+      return "Fix the highlighted field to continue.";
+    }
+    if (eventTypes.length === 0) return "Add at least one event type.";
+    if (eventTypeNames.some((name) => !name)) return "Name every event type.";
+    if (eventTypeNames.some((name) => !EVENT_TYPE_NAME_PATTERN.test(name))) {
+      return "Use lowercase letters and numbers in event type names, separated by dots, dashes, or underscores.";
+    }
+    if (new Set(eventTypeNames).size !== eventTypeNames.length) {
+      return "Give every event type a different name.";
+    }
+    if (eventTypes.some(({ pointValue }) => !Number.isInteger(pointValue) || pointValue < 0)) {
+      return "Points must be whole numbers, 0 or more.";
+    }
+    return null;
+  })();
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (submitBlocker) return;
+    const nearbuildersProjectId = isEditing
+      ? undefined
+      : (imported?.project.id ?? defaults?.nearbuildersProjectId);
+    try {
+      await onCreate({
+        sourceId,
+        displayName,
+        nearAccountId,
+        eventTypes,
+        ...(nearbuildersProjectId && { nearbuildersProjectId }),
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "";
+      const field = fieldForError(error);
+      if (field === "project") setImportError(message);
+      else if (field) setFieldErrors({ [field]: message });
+      return;
+    }
+    setFieldErrors({});
+    if (isEditing) return;
+    setImported(null);
+    setSearchKey((key) => key + 1);
+    setSourceId("");
+    setDisplayName("");
+    setNearAccountId(defaultNearAccountId);
+    setEventTypes([emptyEventType()]);
+  };
+
   const form = (
     <form className="space-y-8" onSubmit={handleSubmit}>
-      <fieldset className="space-y-4">
-        <legend className="mb-4 text-sm font-semibold text-foreground">About your source</legend>
-        <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
-          <FormField
-            label="Source ID"
-            htmlFor="source-id"
-            description="Permanent and public on every event. It cannot be changed later."
-            error={sourceIdFormatError ?? fieldErrors.sourceId}
-          >
-            <Input
-              id="source-id"
-              name="sourceId"
-              value={sourceId}
-              aria-invalid={Boolean(sourceIdFormatError ?? fieldErrors.sourceId)}
-              onChange={(event) => {
-                setSourceId(event.target.value);
-                setFieldErrors(({ sourceId: _, ...rest }) => rest);
-              }}
-              placeholder="near-catalog"
-              className="bg-background"
-              required
-            />
-          </FormField>
-          <FormField
-            label="Display name"
-            htmlFor="display-name"
-            description="Shown on feed cards. You can change it later."
-          >
-            <Input
-              id="display-name"
-              name="displayName"
-              value={displayName}
-              onChange={(event) => setDisplayName(event.target.value)}
-              placeholder="NEAR Catalog"
-              className="bg-background"
-              required
-            />
-          </FormField>
-          <FormField
-            label="NEAR account"
-            htmlFor="near-account-id"
-            description="Signs the on-chain link. Each NEAR account can own only one source."
-            error={fieldErrors.nearAccountId}
-          >
-            <Input
-              id="near-account-id"
-              name="nearAccountId"
-              value={nearAccountId}
-              aria-invalid={Boolean(fieldErrors.nearAccountId)}
-              onChange={(event) => {
-                setNearAccountId(event.target.value);
-                setFieldErrors(({ nearAccountId: _, ...rest }) => rest);
-              }}
-              placeholder="catalog.near"
-              className="bg-background"
-              required
-            />
-          </FormField>
-        </div>
-      </fieldset>
-
-      <fieldset className="space-y-4">
-        <div className="space-y-1">
-          <legend className="text-sm font-semibold text-foreground">Event types</legend>
-          <p className="text-xs text-muted-foreground">
-            The kinds of action you report, such as{" "}
-            <span className="font-mono">feedback.submitted</span>. Events of any other type are
-            rejected with a 400.
-          </p>
-        </div>
-
-        <div className="space-y-3">
-          {eventTypes.map((eventType, index) => (
-            <div
-              key={`event-type-${index.toString()}`}
-              className="space-y-4 rounded-lg border border-border bg-background p-4"
-            >
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-xs font-medium text-muted-foreground">
-                  Event type {index + 1}
-                </span>
-                <div className="flex items-center gap-1">
-                  <Label
-                    htmlFor={`event-type-enabled-${index.toString()}`}
-                    className="flex items-center gap-2 px-2 text-xs font-normal"
-                  >
-                    <Checkbox
-                      id={`event-type-enabled-${index.toString()}`}
-                      checked={eventType.enabled}
-                      onCheckedChange={(checked) =>
-                        updateEventType(index, { enabled: checked === true })
-                      }
-                    />
-                    Enabled
-                  </Label>
-                  {eventTypes.length > 1 && (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="size-8"
-                      aria-label={`Remove event type ${index + 1}`}
-                      onClick={() =>
-                        setEventTypes((current) =>
-                          current.filter((_, eventTypeIndex) => eventTypeIndex !== index),
-                        )
-                      }
-                    >
-                      <Trash2 />
-                    </Button>
-                  )}
-                </div>
-              </div>
-              <div className="grid gap-4 sm:grid-cols-[1fr_8rem] sm:items-start">
-                <FormField label="Name" htmlFor={`event-type-name-${index.toString()}`}>
-                  <Input
-                    id={`event-type-name-${index.toString()}`}
-                    value={eventType.name}
-                    onChange={(event) => updateEventType(index, { name: event.target.value })}
-                    placeholder="catalog.project.published"
-                    required
-                  />
-                </FormField>
-                <FormField
-                  label="Points"
-                  htmlFor={`event-type-points-${index.toString()}`}
-                  description="Per event. 0 scores nothing."
-                >
-                  <Input
-                    id={`event-type-points-${index.toString()}`}
-                    type="number"
-                    min={0}
-                    step={1}
-                    value={eventType.pointValue}
-                    onChange={(event) =>
-                      updateEventType(index, { pointValue: Number(event.target.value) })
-                    }
-                    required
-                  />
-                </FormField>
-              </div>
-              <FormField label="Description" htmlFor={`event-type-description-${index.toString()}`}>
+      {onImportProject && !isEditing && (
+        <ActivityProjectSearch
+          key={searchKey}
+          selected={
+            imported
+              ? {
+                  title: imported.project.title,
+                  url: imported.project.url,
+                  logoUrl: imported.logoUrl,
+                  ownerSignInAccountId,
+                }
+              : null
+          }
+          isImporting={isImporting}
+          error={importError}
+          ownedAccountIds={signedInAccountIds}
+          onSearch={onSearchProjects}
+          onImport={(reference, logoUrl) => void importProject(reference, logoUrl ?? null)}
+          onClear={() => {
+            setImported(null);
+            setIsManualEntry(false);
+          }}
+          onQueryChange={() => setImportError(null)}
+          onEnterManually={showDetails ? undefined : () => setIsManualEntry(true)}
+        />
+      )}
+      {showDetails && (
+        <>
+          <fieldset className="space-y-4">
+            <legend className="mb-4 text-sm font-semibold text-foreground">
+              About your source
+            </legend>
+            <div className="grid gap-x-6 gap-y-5 md:grid-cols-2">
+              <ActivityFormField
+                label="Source ID"
+                htmlFor="source-id"
+                description={
+                  isEditing
+                    ? "Permanent, so it cannot be changed."
+                    : "Permanent and public on every event. It cannot be changed later."
+                }
+                error={sourceIdFormatError ?? fieldErrors.sourceId}
+              >
                 <Input
-                  id={`event-type-description-${index.toString()}`}
-                  value={eventType.description}
-                  onChange={(event) => updateEventType(index, { description: event.target.value })}
-                  placeholder="A project was published"
+                  id="source-id"
+                  name="sourceId"
+                  value={sourceId}
+                  readOnly={isEditing}
+                  aria-invalid={Boolean(sourceIdFormatError ?? fieldErrors.sourceId)}
+                  onChange={(event) => {
+                    setSourceId(event.target.value);
+                    setFieldErrors(({ sourceId: _, ...rest }) => rest);
+                  }}
+                  placeholder="near-catalog"
+                  className="bg-background"
                   required
                 />
-              </FormField>
+              </ActivityFormField>
+              <ActivityFormField
+                label="Display name"
+                htmlFor="display-name"
+                description="Shown on feed cards. You can change it later."
+              >
+                <Input
+                  id="display-name"
+                  name="displayName"
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  placeholder="NEAR Catalog"
+                  className="bg-background"
+                  required
+                />
+              </ActivityFormField>
+              <ActivityFormField
+                label="NEAR account"
+                htmlFor="near-account-id"
+                description={
+                  ownerSignInAccountId ? (
+                    <>
+                      Sign in with the project owner's NEAR account:{" "}
+                      <span className="font-mono font-medium text-foreground">
+                        {ownerSignInAccountId}
+                      </span>
+                    </>
+                  ) : (
+                    "Signs the on-chain link. One NEAR account can own up to 10 sources."
+                  )
+                }
+                error={fieldErrors.nearAccountId}
+              >
+                <Input
+                  id="near-account-id"
+                  name="nearAccountId"
+                  value={nearAccountId}
+                  aria-invalid={Boolean(fieldErrors.nearAccountId)}
+                  onChange={(event) => {
+                    setNearAccountId(event.target.value);
+                    setFieldErrors(({ nearAccountId: _, ...rest }) => rest);
+                  }}
+                  placeholder="catalog.near"
+                  className="bg-background"
+                  required
+                />
+              </ActivityFormField>
             </div>
-          ))}
-        </div>
+          </fieldset>
 
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          className="w-full sm:w-auto"
-          onClick={() => setEventTypes((current) => [...current, emptyEventType()])}
-        >
-          <Plus />
-          Add event type
-        </Button>
-      </fieldset>
+          <ActivityEventTypesEditor eventTypes={eventTypes} onChange={setEventTypes} />
 
-      <div className="flex justify-end border-t border-border pt-6">
-        <Button type="submit" className="w-full sm:w-auto" disabled={isSubmitting}>
-          Register source
-        </Button>
-      </div>
+          <div className="flex flex-col-reverse gap-2 border-t border-border pt-6 sm:flex-row sm:items-center sm:justify-end">
+            {submitBlocker && (
+              <p
+                id="registration-blocker"
+                className="text-xs text-muted-foreground sm:mr-auto"
+                aria-live="polite"
+              >
+                {submitBlocker}
+              </p>
+            )}
+            {onCancel && (
+              <Button type="button" variant="ghost" className="w-full sm:w-auto" onClick={onCancel}>
+                Cancel
+              </Button>
+            )}
+            <Button
+              type="submit"
+              className="w-full sm:w-auto"
+              disabled={isSubmitting || Boolean(submitBlocker)}
+              aria-describedby={submitBlocker ? "registration-blocker" : undefined}
+            >
+              {isEditing ? "Save changes" : "Register source"}
+            </Button>
+          </div>
+        </>
+      )}
     </form>
   );
 
@@ -299,33 +368,5 @@ export function ActivitySourceRegistration({
       <h2 className="text-lg font-semibold text-foreground">Register Activity Source</h2>
       <Card className="p-5 sm:p-6">{form}</Card>
     </section>
-  );
-}
-
-function FormField({
-  label,
-  htmlFor,
-  description,
-  error,
-  children,
-}: {
-  label: string;
-  htmlFor: string;
-  description?: string;
-  error?: string | null;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label htmlFor={htmlFor}>{label}</Label>
-      {children}
-      {error ? (
-        <p className="text-xs text-destructive" role="alert">
-          {error}
-        </p>
-      ) : (
-        description && <FieldDescription className="text-xs">{description}</FieldDescription>
-      )}
-    </div>
   );
 }

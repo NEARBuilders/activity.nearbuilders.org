@@ -4,6 +4,7 @@ import {
   CaretDownIcon as CaretDown,
   GitPullRequestIcon as GitPullRequest,
   HeartIcon as Heart,
+  HourglassMediumIcon as Hourglass,
   MagnifyingGlassIcon as MagnifyingGlass,
   ShieldCheckIcon as ShieldCheck,
   TagIcon as Tag,
@@ -37,6 +38,7 @@ export type ActivityFeedEventView = {
     sourceDisplayName: string;
     integration: "github" | null;
     trustStatus: "standard" | "trusted";
+    approvalStatus?: "pending" | "approved";
     scoreMultiplier: number;
     payloadClaimsVerified: false;
   };
@@ -271,10 +273,21 @@ export function ActivityFeed({
                           <ShieldCheck />
                           Verified signature
                         </Badge>
-                        <ActivityTrustBadge
-                          trustStatus={event.provenance.trustStatus}
-                          scoreMultiplier={event.provenance.scoreMultiplier}
-                        />
+                        {event.provenance.approvalStatus === "pending" ? (
+                          <Badge
+                            variant="outline"
+                            className="text-muted-foreground"
+                            title="This source is awaiting review. Its events don't count toward the leaderboard yet."
+                          >
+                            <Hourglass />
+                            Under review
+                          </Badge>
+                        ) : (
+                          <ActivityTrustBadge
+                            trustStatus={event.provenance.trustStatus}
+                            scoreMultiplier={event.provenance.scoreMultiplier}
+                          />
+                        )}
                         {event.provenance.integration === "github" &&
                           event.type.startsWith("github.") && (
                             <Badge variant="outline">

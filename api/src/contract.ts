@@ -11,6 +11,25 @@ import { z } from "every-plugin/zod";
 export const NEAR_ACCOUNT_ID_REGEX =
   /^(?=.{2,64}$)([a-z0-9]+(?:[-_][a-z0-9]+)*)(\.([a-z0-9]+(?:[-_][a-z0-9]+)*))*$/;
 export const ACTIVITY_SOURCE_ID_REGEX = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
+export const MAX_ACTIVITY_SOURCES_PER_NEAR_ACCOUNT = 10;
+
+export const ActivitySourceFieldSchema = z.enum(["sourceId", "nearAccountId", "project"]);
+
+const SOURCE_FIELD_ERRORS = {
+  BAD_REQUEST: {
+    ...BAD_REQUEST,
+    data: BAD_REQUEST.data.extend({ field: ActivitySourceFieldSchema.optional() }),
+  },
+  FORBIDDEN: {
+    ...FORBIDDEN,
+    data: FORBIDDEN.data.extend({ field: ActivitySourceFieldSchema.optional() }),
+  },
+  CONFLICT: {
+    status: 409,
+    data: z.object({ field: ActivitySourceFieldSchema.optional() }),
+  },
+};
+
 export const ACTIVITY_EVENT_TYPE_NAME_REGEX = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
 export const GITHUB_OWNER_REGEX = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
 export const GITHUB_REPOSITORY_REGEX = /^[A-Za-z0-9._-]+$/;
@@ -45,7 +64,7 @@ export const ActivityScoreMultiplierSchema = z.number().min(1).max(10).multipleO
 
 export const ActivityEventTypeSchema = z.object({
   name: ActivityEventTypeNameSchema,
-  description: z.string().min(1).max(500),
+  description: z.string().trim().max(500).default(""),
   enabled: z.boolean(),
   pointValue: z.number().int().min(0).max(1_000_000),
 });
@@ -69,6 +88,7 @@ export const ActivitySourceSchema = z.object({
   sourceId: z.string(),
   displayName: z.string(),
   nearAccountId: z.string(),
+  nearbuildersProjectId: z.string().nullable(),
   organizationId: z.string(),
   approvalStatus: ActivitySourceApprovalStatusSchema,
   canIngest: z.boolean(),
@@ -213,6 +233,7 @@ export const ActivityEventProvenanceSchema = z.object({
   sourceDisplayName: z.string(),
   integration: z.literal("github").nullable(),
   trustStatus: ActivitySourceTrustStatusSchema,
+  approvalStatus: z.enum(["pending", "approved"]),
   scoreMultiplier: ActivityScoreMultiplierSchema,
   payloadClaimsVerified: z.literal(false),
 });
@@ -373,6 +394,64 @@ const ActivityEventTypesInputSchema = z
     message: "Event type names must be unique",
   });
 
+export const NearbuildersProjectDraftSchema = z.object({
+  project: z.object({
+    id: z.string(),
+    slug: z.string(),
+    title: z.string(),
+    url: z.string(),
+  }),
+  sourceId: z.string().optional(),
+  displayName: z.string(),
+  nearAccountId: z.string().optional(),
+});
+
+export const NearbuildersProjectSummarySchema = z.object({
+  id: z.string(),
+  slug: z.string(),
+  title: z.string(),
+  url: z.string(),
+  domain: z.string().nullable(),
+  logoUrl: z.string().nullable(),
+  ownerId: z.string().nullable(),
+  ownerAccountIds: z.array(z.string()),
+});
+
+export const ActivityBindingDraftSchema = z.object({
+  project: z
+    .object({
+      reference: z.string().trim().min(1).max(300).optional(),
+      id: z.string().trim().min(1).max(200).optional(),
+      slug: z.string().trim().min(1).max(200).optional(),
+      title: z.string().trim().min(1).max(200).optional(),
+      url: z.string().trim().min(1).max(300).optional(),
+    })
+    .optional(),
+  sourceId: z.string().min(2).max(100).regex(ACTIVITY_SOURCE_ID_REGEX).optional(),
+  displayName: z.string().trim().min(1).max(120).optional(),
+  nearAccountId: z.string().min(2).max(64).regex(NEAR_ACCOUNT_ID_REGEX).optional(),
+  eventTypes: ActivityEventTypesInputSchema.optional(),
+});
+
+export const ActivityBindingSessionSchema = z.object({
+  matchCode: z.string(),
+  status: z.enum(["waiting", "ready", "claimed", "expired"]),
+  draft: ActivityBindingDraftSchema,
+  sourceId: z.string().nullable(),
+  expiresAt: z.string(),
+});
+
+export const ActivityBindingClaimSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.enum(["waiting", "expired"]) }),
+  z.object({ status: z.literal("claimed"), sourceId: z.string() }),
+  z.object({
+    status: z.literal("ready"),
+    sourceId: z.string(),
+    secret: z.string(),
+    apiKeyId: z.string(),
+  }),
+]);
+
 export const contract = oc.router({
   ping: oc.route({ method: "GET", path: "/ping" }).output(
     z.object({
@@ -482,11 +561,12 @@ export const contract = oc.router({
         sourceId: z.string().min(2).max(100).regex(ACTIVITY_SOURCE_ID_REGEX),
         displayName: z.string().trim().min(1).max(120),
         nearAccountId: z.string().min(2).max(64),
+        nearbuildersProjectId: z.string().trim().min(1).max(200).optional(),
         eventTypes: ActivityEventTypesInputSchema,
       }),
     )
     .output(ActivitySourceSchema)
-    .errors({ UNAUTHORIZED, FORBIDDEN, BAD_REQUEST, CONFLICT: { status: 409 } }),
+    .errors({ UNAUTHORIZED, ...SOURCE_FIELD_ERRORS }),
 
   listActivitySources: oc
     .route({ method: "GET", path: "/activity/sources" })
@@ -504,7 +584,7 @@ export const contract = oc.router({
       }),
     )
     .output(ActivitySourceSchema)
-    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST, CONFLICT: { status: 409 } }),
+    .errors({ UNAUTHORIZED, NOT_FOUND, ...SOURCE_FIELD_ERRORS }),
 
   listActivitySourcesForReview: oc
     .route({ method: "GET", path: "/activity/source-reviews" })
@@ -638,6 +718,70 @@ export const contract = oc.router({
     .output(z.array(ActivityGithubQuarantineSchema))
     .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
 
+  createActivityBindingSession: oc
+    .route({
+      method: "POST",
+      path: "/v1/binding-sessions",
+      summary: "Start an agent binding session",
+      description:
+        "Creates a short-lived link a person opens to register and link an Activity Source. The agent keeps the poll token and claims the Source API Key once the person finishes.",
+      tags: ["Activity"],
+    })
+    .input(ActivityBindingDraftSchema)
+    .output(
+      z.object({
+        sessionId: z.string(),
+        url: z.string(),
+        pollToken: z.string(),
+        matchCode: z.string(),
+        expiresAt: z.string(),
+        draft: ActivityBindingDraftSchema,
+      }),
+    )
+    .errors({ BAD_REQUEST, NOT_FOUND, SERVICE_UNAVAILABLE, TOO_MANY_REQUESTS: { status: 429 } }),
+
+  searchNearbuildersProjects: oc
+    .route({ method: "GET", path: "/activity/projects/search" })
+    .input(z.object({ query: z.string().trim().min(2).max(200) }))
+    .output(z.array(NearbuildersProjectSummarySchema))
+    .errors({ UNAUTHORIZED, BAD_REQUEST, SERVICE_UNAVAILABLE }),
+
+  lookupNearbuildersProject: oc
+    .route({ method: "POST", path: "/activity/projects/lookup" })
+    .input(z.object({ reference: z.string().trim().min(1).max(300) }))
+    .output(NearbuildersProjectDraftSchema)
+    .errors({ UNAUTHORIZED, BAD_REQUEST, NOT_FOUND, SERVICE_UNAVAILABLE }),
+
+  claimActivityBindingSession: oc
+    .route({
+      method: "POST",
+      path: "/v1/binding-sessions/{sessionId}/claim",
+      summary: "Claim the Source API Key from a binding session",
+      description:
+        "Authenticates with the session's poll token. Returns the Source API Key exactly once after the person completes the session; otherwise reports the session status.",
+      tags: ["Activity"],
+    })
+    .input(z.object({ sessionId: z.string().uuid() }))
+    .output(ActivityBindingClaimSchema)
+    .errors({ UNAUTHORIZED, NOT_FOUND }),
+
+  getActivityBindingSession: oc
+    .route({ method: "POST", path: "/activity/binding-sessions/lookup" })
+    .input(z.object({ sessionToken: z.string().min(1).max(200) }))
+    .output(ActivityBindingSessionSchema)
+    .errors({ UNAUTHORIZED, NOT_FOUND }),
+
+  completeActivityBindingSession: oc
+    .route({ method: "POST", path: "/activity/binding-sessions/complete" })
+    .input(
+      z.object({
+        sessionToken: z.string().min(1).max(200),
+        sourceId: z.string().min(2).max(100).regex(ACTIVITY_SOURCE_ID_REGEX),
+      }),
+    )
+    .output(ActivityBindingSessionSchema)
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST, CONFLICT: { status: 409 } }),
+
   submitActivityEvent: oc
     .route({
       method: "POST",
@@ -655,6 +799,7 @@ export const contract = oc.router({
       BAD_REQUEST,
       SERVICE_UNAVAILABLE,
       CONFLICT: { status: 409 },
+      TOO_MANY_REQUESTS: { status: 429 },
     }),
 
   listActivityEvents: oc

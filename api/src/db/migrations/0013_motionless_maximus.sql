@@ -1,0 +1,2 @@
+ALTER TABLE "activity_sources" DROP CONSTRAINT "activity_sources_near_account_id_unique";--> statement-breakpoint
+CREATE INDEX "activity_sources_near_account_id_idx" ON "activity_sources" USING btree ("near_account_id");

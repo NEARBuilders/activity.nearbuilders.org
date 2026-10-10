@@ -22,6 +22,7 @@ import { createActivitySseStream } from "./lib/activity-sse";
 import { createAuthMiddleware } from "./lib/auth";
 import { ContextSchema } from "./lib/context";
 import type { PluginsClient } from "./lib/plugins-types.gen";
+import { ActivityBindingSessionsService } from "./services/activity-binding-sessions";
 import { ActivityCredentialsLive, ActivityCredentialsTag } from "./services/activity-credentials";
 import { ActivityEndorsementsService } from "./services/activity-endorsements";
 import {
@@ -32,7 +33,10 @@ import {
 } from "./services/activity-feed";
 import { ActivityGithubService } from "./services/activity-github";
 import { ActivityHealthService } from "./services/activity-health";
-import { ActivityIngestionService } from "./services/activity-ingestion";
+import {
+  ActivityIngestionService,
+  PENDING_SOURCE_DAILY_EVENT_LIMIT,
+} from "./services/activity-ingestion";
 import {
   ActivityLeaderboardLive,
   ActivityLeaderboardTag,
@@ -44,6 +48,7 @@ import {
   DatabaseActivityModerationStore,
 } from "./services/activity-moderation";
 import { ActivitySourcesLive, ActivitySourcesTag } from "./services/activity-sources";
+import { NearbuildersProjectsClient } from "./services/nearbuilders-projects";
 import { TenantsLive, TenantsTag } from "./services/tenants";
 
 const SUBDOMAIN_SEGMENT_REGEX = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
@@ -83,9 +88,27 @@ function validateAccountId(accountId: string): void {
   if (!NEAR_ACCOUNT_ID_REGEX.test(accountId)) {
     throw new ORPCError("BAD_REQUEST", {
       message: "Invalid accountId format",
-      data: { hint: "Must be a valid NEAR account ID" },
+      data: { hint: "Must be a valid NEAR account ID", field: "nearAccountId" },
     });
   }
+}
+
+function requestOrigin(headers: Headers | undefined): string {
+  const host = headers?.get("x-forwarded-host") ?? headers?.get("host");
+  if (!host) return "https://activity.nearbuilders.org";
+  const protocol =
+    headers?.get("x-forwarded-proto")?.split(",")[0]?.trim() ??
+    (/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host) ? "http" : "https");
+  return `${protocol}://${host}`;
+}
+
+function requestClientKey(headers: Headers | undefined): string | null {
+  const forwarded = headers
+    ?.get("x-forwarded-for")
+    ?.split(",")
+    .map((address) => address.trim())
+    .filter(Boolean);
+  return forwarded?.at(-1) || headers?.get("x-real-ip") || null;
 }
 
 function mainnetNearAccountIds(
@@ -96,6 +119,30 @@ function mainnetNearAccountIds(
     .map(({ accountId }) => accountId);
 }
 
+async function requireProjectOwnerAccount(
+  projects: { getOwnerAccountIds(projectId: string): Promise<string[]> },
+  projectId: string,
+  nearAccountId: string,
+  linkedAccountIds: string[],
+): Promise<void> {
+  const ownerAccountIds = await projects.getOwnerAccountIds(projectId);
+  if (!ownerAccountIds.includes(nearAccountId)) {
+    throw new ORPCError("FORBIDDEN", {
+      data: { field: "nearAccountId" },
+      message:
+        ownerAccountIds.length > 0
+          ? `Only the project owner's NEAR account (${ownerAccountIds.join(" or ")}) can register this nearbuilders.org project`
+          : "This nearbuilders.org project has no NEAR account owner to register it",
+    });
+  }
+  if (!linkedAccountIds.includes(nearAccountId)) {
+    throw new ORPCError("FORBIDDEN", {
+      data: { field: "nearAccountId" },
+      message: `Sign in with ${nearAccountId} to register this nearbuilders.org project`,
+    });
+  }
+}
+
 export default createPlugin.withPlugins<PluginsClient>()({
   variables: z.object({
     activityNostrBindingContract: z.string().default("contextual.near"),
@@ -103,6 +150,12 @@ export default createPlugin.withPlugins<PluginsClient>()({
     activityNostrKvApiUrl: z.string().default("https://kv.main.fastnear.com"),
     activityRelayUrl: z.string().default("wss://relay.nearbuilders.org"),
     activityNostrRpcUrl: z.string().optional(),
+    activityPendingSourceDailyEventLimit: z
+      .number()
+      .int()
+      .positive()
+      .default(PENDING_SOURCE_DAILY_EVENT_LIMIT),
+    nearbuildersApiUrl: z.string().default("https://nearbuilders.org/api"),
   }),
 
   secrets: z.object({
@@ -177,6 +230,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activitySourcesService,
         activityRelay,
         activityLeaderboard,
+        { pendingSourceDailyEventLimit: config.variables.activityPendingSourceDailyEventLimit },
       );
       const activityGithubService = new ActivityGithubService({
         db: database,
@@ -196,6 +250,14 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityLeaderboard,
       );
       const activityEndorsementsService = new ActivityEndorsementsService(database);
+      const nearbuildersProjects = new NearbuildersProjectsClient(
+        config.variables.nearbuildersApiUrl,
+      );
+      const activityBindingSessionsService = new ActivityBindingSessionsService(
+        database,
+        activityCredentialsService,
+        { resolveProject: (reference) => nearbuildersProjects.resolve(reference) },
+      );
       const activityLeaderboardHistory = new DatabaseActivityLeaderboardHistory(
         database,
         activityFeedService,
@@ -233,6 +295,8 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityGithub: activityGithubService,
         activityFeed: activityFeedService,
         activityEndorsements: activityEndorsementsService,
+        activityBindingSessions: activityBindingSessionsService,
+        nearbuildersProjects,
         activityModeration: activityModerationService,
         activityLeaderboard,
         activityRelay,
@@ -438,6 +502,14 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .use(requireNearAuthentication)
         .handler(async ({ input, context }) => {
           validateAccountId(input.nearAccountId);
+          if (input.nearbuildersProjectId) {
+            await requireProjectOwnerAccount(
+              services.nearbuildersProjects,
+              input.nearbuildersProjectId,
+              input.nearAccountId,
+              mainnetNearAccountIds(context.near.linkedAccounts),
+            );
+          }
           return await services.activitySources.createSource({
             ...input,
             organizationId: context.organization.activeOrganizationId,
@@ -464,7 +536,21 @@ export default createPlugin.withPlugins<PluginsClient>()({
               message: "At least one source field must be updated",
             });
           }
-          if (input.nearAccountId !== undefined) validateAccountId(input.nearAccountId);
+          if (input.nearAccountId !== undefined) {
+            validateAccountId(input.nearAccountId);
+            const existing = await services.activitySources.getSourceAccount(
+              context.organization.activeOrganizationId,
+              input.sourceId,
+            );
+            if (existing?.nearbuildersProjectId && existing.nearAccountId !== input.nearAccountId) {
+              await requireProjectOwnerAccount(
+                services.nearbuildersProjects,
+                existing.nearbuildersProjectId,
+                input.nearAccountId,
+                mainnetNearAccountIds(context.near?.linkedAccounts ?? []),
+              );
+            }
+          }
           return await services.activitySources.updateSource(
             context.organization.activeOrganizationId,
             input.sourceId,
@@ -625,6 +711,50 @@ export default createPlugin.withPlugins<PluginsClient>()({
             context.organization.activeOrganizationId,
             input.sourceId,
           ),
+        ),
+
+      createActivityBindingSession: builder.createActivityBindingSession.handler(
+        async ({ input, context }) => {
+          return services.activityBindingSessions.create(
+            input,
+            requestOrigin(context.reqHeaders),
+            requestClientKey(context.reqHeaders),
+          );
+        },
+      ),
+
+      claimActivityBindingSession: builder.claimActivityBindingSession.handler(
+        async ({ input, context }) => {
+          const authorization = context.reqHeaders?.get("authorization");
+          const pollToken = authorization?.match(/^Bearer\s+(.+)$/i)?.[1];
+          if (!pollToken) {
+            throw new ORPCError("UNAUTHORIZED", { message: "Binding session poll token required" });
+          }
+          return services.activityBindingSessions.claim(input.sessionId, pollToken);
+        },
+      ),
+
+      searchNearbuildersProjects: builder.searchNearbuildersProjects
+        .use(requireAuth)
+        .handler(async ({ input }) => services.nearbuildersProjects.search(input.query)),
+
+      lookupNearbuildersProject: builder.lookupNearbuildersProject
+        .use(requireAuth)
+        .handler(async ({ input }) => services.nearbuildersProjects.resolve(input.reference)),
+
+      getActivityBindingSession: builder.getActivityBindingSession
+        .use(requireAuth)
+        .handler(async ({ input }) => services.activityBindingSessions.lookup(input.sessionToken)),
+
+      completeActivityBindingSession: builder.completeActivityBindingSession
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) =>
+          services.activityBindingSessions.complete({
+            sessionToken: input.sessionToken,
+            organizationId: context.organization.activeOrganizationId,
+            sourceId: input.sourceId,
+            actorId: context.userId,
+          }),
         ),
 
       submitActivityEvent: builder.submitActivityEvent.handler(async ({ input, context }) => {

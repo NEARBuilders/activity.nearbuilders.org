@@ -30,6 +30,7 @@ async function getTestConfig(): Promise<typeof TEST_CONFIG> {
         ...TEST_CONFIG.variables,
         activityRelayUrl: await ensureTestRelay(),
         activityNostrRpcUrl: "",
+        activityPendingSourceDailyEventLimit: 3,
       },
     } as typeof TEST_CONFIG;
   }

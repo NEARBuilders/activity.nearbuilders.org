@@ -26,7 +26,8 @@ Leaderboard reads fetch current Event Type point values and current source multi
 then use a temporary Redis weighted union to calculate the exact score. The temporary result is used
 only to select the top actors; their raw counts are then returned as a full breakdown. A point-value
 or source-trust update changes the next read—including historical periods—without modifying Redis or
-replaying Nostr history. Source approval still controls ingestion independently of trust weighting.
+replaying Nostr history. Only approved sources are ranked; a pending source's events are counted but
+excluded at read time, so approval adds them, history included, without a rebuild.
 
 Weekly and monthly sorted sets expire 24 hours after their period closes. The all-time sorted sets
 and event-state hash do not expire because they provide the permanent exactly-once record.

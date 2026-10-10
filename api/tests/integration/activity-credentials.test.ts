@@ -14,7 +14,7 @@ import { provisionIngestionSource } from "./activity-test-helpers";
 afterAll(teardown);
 
 describe("Activity source credentials", () => {
-  it("creates a Signing Identity only for an approved Source Owner", async () => {
+  it("creates a Signing Identity for a pending source but not a rejected one", async () => {
     const owner = await getPluginClient(orgOwnerContext("credential-owner", "org-credentials"));
     await owner.createActivitySource({
       sourceId: "credential-source",
@@ -28,17 +28,6 @@ describe("Activity source credentials", () => {
           pointValue: 1,
         },
       ],
-    });
-
-    await expect(
-      owner.createActivitySigningIdentity({ sourceId: "credential-source" }),
-    ).rejects.toThrow("Activity Source is not approved");
-
-    const administrator = await getPluginClient(adminContext());
-    await administrator.reviewActivitySource({
-      sourceId: "credential-source",
-      decision: "approved",
-      reason: "Credential test source",
     });
 
     const identity = await owner.createActivitySigningIdentity({
@@ -96,6 +85,29 @@ describe("Activity source credentials", () => {
         rotated,
       ]),
     );
+
+    await owner.createActivitySource({
+      sourceId: "rejected-credential-source",
+      displayName: "Rejected Credential Source",
+      nearAccountId: "rejected-credential.near",
+      eventTypes: [
+        {
+          name: "credential.event",
+          description: "An event authenticated with source credentials",
+          enabled: true,
+          pointValue: 1,
+        },
+      ],
+    });
+    const administrator = await getPluginClient(adminContext());
+    await administrator.reviewActivitySource({
+      sourceId: "rejected-credential-source",
+      decision: "rejected",
+      reason: "Credential test rejection",
+    });
+    await expect(
+      owner.createActivitySigningIdentity({ sourceId: "rejected-credential-source" }),
+    ).rejects.toThrow("Activity Source was rejected");
   });
 
   it("prepares a NEAR-authorized binding only for the source account", async () => {
@@ -145,7 +157,7 @@ describe("Activity source credentials", () => {
     const secondaryOwner = await getPluginClient(ownerWithSecondaryAccount);
     await expect(
       secondaryOwner.prepareActivitySigningIdentityBinding({ sourceId: "binding-source" }),
-    ).resolves.toMatchObject({ key: "nostr/binding-source.near" });
+    ).resolves.toMatchObject({ key: "activity/binding-source" });
 
     const prepared = await owner.prepareActivitySigningIdentityBinding({
       sourceId: "binding-source",
@@ -156,12 +168,13 @@ describe("Activity source credentials", () => {
     expect(prepared).toMatchObject({
       contractId: "contextual.near",
       methodName: "__fastdata_kv",
-      key: "nostr/binding-source.near",
-      args: { "nostr/binding-source.near": prepared.value },
+      key: "activity/binding-source",
+      args: { "activity/binding-source": prepared.value },
       gas: "20000000000000",
       attachedDeposit: "0",
     });
     expect(bindingValue).toMatchObject({
+      sourceId: "binding-source",
       npub: identity.publicKey,
       relay: expect.stringMatching(/^wss:\/\//),
       proof: expect.any(String),
@@ -169,7 +182,10 @@ describe("Activity source credentials", () => {
     });
     expect(proof).toMatchObject({
       nostrPubkey: identity.publicKey,
-      challenge: expect.stringMatching(/^bind:binding-source\.near:/),
+      challenge: expect.stringMatching(
+        /^bind:binding-source\.near:binding-source:\d+:activity-source$/,
+      ),
+      sourceId: "binding-source",
       eventId: expect.stringMatching(/^[a-f0-9]{64}$/),
       verifiedBy: "binding-source.near",
       verifiedAt: expect.any(Number),
@@ -203,7 +219,7 @@ describe("Activity source credentials", () => {
     }
   });
 
-  it("reveals source API keys once and rejects revoked or unapproved keys", async () => {
+  it("reveals source API keys once, keeps pending keys working, and rejects revoked or rejected keys", async () => {
     const owner = await getPluginClient(orgOwnerContext("api-key-source", "org-api-key"));
     await owner.createActivitySource({
       sourceId: "api-key-source",
@@ -306,8 +322,17 @@ describe("Activity source credentials", () => {
       sourceId: "api-key-source",
       displayName: "API Key Source Updated",
     });
+    await expect(credentials.authenticateEventWriteKey(pendingKey.secret)).resolves.toMatchObject({
+      sourceId: "api-key-source",
+    });
+
+    await administrator.reviewActivitySource({
+      sourceId: "api-key-source",
+      decision: "rejected",
+      reason: "API key test rejection",
+    });
     await expect(credentials.authenticateEventWriteKey(pendingKey.secret)).rejects.toThrow(
-      "Activity Source is not approved for ingestion",
+      "Activity Source was rejected",
     );
   });
 
@@ -349,5 +374,137 @@ describe("Activity source credentials", () => {
       }),
     ).rejects.toThrow("Activity Source signing identity is not bound");
     expect(getTestRelayEvents()).toHaveLength(0);
+  });
+
+  it("binds several sources on one NEAR account through their own on-chain slots", async () => {
+    const owner = await getPluginClient(orgOwnerContext("multi-owner", "org-multi"));
+    const eventTypes = [{ name: "multi.event", description: "", enabled: true, pointValue: 1 }];
+    for (const sourceId of ["multi-a", "multi-b"]) {
+      await owner.createActivitySource({
+        sourceId,
+        displayName: sourceId,
+        nearAccountId: "multi-owner.near",
+        eventTypes,
+      });
+      await owner.createActivitySigningIdentity({ sourceId });
+    }
+    const preparedA = await owner.prepareActivitySigningIdentityBinding({ sourceId: "multi-a" });
+    const preparedB = await owner.prepareActivitySigningIdentityBinding({ sourceId: "multi-b" });
+    expect(preparedA.key).toBe("activity/multi-a");
+    expect(preparedB.key).toBe("activity/multi-b");
+
+    const slots = new Map<string, unknown>([
+      ["/contextual.near/multi-owner.near/activity/multi-a", JSON.parse(preparedA.value)],
+      ["/contextual.near/multi-owner.near/activity/multi-b", JSON.parse(preparedB.value)],
+    ]);
+    const requested: string[] = [];
+    const originalFetch = globalThis.fetch;
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url.startsWith("https://kv.main.fastnear.com/")) {
+        requested.push(url);
+        const path = new URL(url).pathname.replace(/^\/v0\/latest/, "");
+        const value = slots.get(path);
+        return new Response(JSON.stringify({ entries: value ? [{ value }] : [] }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return originalFetch(input, init);
+    });
+    try {
+      await expect(
+        owner.confirmActivitySigningIdentityBinding({ sourceId: "multi-a" }),
+      ).resolves.toMatchObject({ bindingStatus: "bound", boundNearAccountId: "multi-owner.near" });
+      await expect(
+        owner.confirmActivitySigningIdentityBinding({ sourceId: "multi-b" }),
+      ).resolves.toMatchObject({ bindingStatus: "bound", boundNearAccountId: "multi-owner.near" });
+    } finally {
+      fetchSpy.mockRestore();
+    }
+    expect(requested).toContain(
+      "https://kv.main.fastnear.com/v0/latest/contextual.near/multi-owner.near/activity/multi-a",
+    );
+    expect(requested.some((url) => url.endsWith("/nostr/multi-owner.near"))).toBe(false);
+  });
+
+  it("accepts a legacy account-level binding but rejects a slot claiming another source", async () => {
+    const owner = await getPluginClient(orgOwnerContext("legacy-owner", "org-legacy"));
+    await owner.createActivitySource({
+      sourceId: "legacy-source",
+      displayName: "Legacy Source",
+      nearAccountId: "legacy-owner.near",
+      eventTypes: [{ name: "legacy.event", description: "", enabled: true, pointValue: 1 }],
+    });
+    const identity = await owner.createActivitySigningIdentity({ sourceId: "legacy-source" });
+
+    const respondWith = (slots: Record<string, unknown>) => {
+      const originalFetch = globalThis.fetch;
+      return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (url.startsWith("https://kv.main.fastnear.com/")) {
+          const path = new URL(url).pathname.replace(/^\/v0\/latest/, "");
+          const value = slots[path];
+          return new Response(JSON.stringify({ entries: value ? [{ value }] : [] }), {
+            status: 200,
+            headers: { "content-type": "application/json" },
+          });
+        }
+        return originalFetch(input, init);
+      });
+    };
+
+    const wrongSource = respondWith({
+      "/contextual.near/legacy-owner.near/activity/legacy-source": {
+        sourceId: "someone-else",
+        npub: identity.publicKey,
+      },
+    });
+    try {
+      await expect(
+        owner.confirmActivitySigningIdentityBinding({ sourceId: "legacy-source" }),
+      ).rejects.toThrow("The NEAR-to-Nostr binding does not match this signing identity");
+    } finally {
+      wrongSource.mockRestore();
+    }
+
+    const unnamedSlot = respondWith({
+      "/contextual.near/legacy-owner.near/activity/legacy-source": { npub: identity.publicKey },
+    });
+    try {
+      await expect(
+        owner.confirmActivitySigningIdentityBinding({ sourceId: "legacy-source" }),
+      ).rejects.toThrow("The NEAR-to-Nostr binding does not match this signing identity");
+    } finally {
+      unnamedSlot.mockRestore();
+    }
+
+    const otherAccount = respondWith({
+      "/contextual.near/attacker.near/activity/legacy-source": {
+        sourceId: "legacy-source",
+        npub: identity.publicKey,
+      },
+    });
+    try {
+      await expect(
+        owner.confirmActivitySigningIdentityBinding({ sourceId: "legacy-source" }),
+      ).rejects.toThrow("The NEAR-to-Nostr binding is not available yet");
+    } finally {
+      otherAccount.mockRestore();
+    }
+
+    const legacy = respondWith({
+      "/contextual.near/legacy-owner.near/nostr/legacy-owner.near": {
+        npub: identity.publicKey,
+        bound_at: 1_790_000_000,
+      },
+    });
+    try {
+      await expect(
+        owner.confirmActivitySigningIdentityBinding({ sourceId: "legacy-source" }),
+      ).resolves.toMatchObject({ bindingStatus: "bound" });
+    } finally {
+      legacy.mockRestore();
+    }
   });
 });

@@ -350,4 +350,59 @@ describe("Activity event ingestion", () => {
       unacknowledgedEvent?.id,
     ]);
   });
+
+  it("accepts a pending source's events under review up to a daily limit until approval", async () => {
+    const { secret } = await provisionIngestionSource({
+      sourceId: "pending-ingestion-source",
+      ownerId: "pending-ingestion-owner",
+      organizationId: "org-pending-ingestion",
+      eventType: "pending.recorded",
+      approve: false,
+    });
+    const gateway = await getPluginClient(undefined, {
+      authorization: `Bearer ${secret}`,
+    });
+    const submit = (sequence: number) =>
+      gateway.submitActivityEvent({
+        eventType: "pending.recorded",
+        actor: "pending-actor.near",
+        idempotencyKey: `pending:${sequence}`,
+        payload: { sequence },
+      });
+    resetTestRelayEvents();
+
+    const first = await submit(1);
+    await submit(2);
+    await submit(3);
+    await expect(submit(4)).rejects.toThrow(
+      "Activity Sources under review may submit up to 3 events per day",
+    );
+    await expect(submit(1)).resolves.toEqual(first);
+    expect(getTestRelayEvents()).toHaveLength(3);
+
+    const publicClient = await getPluginClient();
+    const underReview = await publicClient.listActivityEvents({
+      source: "pending-ingestion-source",
+    });
+    expect(underReview.data).toHaveLength(3);
+    expect(
+      underReview.data.every(({ provenance }) => provenance.approvalStatus === "pending"),
+    ).toBe(true);
+
+    const administrator = await getPluginClient(adminContext());
+    await administrator.reviewActivitySource({
+      sourceId: "pending-ingestion-source",
+      decision: "approved",
+      reason: "Pending ingestion source reviewed",
+    });
+
+    await expect(submit(4)).resolves.toMatchObject({ eventId: expect.any(String) });
+    const approved = await publicClient.listActivityEvents({
+      source: "pending-ingestion-source",
+    });
+    expect(approved.data).toHaveLength(4);
+    expect(approved.data.every(({ provenance }) => provenance.approvalStatus === "approved")).toBe(
+      true,
+    );
+  });
 });

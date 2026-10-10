@@ -7,6 +7,7 @@ export async function provisionIngestionSource(input: {
   organizationId: string;
   eventType: string;
   eventTypeEnabled?: boolean;
+  approve?: boolean;
 }) {
   const owner = await getPluginClient(
     orgOwnerContext(input.ownerId, input.organizationId, `${input.ownerId}.near`),
@@ -24,16 +25,28 @@ export async function provisionIngestionSource(input: {
       },
     ],
   });
-  const administrator = await getPluginClient(adminContext());
-  await administrator.reviewActivitySource({
+  if (input.approve ?? true) {
+    const administrator = await getPluginClient(adminContext());
+    await administrator.reviewActivitySource({
+      sourceId: input.sourceId,
+      decision: "approved",
+      reason: "Ingestion test source",
+    });
+  }
+  await linkSourceOnChain(owner, input.sourceId);
+  const created = await owner.createActivitySourceApiKey({
     sourceId: input.sourceId,
-    decision: "approved",
-    reason: "Ingestion test source",
+    name: "Ingestion test",
   });
-  await owner.createActivitySigningIdentity({ sourceId: input.sourceId });
-  const prepared = await owner.prepareActivitySigningIdentityBinding({
-    sourceId: input.sourceId,
-  });
+  return { owner, ...created };
+}
+
+export async function linkSourceOnChain(
+  owner: Awaited<ReturnType<typeof getPluginClient>>,
+  sourceId: string,
+) {
+  await owner.createActivitySigningIdentity({ sourceId });
+  const prepared = await owner.prepareActivitySigningIdentityBinding({ sourceId });
   const bindingValue = JSON.parse(prepared.value);
   const originalFetch = globalThis.fetch;
   const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (request, init) => {
@@ -46,13 +59,8 @@ export async function provisionIngestionSource(input: {
     return originalFetch(request, init);
   });
   try {
-    await owner.confirmActivitySigningIdentityBinding({ sourceId: input.sourceId });
+    await owner.confirmActivitySigningIdentityBinding({ sourceId });
   } finally {
     fetchSpy.mockRestore();
   }
-  const created = await owner.createActivitySourceApiKey({
-    sourceId: input.sourceId,
-    name: "Ingestion test",
-  });
-  return { owner, ...created };
 }

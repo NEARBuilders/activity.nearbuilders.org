@@ -52,6 +52,28 @@ describe("ActivityFeed", () => {
     expect(container.querySelector("time")?.getAttribute("datetime")).toBe(event.timestamp);
   });
 
+  it("marks events from a source under review instead of showing trust", () => {
+    render(
+      <ActivityFeed
+        events={[
+          {
+            ...event,
+            provenance: { ...event.provenance, approvalStatus: "pending" },
+          },
+        ]}
+        status="success"
+        skippedInvalid={0}
+        hasMore={false}
+        onApplyFilters={vi.fn()}
+        onNextPage={vi.fn()}
+        onRetry={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Under review")).toBeTruthy();
+    expect(screen.queryByText("Trusted · 1.5×")).toBeNull();
+  });
+
   it("labels GitHub-ingested events in the normal Activity feed", () => {
     render(
       <ActivityFeed

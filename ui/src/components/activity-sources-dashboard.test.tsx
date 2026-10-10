@@ -57,7 +57,7 @@ describe("ActivitySourcesDashboard", () => {
     expect(markup).toContain("NEAR Catalog");
     expect(markup).toContain("catalog.project.published");
     expect(markup).toContain("25 points");
-    expect(markup).toContain("Pending approval");
+    expect(markup).toContain("Under review");
     expect(markup).toContain("Standard weighting");
     expect(markup).not.toContain("Approve source");
   });
@@ -103,7 +103,7 @@ describe("ActivitySourcesDashboard", () => {
     expect(markup).not.toContain("Register source");
   });
 
-  it("tells a waiting owner who approves the source and that the role is separate", () => {
+  it("tells an owner under review that events are accepted before approval", () => {
     const markup = renderToStaticMarkup(
       <ActivitySourcesDashboard
         sources={[pendingSource]}
@@ -118,8 +118,8 @@ describe("ActivitySourcesDashboard", () => {
       />,
     );
 
-    expect(markup).toContain("Waiting on a Platform Administrator");
-    expect(markup).toContain("separate from your organization");
+    expect(markup).toContain("You can already send events");
+    expect(markup).toContain("once a Platform Administrator approves");
   });
 
   it("explains when the active member is not an organization owner", () => {
@@ -180,7 +180,7 @@ describe("ActivitySourcesDashboard", () => {
     fireEvent.change(screen.getByLabelText("Name"), {
       target: { value: "catalog.project.published" },
     });
-    fireEvent.change(screen.getByLabelText("Description"), {
+    fireEvent.change(screen.getByLabelText("Description (optional)"), {
       target: { value: "A project was published" },
     });
     fireEvent.change(screen.getByLabelText("Points"), { target: { value: "25" } });
@@ -224,7 +224,9 @@ describe("ActivitySourcesDashboard", () => {
     fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "NEAR Catalog" } });
     fireEvent.change(screen.getByLabelText("NEAR account"), { target: { value: "catalog.near" } });
     fireEvent.change(screen.getByLabelText("Name"), { target: { value: "catalog.updated" } });
-    fireEvent.change(screen.getByLabelText("Description"), { target: { value: "Updated" } });
+    fireEvent.change(screen.getByLabelText("Description (optional)"), {
+      target: { value: "Updated" },
+    });
     fireEvent.click(screen.getByRole("button", { name: "Register source" }));
 
     await waitFor(() => expect(onCreate).toHaveBeenCalledOnce());

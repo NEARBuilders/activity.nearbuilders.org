@@ -33,7 +33,6 @@ describe("getActivityOnboardingSteps", () => {
       near: "current",
       organization: "upcoming",
       register: "upcoming",
-      approval: "upcoming",
       binding: "upcoming",
       "api-key": "upcoming",
     });
@@ -51,7 +50,7 @@ describe("getActivityOnboardingSteps", () => {
     ).toBe("current");
   });
 
-  it("marks approval as waiting rather than actionable while a source is pending", () => {
+  it("lets a pending source continue to binding without waiting for approval", () => {
     const steps = statuses({
       ...ready,
       source: { approvalStatus: "pending" },
@@ -59,22 +58,28 @@ describe("getActivityOnboardingSteps", () => {
       hasApiKey: false,
     });
     expect(steps.register).toBe("complete");
-    expect(steps.approval).toBe("waiting");
+    expect(steps.binding).toBe("current");
+    expect(steps).not.toHaveProperty("approval");
+  });
+
+  it("completes setup for a pending source once it has an API key", () => {
+    expect(
+      new Set(Object.values(statuses({ ...ready, source: { approvalStatus: "pending" } }))),
+    ).toEqual(new Set(["complete"]));
+  });
+
+  it("blocks the register step when the source was rejected", () => {
+    const steps = statuses({
+      ...ready,
+      source: { approvalStatus: "rejected" },
+      identity: null,
+      hasApiKey: false,
+    });
+    expect(steps.register).toBe("blocked");
     expect(steps.binding).toBe("upcoming");
   });
 
-  it("marks approval as blocked when the source was rejected", () => {
-    expect(
-      statuses({
-        ...ready,
-        source: { approvalStatus: "rejected" },
-        identity: null,
-        hasApiKey: false,
-      }).approval,
-    ).toBe("blocked");
-  });
-
-  it("walks binding and API key in order after approval", () => {
+  it("walks binding and API key in order after registration", () => {
     expect(statuses({ ...ready, identity: null, hasApiKey: false }).binding).toBe("current");
     expect(
       statuses({ ...ready, identity: { bindingStatus: "pending" }, hasApiKey: false }).binding,

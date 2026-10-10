@@ -39,6 +39,7 @@ export interface CreateActivitySourceInput {
   sourceId: string;
   displayName: string;
   nearAccountId: string;
+  nearbuildersProjectId?: string;
   eventTypes: ActivityEventTypeView[];
 }
 

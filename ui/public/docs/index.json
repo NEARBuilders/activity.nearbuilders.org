@@ -27,6 +27,16 @@
       },
       {
         "depth": 2,
+        "text": "Set it up with a coding agent",
+        "slug": "set-it-up-with-a-coding-agent"
+      },
+      {
+        "depth": 3,
+        "text": "Binding session API",
+        "slug": "binding-session-api"
+      },
+      {
+        "depth": 2,
         "text": "1. Register a source",
         "slug": "1-register-a-source"
       },
@@ -190,6 +200,11 @@
         "depth": 2,
         "text": "Source credentials and signing",
         "slug": "source-credentials-and-signing"
+      },
+      {
+        "depth": 2,
+        "text": "Agent binding sessions",
+        "slug": "agent-binding-sessions"
       },
       {
         "depth": 2,
