@@ -69,6 +69,12 @@ function BindingPage() {
   const draft = session?.draft ?? {};
   const projectName = draft.project?.title ?? draft.displayName ?? "your project";
   const isPageDelivery = session?.delivery === "page";
+  const expectedNearAccountId = isPageDelivery ? (draft.nearAccountId ?? null) : null;
+  const signedInWithWrongAccount = Boolean(
+    expectedNearAccountId &&
+      access.linkedNearAccounts !== undefined &&
+      !access.linkedNearAccountIds.includes(expectedNearAccountId),
+  );
 
   const sourcesQuery = useQuery({
     queryKey: ["activity-sources", auth.user?.id, access.activeOrganizationId],
@@ -103,6 +109,24 @@ function BindingPage() {
   const connectionWorks = Boolean(
     revealed && lastTestEventAt && Date.parse(lastTestEventAt) >= revealed.at - 5_000,
   );
+
+  const switchAccount = useMutation({
+    mutationFn: async () => {
+      const { error } = await authClient.signOut();
+      if (error) throw new Error(error.message || "Failed to sign out");
+      await authClient.near.disconnect().catch(() => {});
+    },
+    onSuccess: async () => {
+      queryClient.setQueryData(["session"], null);
+      await queryClient.invalidateQueries();
+      await router.navigate({
+        to: "/login",
+        search: { redirect: `/binding?sessionToken=${encodeURIComponent(sessionToken)}` },
+        replace: true,
+      });
+    },
+    onError: (error: Error) => toast.error(error.message || "Failed to switch account"),
+  });
 
   const refreshSession = () =>
     queryClient.invalidateQueries({ queryKey: bindingSessionQueryKey(sessionToken) });
@@ -242,6 +266,23 @@ function BindingPage() {
   }
 
   const renderStep = () => {
+    if (signedInWithWrongAccount && expectedNearAccountId) {
+      const signedInAs = access.linkedNearAccountIds.join(", ") || "an account without NEAR";
+      return (
+        <StepCard
+          title={`Sign in as ${expectedNearAccountId}`}
+          description={`This project belongs to ${expectedNearAccountId} on nearbuilders.org, so the same NEAR account has to register it here. You are signed in as ${signedInAs}.`}
+        >
+          <Button
+            type="button"
+            onClick={() => switchAccount.mutate()}
+            disabled={switchAccount.isPending}
+          >
+            {switchAccount.isPending ? "Signing out…" : `Switch to ${expectedNearAccountId}`}
+          </Button>
+        </StepCard>
+      );
+    }
     if (access.registrationAccess === null) return <Skeleton className="h-24 w-full" />;
     if (access.registrationAccess === "near-required") {
       return (
@@ -366,6 +407,13 @@ function BindingPage() {
             ? "Confirm the details and approve one wallet transaction. You get your API key, a command to test it, and a prompt for your coding agent."
             : "Your coding agent asked to set up Activity for this project. You sign in, confirm the details, and approve one wallet transaction. The agent does the rest."}
         </p>
+        {expectedNearAccountId && (
+          <p className="text-sm text-muted-foreground">
+            Sign in with{" "}
+            <span className="font-mono font-medium text-foreground">{expectedNearAccountId}</span>,
+            the NEAR account you use on nearbuilders.org.
+          </p>
+        )}
         {draft.project?.url && (
           <p className="text-sm text-muted-foreground">
             Project:{" "}
