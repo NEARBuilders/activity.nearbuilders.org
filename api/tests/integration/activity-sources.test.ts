@@ -51,7 +51,10 @@ describe("Activity sources", () => {
         nearAccountId: "another-conflict.near",
         eventTypes,
       }),
-    ).rejects.toThrow("The Source ID conflict-source is already taken");
+    ).rejects.toMatchObject({
+      message: "The Source ID conflict-source is already taken",
+      data: { field: "sourceId" },
+    });
     await expect(
       client.createActivitySource({
         sourceId: "conflict-source-two",
@@ -81,9 +84,12 @@ describe("Activity sources", () => {
         nearAccountId: "cap-owner.near",
         eventTypes,
       }),
-    ).rejects.toThrow(
-      "The NEAR account cap-owner.near already owns the maximum of 10 Activity Sources",
-    );
+    ).rejects.toMatchObject({
+      message: expect.stringContaining(
+        "The NEAR account cap-owner.near already owns the maximum of 10 Activity Sources",
+      ),
+      data: { field: "nearAccountId" },
+    });
     await expect(
       client.createActivitySource({
         sourceId: "cap-source-other-account",
@@ -423,9 +429,11 @@ describe("Activity sources", () => {
           nearbuildersProjectId: "proj_linked_example",
           eventTypes: [{ name: "copy.event", enabled: true, pointValue: 1 }],
         }),
-      ).rejects.toThrow(
-        "This nearbuilders.org project already has an Activity Source: project-link-source",
-      );
+      ).rejects.toMatchObject({
+        message:
+          "This nearbuilders.org project already has an Activity Source: project-link-source",
+        data: { field: "project" },
+      });
     } finally {
       projects.mockRestore();
     }
@@ -458,7 +466,10 @@ describe("Activity sources", () => {
           nearbuildersProjectId: "proj_owned",
           eventTypes: [{ name: "squat.event", enabled: true, pointValue: 1 }],
         }),
-      ).rejects.toThrow("Sign in with real-owner.near to register this nearbuilders.org project");
+      ).rejects.toMatchObject({
+        message: "Sign in with real-owner.near to register this nearbuilders.org project",
+        data: { field: "nearAccountId" },
+      });
       await expect(
         squatter.createActivitySource({
           sourceId: "missing-project-source",

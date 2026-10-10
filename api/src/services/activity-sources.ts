@@ -13,6 +13,7 @@ import {
   activitySources as sourcesTable,
   activitySourceTrustChanges as trustChangesTable,
 } from "../db/schema";
+import { requireSourceNotRejected } from "./activity-source-access";
 
 export type ActivitySourceApprovalStatus =
   (typeof activitySourceApprovalStatus)["enumValues"][number];
@@ -179,6 +180,7 @@ async function requireSourceCapacity(
   if ((row?.total ?? 0) >= MAX_ACTIVITY_SOURCES_PER_NEAR_ACCOUNT) {
     throw new ORPCError("CONFLICT", {
       message: `The NEAR account ${nearAccountId} already owns the maximum of ${MAX_ACTIVITY_SOURCES_PER_NEAR_ACCOUNT} Activity Sources. Use another NEAR account for this one.`,
+      data: { field: "nearAccountId" },
     });
   }
 }
@@ -245,6 +247,9 @@ export const ActivitySourcesLive = Layer.effect(
                     .limit(1)
                 : [];
               throw new ORPCError("CONFLICT", {
+                ...((existing || projectSource) && {
+                  data: { field: existing ? "sourceId" : "project" },
+                }),
                 message: existing
                   ? `The Source ID ${input.sourceId} is already taken`
                   : projectSource
@@ -277,11 +282,7 @@ export const ActivitySourcesLive = Layer.effect(
           if (!source) {
             throw new ORPCError("NOT_FOUND", { message: "Activity Source not found" });
           }
-          if (source.approvalStatus === "rejected") {
-            throw new ORPCError("FORBIDDEN", {
-              message: "Activity Source was rejected",
-            });
-          }
+          requireSourceNotRejected(source);
           const eventTypes = await eventTypesFor([source.id]);
           const reviews = await reviewsFor([source.id]);
           return toRecord(source, eventTypes, reviews);
