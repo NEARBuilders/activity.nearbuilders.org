@@ -1,5 +1,38 @@
 # ui
 
+## 1.10.0
+
+### Minor Changes
+
+- ef677e2: Make Activity onboarding agent-first. A coding agent starts a binding session with
+  `POST /v1/binding-sessions`, hands the person a `/binding` link and match code, and claims the
+  Source API Key exactly once from `POST /v1/binding-sessions/{sessionId}/claim` after the person
+  signs in, confirms the prefilled details, and links the source on-chain. Sessions can be prefilled
+  from a nearbuilders.org project link, slug, or name, and each source records the nearbuilders.org
+  project it was registered from, which may have only one source.
+
+  Administrator approval no longer blocks onboarding: a pending source can link on-chain, create API
+  keys, and publish up to 500 events a day, which appear in the feed marked "Under review" and join
+  leaderboards once it is approved. Rejected sources stay blocked and leave the feed, and editing a
+  rejected source no longer reopens it.
+
+  The registration form can import a nearbuilders.org project, event type descriptions are optional,
+  the setup panel shows Info, Link on-chain, and API key with a way back to edit Info, and `/skill.md`
+  documents the agent flow.
+
+- dca58d9: Add the local Nostr and Redis Activity protocol boundary and NEAR-authenticated Activity Source registration, approval, and review history.
+- a310604: Add exact dynamically weighted weekly, monthly, and all-time Activity leaderboards backed by an idempotent Redis projection.
+- 3dde7ad: Add configurable public GitHub polling for merged pull requests and closed issues, including explicit NEAR actor mappings and feed provenance.
+- 825c0d2: Add a public, trusted, filtered, cursor-paginated Activity feed API and UI.
+- 96b4c77: Add encrypted Signing Identities, mainnet NEAR binding, and revocable source-scoped API credentials for approved Activity Sources.
+- 0d0aa02: Expose time-scoped cryptographic provenance, auditable source trust weighting, and trust-aware Activity feed and leaderboard presentation.
+
+### Patch Changes
+
+- 6d20354: Add a typed Activity RPC client package and remove the Beta banner from the site.
+- 845ef43: Remove nonfunctional template routes and unused UI scaffolding, and make organization switching update the active workspace consistently across the Activity interface.
+- 9e1a376: Add a first-run-friendly master-key generator (`bun run keys:gen`) and a fail-fast check in the API runtime that refuses to boot with an empty `ACTIVITY_SIGNING_MASTER_KEYS` when `NODE_ENV=production`. README and protocol docs gain a "generate, rotate, recover" runbook so the dev path (`bun run keys:gen`) and the production path (operator-provisioned secret) are unambiguous.
+
 ## 1.9.1
 
 ### Patch Changes
