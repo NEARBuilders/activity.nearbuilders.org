@@ -27,7 +27,9 @@ Read the codebase and find the meaningful things users do: actions with a clear 
 moment. Prefer a few well-named types over many.
 
 - Names are lowercase, dot or dash separated, such as `task.completed` or `pull-request.merged`.
-- Each has a `pointValue` (whole number, 0 or more) and an optional `description`.
+- Each has a `pointValue` (whole number, 0 to 100) and an optional `description`.
+- To test the connection, send an `activity.test` event. It is accepted for every source, never
+  published or scored, and needs no Event Type of its own.
 - The actor of every event must be a NEAR account ID, such as `alice.near`. Only report actions
   where you know the user's NEAR account.
 

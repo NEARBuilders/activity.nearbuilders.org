@@ -3,6 +3,7 @@ import { and, count, eq, gte, isNull } from "drizzle-orm";
 import { ORPCError } from "every-plugin/orpc";
 import { type Event, validateEvent, verifyEvent } from "nostr-tools/pure";
 import { ACTIVITY_EVENT_KIND, type ActivityRelay } from "../activity/activity-relay";
+import { ACTIVITY_TEST_EVENT_TYPE } from "../contract";
 import type { Database } from "../db";
 import {
   activitySources as sourcesTable,
@@ -60,7 +61,10 @@ export class ActivityIngestionService {
     this.#now = options.now ?? (() => new Date());
   }
 
-  async submit(apiKey: string, input: ActivityEventSubmission): Promise<{ eventId: string }> {
+  async submit(
+    apiKey: string,
+    input: ActivityEventSubmission,
+  ): Promise<{ eventId: string; test?: true }> {
     const credential = await this.#credentials.authenticateEventWriteKey(apiKey);
     return this.#submitWithCredential(credential, input);
   }
@@ -68,7 +72,7 @@ export class ActivityIngestionService {
   async submitForSource(
     sourceId: string,
     input: ActivityEventSubmission,
-  ): Promise<{ eventId: string }> {
+  ): Promise<{ eventId: string; test?: true }> {
     const credential = await this.#credentials.getInternalEventWriteCredential(sourceId);
     return this.#submitWithCredential(credential, input);
   }
@@ -105,7 +109,7 @@ export class ActivityIngestionService {
   async #submitWithCredential(
     credential: ActivityEventWriteCredential,
     input: ActivityEventSubmission,
-  ): Promise<{ eventId: string }> {
+  ): Promise<{ eventId: string; test?: true }> {
     const payloadJson = JSON.stringify(input.payload);
     if (!payloadJson || Buffer.byteLength(payloadJson, "utf8") > ACTIVITY_EVENT_PAYLOAD_MAX_BYTES) {
       throw new ORPCError("BAD_REQUEST", {
@@ -114,6 +118,15 @@ export class ActivityIngestionService {
     }
     const occurredAt = input.occurredAt ? resolveOccurredAt(input.occurredAt) : null;
     const source = await this.#sources.getSourceForIngestion(credential.sourceId);
+    if (input.eventType === ACTIVITY_TEST_EVENT_TYPE) {
+      await this.#sources.recordTestEvent(credential.sourceId);
+      return {
+        eventId: createHash("sha256")
+          .update(`${ACTIVITY_TEST_EVENT_TYPE}:${credential.sourceId}:${input.idempotencyKey}`)
+          .digest("hex"),
+        test: true,
+      };
+    }
     const eventType = source.eventTypes.find(({ name }) => name === input.eventType);
     if (!eventType?.enabled) {
       throw new ORPCError("BAD_REQUEST", {

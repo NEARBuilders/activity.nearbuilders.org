@@ -1,10 +1,11 @@
 import { createHash, randomBytes, randomInt } from "node:crypto";
-import { and, count, eq, gte, isNull } from "drizzle-orm";
+import { and, count, eq, gte, isNotNull, isNull } from "drizzle-orm";
 import { ORPCError } from "every-plugin/orpc";
 import type { Database } from "../db";
 import {
   activityBindingSessions as sessionsTable,
   activitySources as sourcesTable,
+  activityEventSubmissions as submissionsTable,
 } from "../db/schema";
 import type { ActivityCredentialsService } from "./activity-credentials";
 import type { NearbuildersProjectDraft } from "./nearbuilders-projects";
@@ -32,7 +33,18 @@ export interface ActivityBindingDraft {
 
 export type ActivityBindingSessionStatus = "waiting" | "ready" | "claimed" | "expired";
 
+export type ActivityBindingDelivery = "agent" | "page";
+
+export interface ActivityProjectActivity {
+  status: "none" | "connected" | "tracked" | "rejected";
+  sourceId: string | null;
+  displayName: string | null;
+  approvalStatus: "pending" | "approved" | "rejected" | null;
+  reviewReason: string | null;
+}
+
 export interface ActivityBindingSessionView {
+  delivery: ActivityBindingDelivery;
   matchCode: string;
   status: ActivityBindingSessionStatus;
   draft: ActivityBindingDraft;
@@ -140,10 +152,12 @@ export class ActivityBindingSessionsService {
     input: ActivityBindingDraft,
     origin: string,
     requesterKey: string | null,
+    issuer: { sourceId: string } | null = null,
   ): Promise<{
     sessionId: string;
     url: string;
-    pollToken: string;
+    pollToken?: string;
+    delivery: ActivityBindingDelivery;
     matchCode: string;
     expiresAt: string;
     draft: ActivityBindingDraft;
@@ -151,6 +165,12 @@ export class ActivityBindingSessionsService {
     const requesterKeyHash = requesterKey ? hashToken(requesterKey) : null;
     await this.#enforceRateLimit(requesterKeyHash);
     const draft = await this.prefill(input);
+    const delivery: ActivityBindingDelivery = issuer ? "page" : "agent";
+    if (issuer && !draft.project?.id) {
+      throw new ORPCError("BAD_REQUEST", {
+        message: "A partner binding session must name a nearbuilders.org project",
+      });
+    }
     const sessionToken = `abs_${randomBytes(32).toString("base64url")}`;
     const pollToken = `abp_${randomBytes(32).toString("base64url")}`;
     const matchCode = createMatchCode();
@@ -163,6 +183,8 @@ export class ActivityBindingSessionsService {
         pollTokenHash: hashToken(pollToken),
         matchCode,
         draftJson: JSON.stringify(draft),
+        delivery,
+        issuerSourceId: issuer?.sourceId ?? null,
         requesterKeyHash,
         expiresAt,
         createdAt: now,
@@ -175,7 +197,8 @@ export class ActivityBindingSessionsService {
     return {
       sessionId: created.id,
       url: url.toString(),
-      pollToken,
+      ...(delivery === "agent" && { pollToken }),
+      delivery,
       matchCode,
       expiresAt: expiresAt.toISOString(),
       draft,
@@ -191,6 +214,7 @@ export class ActivityBindingSessionsService {
       .limit(1);
     if (!result) throw sessionNotFound();
     return {
+      delivery: result.session.delivery,
       matchCode: result.session.matchCode,
       status: this.#statusOf(result.session),
       draft: JSON.parse(result.session.draftJson) as ActivityBindingDraft,
@@ -255,6 +279,7 @@ export class ActivityBindingSessionsService {
       throw new ORPCError("CONFLICT", { message: "Binding session is already complete" });
     }
     return {
+      delivery: updated.delivery,
       matchCode: updated.matchCode,
       status: this.#statusOf(updated),
       draft: JSON.parse(updated.draftJson) as ActivityBindingDraft,
@@ -272,7 +297,7 @@ export class ActivityBindingSessionsService {
         and(eq(sessionsTable.id, sessionId), eq(sessionsTable.pollTokenHash, hashToken(pollToken))),
       )
       .limit(1);
-    if (!result) throw sessionNotFound();
+    if (!result || result.session.delivery !== "agent") throw sessionNotFound();
     const status = this.#statusOf(result.session);
     if (status === "waiting" || status === "expired") return { status };
     const source = result.source;
@@ -300,6 +325,102 @@ export class ActivityBindingSessionsService {
         .where(eq(sessionsTable.id, result.session.id));
       throw error;
     }
+  }
+
+  async reveal(input: {
+    sessionToken: string;
+    organizationId: string;
+  }): Promise<{ sourceId: string; secret: string; apiKeyId: string }> {
+    const [result] = await this.#db
+      .select({ session: sessionsTable, source: sourcesTable })
+      .from(sessionsTable)
+      .leftJoin(sourcesTable, eq(sourcesTable.id, sessionsTable.sourceRecordId))
+      .where(eq(sessionsTable.sessionTokenHash, hashToken(input.sessionToken)))
+      .limit(1);
+    if (!result) throw sessionNotFound();
+    if (result.session.delivery !== "page") {
+      throw new ORPCError("FORBIDDEN", {
+        message: "This binding session hands its key to the agent that started it",
+      });
+    }
+    const source = result.source;
+    if (!source || source.organizationId !== input.organizationId) {
+      throw new ORPCError("FORBIDDEN", {
+        message: "Finish linking the Activity Source before showing its key",
+      });
+    }
+    const status = this.#statusOf(result.session);
+    if (status === "claimed") {
+      throw new ORPCError("CONFLICT", {
+        message:
+          "This key was already shown. Create a new one on the Activity Sources page if you lost it.",
+      });
+    }
+    if (status !== "ready") {
+      throw new ORPCError("FORBIDDEN", {
+        message: "Finish linking the Activity Source before showing its key",
+      });
+    }
+    const [reserved] = await this.#db
+      .update(sessionsTable)
+      .set({ keyClaimedAt: this.#now() })
+      .where(and(eq(sessionsTable.id, result.session.id), isNull(sessionsTable.keyClaimedAt)))
+      .returning({ id: sessionsTable.id });
+    if (!reserved) {
+      throw new ORPCError("CONFLICT", {
+        message:
+          "This key was already shown. Create a new one on the Activity Sources page if you lost it.",
+      });
+    }
+    try {
+      const { secret, apiKey } = await this.#credentials.createApiKey(
+        source.organizationId,
+        source.sourceId,
+        "Source API key",
+      );
+      return { sourceId: source.sourceId, secret, apiKeyId: apiKey.id };
+    } catch (error) {
+      await this.#db
+        .update(sessionsTable)
+        .set({ keyClaimedAt: null })
+        .where(eq(sessionsTable.id, result.session.id));
+      throw error;
+    }
+  }
+
+  async projectActivity(projectId: string): Promise<ActivityProjectActivity> {
+    const [source] = await this.#db
+      .select()
+      .from(sourcesTable)
+      .where(eq(sourcesTable.nearbuildersProjectId, projectId))
+      .limit(1);
+    if (!source) {
+      return {
+        status: "none",
+        sourceId: null,
+        displayName: null,
+        approvalStatus: null,
+        reviewReason: null,
+      };
+    }
+    const view = {
+      sourceId: source.sourceId,
+      displayName: source.displayName,
+      approvalStatus: source.approvalStatus,
+      reviewReason: source.approvalStatus === "rejected" ? source.reviewReason : null,
+    };
+    if (source.approvalStatus === "rejected") return { status: "rejected", ...view };
+    const [published] = await this.#db
+      .select({ id: submissionsTable.id })
+      .from(submissionsTable)
+      .where(
+        and(
+          eq(submissionsTable.sourceRecordId, source.id),
+          isNotNull(submissionsTable.publishedAt),
+        ),
+      )
+      .limit(1);
+    return { status: published ? "tracked" : "connected", ...view };
   }
 
   #statusOf(session: typeof sessionsTable.$inferSelect): ActivityBindingSessionStatus {
