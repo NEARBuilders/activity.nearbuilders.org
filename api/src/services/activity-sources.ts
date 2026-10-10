@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { Context, Effect, Layer } from "every-plugin/effect";
 import { ORPCError } from "every-plugin/orpc";
 import { MAX_ACTIVITY_SOURCES_PER_NEAR_ACCOUNT } from "../contract";
@@ -73,6 +73,10 @@ export interface ActivitySourcesService {
   createSource(input: ActivitySourceInput): Promise<ActivitySourceRecord>;
   getSourceForIngestion(sourceId: string): Promise<ActivitySourceRecord>;
   listSourcesByOrganization(organizationId: string): Promise<ActivitySourceRecord[]>;
+  getSourceAccount(
+    organizationId: string,
+    sourceId: string,
+  ): Promise<{ nearAccountId: string; nearbuildersProjectId: string | null } | null>;
   updateSource(
     organizationId: string,
     sourceId: string,
@@ -164,9 +168,10 @@ function toOrpcError(error: unknown): ORPCError<string, unknown> {
 }
 
 async function requireSourceCapacity(
-  tx: Pick<Database, "select">,
+  tx: Pick<Database, "select" | "execute">,
   nearAccountId: string,
 ): Promise<void> {
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${nearAccountId}))`);
   const [row] = await tx
     .select({ total: count() })
     .from(sourcesTable)
@@ -280,6 +285,27 @@ export const ActivitySourcesLive = Layer.effect(
           const eventTypes = await eventTypesFor([source.id]);
           const reviews = await reviewsFor([source.id]);
           return toRecord(source, eventTypes, reviews);
+        } catch (error) {
+          throw toOrpcError(error);
+        }
+      },
+
+      getSourceAccount: async (organizationId, sourceId) => {
+        try {
+          const [source] = await db
+            .select({
+              nearAccountId: sourcesTable.nearAccountId,
+              nearbuildersProjectId: sourcesTable.nearbuildersProjectId,
+            })
+            .from(sourcesTable)
+            .where(
+              and(
+                eq(sourcesTable.sourceId, sourceId),
+                eq(sourcesTable.organizationId, organizationId),
+              ),
+            )
+            .limit(1);
+          return source ?? null;
         } catch (error) {
           throw toOrpcError(error);
         }

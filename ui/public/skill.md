@@ -47,7 +47,9 @@ curl -sS -X POST https://activity.nearbuilders.org/api/v1/binding-sessions \
 ```
 
 Optional fields: `sourceId`, `displayName`, and `nearAccountId` override what the project lookup
-fills in. Without a project, send `displayName` and `sourceId` yourself.
+fills in. Without a project, send `displayName` and `sourceId` yourself. For a nearbuilders.org
+project, `nearAccountId` must be the project owner's account (or the project's linked app account):
+Activity refuses any other account, and the person must sign in with it to finish.
 
 Keep `pollToken` and `sessionId` private and in memory; do not write them to files or print the poll
 token. Handle errors:

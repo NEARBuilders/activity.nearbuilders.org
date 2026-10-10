@@ -213,4 +213,57 @@ describe("Activity binding sessions", () => {
       otherCaller.createActivityBindingSession({ displayName: "Another caller" }),
     ).resolves.toMatchObject({ matchCode: expect.any(String) });
   });
+
+  it("refuses to complete a project session with a source registered for something else", async () => {
+    const originalFetch = globalThis.fetch;
+    const project = {
+      id: "proj_session_owned",
+      slug: "session-owned-project-a1b2c3",
+      title: "Session Owned Project",
+      ownerId: "session-owner.near",
+      domain: null,
+      apps: [],
+    };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (request, init) => {
+      const url = String(request);
+      if (
+        url === `https://nearbuilders.org/api/v1/projects/by-slug/${project.slug}` ||
+        url === `https://nearbuilders.org/api/v1/projects/${project.id}`
+      ) {
+        return new Response(JSON.stringify({ data: project }), {
+          status: 200,
+          headers: { "content-type": "application/json" },
+        });
+      }
+      return originalFetch(request, init);
+    });
+    try {
+      const agent = await getPluginClient();
+      const session = await agent.createActivityBindingSession({
+        project: { reference: `https://nearbuilders.org/projects/${project.slug}` },
+        eventTypes,
+      });
+      const sessionToken = new URL(session.url).searchParams.get("sessionToken") ?? "";
+      const owner = await getPluginClient(
+        orgOwnerContext("session-owner", "org-session-owner", "session-owner.near"),
+      );
+      await owner.createActivitySource({
+        sourceId: "session-unrelated-source",
+        displayName: "Unrelated",
+        nearAccountId: "session-owner.near",
+        eventTypes,
+      });
+
+      await expect(
+        owner.completeActivityBindingSession({
+          sessionToken,
+          sourceId: "session-unrelated-source",
+        }),
+      ).rejects.toThrow(
+        "This Activity Source was not registered for the project this session is for",
+      );
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
 });

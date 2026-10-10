@@ -235,8 +235,9 @@ from `activity/<source-id>` under the source's account.
 
 Because each source has its own slot, one NEAR account can own up to 10 Activity Sources, each with
 its own signing key, and binding never touches the account's personal `nostr/<account>` identity
-record. Sources bound before this change used `nostr/<source-account>`; the gateway still accepts that
-record when it holds the source's exact public key, so they do not need to re-bind.
+record. Earlier sources were bound under `nostr/<source-account>`; the gateway still accepts that
+account-level record when it holds the source's exact public key, so they do not need to re-bind. A
+per-source slot must also name the source it belongs to.
 
 To verify a source independently, read `activity/<source-id>` for the source's NEAR account on
 `contextual.near` and compare its public key with the key that signed the source's events.
@@ -286,7 +287,11 @@ be completed within 30 minutes and claimed within 24 hours. Starting sessions is
 (300 per 10 minutes).
 
 A source records the nearbuilders.org project it was registered from, and each project can be linked
-to only one source. A NEAR account can own up to 10 sources.
+to only one source. The gateway looks the project up itself and accepts it only when the source's
+NEAR account is the project's owner or its linked app account, and that account is linked to the
+person registering. The same check applies when a project's source changes its NEAR account. A
+completed binding session must use the source registered for the session's project. A NEAR account
+can own up to 10 sources.
 
 ## Verification workflow
 

@@ -154,14 +154,18 @@ details; the Source ID stays fixed.
 1. **Sign in** with that NEAR account.
 2. **Select or create an organization** in the workspace menu. You must be its **owner**: members
    cannot register sources or manage credentials. A source belongs to one organization permanently.
-3. **Register the source** on `/activity-sources`. If your project is on nearbuilders.org, paste
-   its link into **Import from nearbuilders.org** and choose **Fill from project** to fill in the
-   first three fields, then check them. A nearbuilders.org project can have only one source.
+3. **Register the source** on `/activity-sources`. Search for your project in **Find your project on
+   nearbuilders.org**, or paste its link, and pick it to fill in the first three fields; projects you
+   own are marked **Owned**. Not on nearbuilders.org? Choose **Enter manually**. A nearbuilders.org
+   project can have only one source, and only the project owner's NEAR account (or the project's
+   linked app account) can register it, signed in as that account.
    - **Source ID** — lowercase, permanent, and shown publicly on every event, such as
      `github.nearbuilders.org`. It cannot be changed later.
    - **Display name** — shown on feed cards.
    - **NEAR account** — the exact mainnet account that will sign the on-chain link in step 5. It
-     defaults to the account you signed in with. One account can own up to 10 sources.
+     must be linked to your profile, and **Register source** stays disabled until it is. For a
+     nearbuilders.org project it is filled with the project owner's account. One account can own up
+     to 10 sources.
    - **Event Types** — at least one, lowercase, such as `feedback.submitted`. Each carries a point
      value used for scoring, an optional description, and can be enabled or disabled. Add every
      type you expect to publish; submitting a type that is missing or disabled returns `400`.

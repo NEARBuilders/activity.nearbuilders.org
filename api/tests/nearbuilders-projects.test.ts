@@ -212,6 +212,7 @@ describe("NearbuildersProjectsClient.search", () => {
         domain: null,
         logoUrl: "https://example.com/logo.png",
         ownerId: "nearbuilding.near",
+        ownerAccountIds: ["nearbuilding.near"],
       },
     ]);
   });

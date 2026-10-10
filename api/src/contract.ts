@@ -397,6 +397,7 @@ export const NearbuildersProjectSummarySchema = z.object({
   domain: z.string().nullable(),
   logoUrl: z.string().nullable(),
   ownerId: z.string().nullable(),
+  ownerAccountIds: z.array(z.string()),
 });
 
 export const ActivityBindingDraftSchema = z.object({

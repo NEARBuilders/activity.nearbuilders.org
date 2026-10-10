@@ -33,7 +33,10 @@ import {
 } from "./services/activity-feed";
 import { ActivityGithubService } from "./services/activity-github";
 import { ActivityHealthService } from "./services/activity-health";
-import { ActivityIngestionService } from "./services/activity-ingestion";
+import {
+  ActivityIngestionService,
+  PENDING_SOURCE_DAILY_EVENT_LIMIT,
+} from "./services/activity-ingestion";
 import {
   ActivityLeaderboardLive,
   ActivityLeaderboardTag,
@@ -145,7 +148,11 @@ export default createPlugin.withPlugins<PluginsClient>()({
     activityNostrKvApiUrl: z.string().default("https://kv.main.fastnear.com"),
     activityRelayUrl: z.string().default("wss://relay.nearbuilders.org"),
     activityNostrRpcUrl: z.string().optional(),
-    activityPendingSourceDailyEventLimit: z.number().int().positive().default(500),
+    activityPendingSourceDailyEventLimit: z
+      .number()
+      .int()
+      .positive()
+      .default(PENDING_SOURCE_DAILY_EVENT_LIMIT),
     nearbuildersApiUrl: z.string().default("https://nearbuilders.org/api"),
   }),
 
@@ -529,11 +536,10 @@ export default createPlugin.withPlugins<PluginsClient>()({
           }
           if (input.nearAccountId !== undefined) {
             validateAccountId(input.nearAccountId);
-            const existing = (
-              await services.activitySources.listSourcesByOrganization(
-                context.organization.activeOrganizationId,
-              )
-            ).find(({ sourceId }) => sourceId === input.sourceId);
+            const existing = await services.activitySources.getSourceAccount(
+              context.organization.activeOrganizationId,
+              input.sourceId,
+            );
             if (existing?.nearbuildersProjectId && existing.nearAccountId !== input.nearAccountId) {
               await requireProjectOwnerAccount(
                 services.nearbuildersProjects,

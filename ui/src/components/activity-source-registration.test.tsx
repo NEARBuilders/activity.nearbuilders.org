@@ -499,4 +499,57 @@ describe("ActivitySourceRegistration", () => {
     expect((screen.getByLabelText("Source ID") as HTMLInputElement).value).toBe("agent-app");
     expect(screen.queryByRole("button", { name: "Enter manually" })).toBeNull();
   });
+
+  it("blocks registration until the user has a linked NEAR account", () => {
+    render(
+      <ActivitySourceRegistration
+        access="allowed"
+        isSubmitting={false}
+        onCreate={vi.fn()}
+        ownedAccountIds={[]}
+        defaults={{
+          sourceId: "no-account",
+          displayName: "No Account",
+          nearAccountId: "someone.near",
+          eventTypes: [{ name: "task.done", description: "", enabled: true, pointValue: 1 }],
+        }}
+      />,
+    );
+
+    expect(
+      (screen.getByRole("button", { name: "Register source" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+    expect(
+      screen.getByText("Link a NEAR account to your profile to register a source."),
+    ).toBeTruthy();
+  });
+
+  it("marks a project as owned through its linked app account", async () => {
+    render(
+      <ActivitySourceRegistration
+        access="allowed"
+        isSubmitting={false}
+        onCreate={vi.fn()}
+        ownedAccountIds={["app.saad.near"]}
+        onImportProject={vi.fn()}
+        onSearchProjects={vi.fn().mockResolvedValue([
+          {
+            id: "proj_app",
+            slug: "app-owned-a1b2c3",
+            title: "App Owned",
+            url: "https://nearbuilders.org/projects/app-owned-a1b2c3",
+            ownerId: "creator.near",
+            ownerAccountIds: ["app.saad.near", "creator.near"],
+          },
+        ])}
+      />,
+    );
+
+    fireEvent.change(screen.getByLabelText("Find your project on nearbuilders.org"), {
+      target: { value: "app" },
+    });
+
+    const results = await screen.findByRole("list", { name: "Matching nearbuilders.org projects" });
+    expect(results.textContent).toContain("Owned");
+  });
 });

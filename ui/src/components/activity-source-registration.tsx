@@ -50,6 +50,7 @@ export interface ActivityProjectSearchResult {
   title: string;
   url: string;
   ownerId: string | null;
+  ownerAccountIds?: string[];
   logoUrl?: string | null;
 }
 
@@ -112,7 +113,7 @@ export function ActivitySourceRegistration({
   defaults,
   onImportProject,
   onSearchProjects,
-  ownedAccountIds = [],
+  ownedAccountIds,
   mode = "create",
   onCancel,
 }: {
@@ -230,12 +231,15 @@ export function ActivitySourceRegistration({
     await importProject(result.id);
   };
 
+  const signedInAccountIds = ownedAccountIds ?? [];
   const isOwnedProject = (result: ActivityProjectSearchResult) =>
-    Boolean(result.ownerId && ownedAccountIds.includes(result.ownerId));
+    (result.ownerAccountIds ?? (result.ownerId ? [result.ownerId] : [])).some((accountId) =>
+      signedInAccountIds.includes(accountId),
+    );
   const ownerSignInAccountId =
     projectOwnerAccountId &&
     nearAccountId.trim() === projectOwnerAccountId &&
-    !ownedAccountIds.includes(projectOwnerAccountId)
+    !signedInAccountIds.includes(projectOwnerAccountId)
       ? projectOwnerAccountId
       : null;
 
@@ -293,8 +297,13 @@ export function ActivitySourceRegistration({
     if (sourceIdFormatError) return "Fix the Source ID format.";
     if (!displayName.trim()) return "Add a display name.";
     if (!nearAccount) return "Add the NEAR account that will sign.";
-    if (!isEditing && ownedAccountIds.length > 0 && !ownedAccountIds.includes(nearAccount)) {
-      return `Sign in with ${nearAccount} to register this source.`;
+    if (!isEditing && ownedAccountIds !== undefined) {
+      if (ownedAccountIds.length === 0) {
+        return "Link a NEAR account to your profile to register a source.";
+      }
+      if (!ownedAccountIds.includes(nearAccount)) {
+        return `Sign in with ${nearAccount} to register this source.`;
+      }
     }
     if (fieldErrors.sourceId || fieldErrors.nearAccountId) {
       return "Fix the highlighted field to continue.";

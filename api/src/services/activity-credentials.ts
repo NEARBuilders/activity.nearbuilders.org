@@ -249,12 +249,17 @@ async function readOnChainBinding(
   return raw && typeof raw === "object" ? (raw as OnChainBinding) : null;
 }
 
-function bindingMatches(
+type BindingTarget = { source: { sourceId: string }; identity: { publicKey: string } };
+
+function sourceBindingMatches(
   binding: OnChainBinding | null,
-  result: { source: { sourceId: string }; identity: { publicKey: string } },
+  target: BindingTarget,
 ): binding is OnChainBinding {
-  if (!binding || binding.npub !== result.identity.publicKey) return false;
-  return binding.sourceId === undefined || binding.sourceId === result.source.sourceId;
+  return binding?.npub === target.identity.publicKey && binding.sourceId === target.source.sourceId;
+}
+
+function legacyBindingMatches(binding: OnChainBinding | null, target: BindingTarget): boolean {
+  return binding?.npub === target.identity.publicKey;
 }
 
 export const ActivityCredentialsLive = (
@@ -452,14 +457,19 @@ export const ActivityCredentialsLive = (
               nearAccountId,
               activitySourceBindingKey(result.source.sourceId),
             );
-            const binding = bindingMatches(sourceBinding, result)
+            const binding = sourceBindingMatches(sourceBinding, result)
               ? sourceBinding
               : await readOnChainBinding(
                   bindingConfig,
                   nearAccountId,
                   legacyNostrBindingKey(nearAccountId),
                 );
-            if (!binding || !bindingMatches(binding, result)) {
+            if (
+              !binding ||
+              !(binding === sourceBinding
+                ? sourceBindingMatches(binding, result)
+                : legacyBindingMatches(binding, result))
+            ) {
               throw new ORPCError("BAD_REQUEST", {
                 message:
                   sourceBinding === null && binding === null

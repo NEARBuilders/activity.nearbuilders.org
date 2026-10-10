@@ -217,7 +217,7 @@ export class ActivityBindingSessionsService {
       throw new ORPCError("CONFLICT", { message: "Binding session is already complete" });
     }
     const [source] = await this.#db
-      .select({ id: sourcesTable.id })
+      .select({ id: sourcesTable.id, nearbuildersProjectId: sourcesTable.nearbuildersProjectId })
       .from(sourcesTable)
       .where(
         and(
@@ -228,6 +228,12 @@ export class ActivityBindingSessionsService {
       .limit(1);
     if (!source) {
       throw new ORPCError("NOT_FOUND", { message: "Activity Source not found" });
+    }
+    const draftProjectId = (JSON.parse(session.draftJson) as ActivityBindingDraft).project?.id;
+    if (draftProjectId && source.nearbuildersProjectId !== draftProjectId) {
+      throw new ORPCError("FORBIDDEN", {
+        message: "This Activity Source was not registered for the project this session is for",
+      });
     }
     const identity = await this.#credentials.getSigningIdentity(
       input.organizationId,

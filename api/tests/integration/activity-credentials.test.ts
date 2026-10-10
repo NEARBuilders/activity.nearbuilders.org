@@ -468,6 +468,17 @@ describe("Activity source credentials", () => {
       wrongSource.mockRestore();
     }
 
+    const unnamedSlot = respondWith({
+      "/contextual.near/legacy-owner.near/activity/legacy-source": { npub: identity.publicKey },
+    });
+    try {
+      await expect(
+        owner.confirmActivitySigningIdentityBinding({ sourceId: "legacy-source" }),
+      ).rejects.toThrow("The NEAR-to-Nostr binding does not match this signing identity");
+    } finally {
+      unnamedSlot.mockRestore();
+    }
+
     const otherAccount = respondWith({
       "/contextual.near/attacker.near/activity/legacy-source": {
         sourceId: "legacy-source",

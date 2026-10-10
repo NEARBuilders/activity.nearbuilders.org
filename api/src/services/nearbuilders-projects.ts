@@ -26,9 +26,28 @@ export interface NearbuildersProjectSummary {
   domain: string | null;
   logoUrl: string | null;
   ownerId: string | null;
+  ownerAccountIds: string[];
 }
 
 export const NEARBUILDERS_PROJECT_SEARCH_LIMIT = 8;
+
+function nearbuildersProjectUrl(slug: string): string {
+  return `${NEARBUILDERS_SITE_URL}/projects/${slug}`;
+}
+
+function isNearAccountId(accountId: unknown): accountId is string {
+  return typeof accountId === "string" && NEAR_ACCOUNT_ID_REGEX.test(accountId);
+}
+
+export function projectOwnerAccountIds(project: NearbuildersProject): string[] {
+  return [
+    ...new Set(
+      [...(project.apps ?? []).map(({ accountId }) => accountId), project.ownerId].filter(
+        isNearAccountId,
+      ),
+    ),
+  ];
+}
 
 export type NearbuildersProjectReference =
   | { kind: "slug"; slug: string; fromLink?: boolean }
@@ -85,17 +104,13 @@ function asSourceId(candidate: string | null | undefined): string | undefined {
 export function deriveNearbuildersProjectDraft(
   project: NearbuildersProject,
 ): NearbuildersProjectDraft {
-  const appAccountId = project.apps?.find(({ accountId }) => accountId)?.accountId ?? null;
-  const nearAccountId = [appAccountId, project.ownerId].find(
-    (accountId): accountId is string =>
-      typeof accountId === "string" && NEAR_ACCOUNT_ID_REGEX.test(accountId),
-  );
+  const [nearAccountId] = projectOwnerAccountIds(project);
   return {
     project: {
       id: project.id,
       slug: project.slug,
       title: project.title,
-      url: `${NEARBUILDERS_SITE_URL}/projects/${project.slug}`,
+      url: nearbuildersProjectUrl(project.slug),
     },
     sourceId:
       asSourceId(project.domain) ??
@@ -142,14 +157,7 @@ export class NearbuildersProjectsClient {
       `/v1/projects/${encodeURIComponent(projectId)}`,
       projectId,
     );
-    return [
-      ...new Set(
-        [...(project.apps ?? []).map(({ accountId }) => accountId), project.ownerId].filter(
-          (accountId): accountId is string =>
-            typeof accountId === "string" && NEAR_ACCOUNT_ID_REGEX.test(accountId),
-        ),
-      ),
-    ];
+    return projectOwnerAccountIds(project);
   }
 
   async search(query: string): Promise<NearbuildersProjectSummary[]> {
@@ -162,10 +170,11 @@ export class NearbuildersProjectsClient {
       id: project.id,
       slug: project.slug,
       title: project.title,
-      url: `${NEARBUILDERS_SITE_URL}/projects/${project.slug}`,
+      url: nearbuildersProjectUrl(project.slug),
       domain: project.domain,
       logoUrl: project.logoUrl ?? null,
       ownerId: project.ownerId,
+      ownerAccountIds: projectOwnerAccountIds(project),
     }));
   }
 
@@ -190,7 +199,7 @@ export class NearbuildersProjectsClient {
     throw new ORPCError("BAD_REQUEST", {
       message: `Several nearbuilders.org projects match "${input.trim()}". Use one of these links: ${candidates
         .slice(0, 5)
-        .map(({ slug }) => `${NEARBUILDERS_SITE_URL}/projects/${slug}`)
+        .map(({ slug }) => nearbuildersProjectUrl(slug))
         .join(", ")}`,
     });
   }
