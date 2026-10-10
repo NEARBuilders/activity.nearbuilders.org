@@ -67,12 +67,12 @@ describe("ActivitySourceRegistration", () => {
     expect(screen.getByRole("alert").textContent).toMatch(/lowercase letters and numbers/);
   });
 
-  it("shows a conflict under the field it belongs to", async () => {
-    const onCreate = vi
-      .fn()
-      .mockRejectedValue(
-        new Error("The NEAR account catalog.near already owns an Activity Source"),
-      );
+  it("shows a conflict under the field its error code names", async () => {
+    const onCreate = vi.fn().mockRejectedValue(
+      Object.assign(new Error("The NEAR account catalog.near has too many sources"), {
+        data: { field: "nearAccountId" },
+      }),
+    );
     render(
       <ActivitySourceRegistration
         access="allowed"
@@ -92,7 +92,7 @@ describe("ActivitySourceRegistration", () => {
 
     await waitFor(() =>
       expect(screen.getByRole("alert").textContent).toBe(
-        "The NEAR account catalog.near already owns an Activity Source",
+        "The NEAR account catalog.near has too many sources",
       ),
     );
   });
@@ -551,5 +551,27 @@ describe("ActivitySourceRegistration", () => {
 
     const results = await screen.findByRole("list", { name: "Matching nearbuilders.org projects" });
     expect(results.textContent).toContain("Owned");
+  });
+
+  it("ignores error wording and keeps uncoded errors off the fields", async () => {
+    const onCreate = vi.fn().mockRejectedValue(new Error("The Source ID is mentioned but uncoded"));
+    render(
+      <ActivitySourceRegistration
+        access="allowed"
+        isSubmitting={false}
+        onCreate={onCreate}
+        defaults={{
+          sourceId: "uncoded",
+          displayName: "Uncoded",
+          nearAccountId: "uncoded.near",
+          eventTypes: [{ name: "task.done", description: "", enabled: true, pointValue: 1 }],
+        }}
+      />,
+    );
+
+    fireEvent.submit(screen.getByRole("button", { name: "Register source" }));
+
+    await waitFor(() => expect(onCreate).toHaveBeenCalled());
+    expect(screen.queryByRole("alert")).toBeNull();
   });
 });
