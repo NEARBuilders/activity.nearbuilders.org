@@ -214,6 +214,15 @@ describe("Activity binding sessions", () => {
     ).resolves.toMatchObject({ matchCode: expect.any(String) });
   });
 
+  it("does not pool callers without a known address into one per-caller limit", async () => {
+    const anonymous = await getPluginClient();
+    for (let attempt = 0; attempt < 11; attempt += 1) {
+      await expect(
+        anonymous.createActivityBindingSession({ displayName: `Unknown ${attempt.toString()}` }),
+      ).resolves.toMatchObject({ matchCode: expect.any(String) });
+    }
+  });
+
   it("refuses to complete a project session with a source registered for something else", async () => {
     const originalFetch = globalThis.fetch;
     const project = {

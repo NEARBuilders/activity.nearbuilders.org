@@ -20,6 +20,7 @@ import {
   activitySigningIdentities as identitiesTable,
   activitySources as sourcesTable,
 } from "../db/schema";
+import { requireAvailableSource, requireSourceNotRejected } from "./activity-source-access";
 
 export interface ActivitySigningIdentityRecord {
   publicKey: string;
@@ -314,11 +315,7 @@ export const ActivityCredentialsLive = (
               if (!source) {
                 throw new ORPCError("NOT_FOUND", { message: "Activity Source not found" });
               }
-              if (source.approvalStatus === "rejected") {
-                throw new ORPCError("FORBIDDEN", {
-                  message: "Activity Source was rejected",
-                });
-              }
+              requireSourceNotRejected(source);
               const [existing] = await tx
                 .select({ id: identitiesTable.id })
                 .from(identitiesTable)
@@ -350,9 +347,7 @@ export const ActivityCredentialsLive = (
         prepareSigningIdentityBinding: async (organizationId, sourceId, linkedNearAccountIds) => {
           try {
             const result = await findActiveIdentity(organizationId, sourceId);
-            if (result.source.approvalStatus === "rejected") {
-              throw new ORPCError("FORBIDDEN", { message: "Activity Source was rejected" });
-            }
+            requireSourceNotRejected(result.source);
             const nearAccountId = requireLinkedSourceAccount(
               result.source.nearAccountId,
               linkedNearAccountIds,
@@ -445,9 +440,7 @@ export const ActivityCredentialsLive = (
         confirmSigningIdentityBinding: async (organizationId, sourceId, linkedNearAccountIds) => {
           try {
             const result = await findActiveIdentity(organizationId, sourceId);
-            if (result.source.approvalStatus === "rejected") {
-              throw new ORPCError("FORBIDDEN", { message: "Activity Source was rejected" });
-            }
+            requireSourceNotRejected(result.source);
             const nearAccountId = requireLinkedSourceAccount(
               result.source.nearAccountId,
               linkedNearAccountIds,
@@ -501,9 +494,7 @@ export const ActivityCredentialsLive = (
         createApiKey: async (organizationId, sourceId, name) => {
           try {
             const result = await findActiveIdentity(organizationId, sourceId);
-            if (result.source.approvalStatus === "rejected") {
-              throw new ORPCError("FORBIDDEN", { message: "Activity Source was rejected" });
-            }
+            requireSourceNotRejected(result.source);
             if (!hasCurrentBinding(result.source, result.identity)) {
               throw new ORPCError("FORBIDDEN", {
                 message: "Bind the Activity Source signing identity before creating an API key",
@@ -602,11 +593,7 @@ export const ActivityCredentialsLive = (
             if (!result || result.apiKey.revokedAt || result.apiKey.permission !== "event:write") {
               throw new ORPCError("UNAUTHORIZED", { message: "Invalid Source API Key" });
             }
-            if (result.source.approvalStatus === "rejected") {
-              throw new ORPCError("FORBIDDEN", {
-                message: "Activity Source was rejected",
-              });
-            }
+            requireSourceNotRejected(result.source);
             if (!hasCurrentBinding(result.source, result.identity)) {
               throw new ORPCError("FORBIDDEN", {
                 message: "Activity Source signing identity is not bound",
@@ -642,11 +629,7 @@ export const ActivityCredentialsLive = (
               )
               .where(eq(sourcesTable.sourceId, sourceId))
               .limit(1);
-            if (!result || result.source.approvalStatus === "rejected") {
-              throw new ORPCError("FORBIDDEN", {
-                message: "Activity Source is not available for ingestion",
-              });
-            }
+            requireAvailableSource(result, "ingestion");
             if (!hasCurrentBinding(result.source, result.identity)) {
               throw new ORPCError("FORBIDDEN", {
                 message: "Activity Source signing identity is not bound",
@@ -689,9 +672,7 @@ export const ActivityCredentialsLive = (
                   message: "Active Activity Source signing identity not found",
                 });
               }
-              if (result.source.approvalStatus === "rejected") {
-                throw new ORPCError("FORBIDDEN", { message: "Activity Source was rejected" });
-              }
+              requireSourceNotRejected(result.source);
 
               await tx
                 .update(identitiesTable)
@@ -749,11 +730,7 @@ export const ActivityCredentialsLive = (
               )
               .where(eq(sourcesTable.sourceId, credential.sourceId))
               .limit(1);
-            if (!result || result.source.approvalStatus === "rejected") {
-              throw new ORPCError("FORBIDDEN", {
-                message: "Activity Source is not available for signing",
-              });
-            }
+            requireAvailableSource(result, "signing");
             if (!hasCurrentBinding(result.source, result.identity)) {
               throw new ORPCError("FORBIDDEN", {
                 message: "Activity Source signing identity is not bound",

@@ -88,7 +88,7 @@ function validateAccountId(accountId: string): void {
   if (!NEAR_ACCOUNT_ID_REGEX.test(accountId)) {
     throw new ORPCError("BAD_REQUEST", {
       message: "Invalid accountId format",
-      data: { hint: "Must be a valid NEAR account ID" },
+      data: { hint: "Must be a valid NEAR account ID", field: "nearAccountId" },
     });
   }
 }
@@ -102,13 +102,13 @@ function requestOrigin(headers: Headers | undefined): string {
   return `${protocol}://${host}`;
 }
 
-function requestClientKey(headers: Headers | undefined): string {
+function requestClientKey(headers: Headers | undefined): string | null {
   const forwarded = headers
     ?.get("x-forwarded-for")
     ?.split(",")
     .map((address) => address.trim())
     .filter(Boolean);
-  return forwarded?.at(-1) || headers?.get("x-real-ip") || "unknown";
+  return forwarded?.at(-1) || headers?.get("x-real-ip") || null;
 }
 
 function mainnetNearAccountIds(
@@ -128,6 +128,7 @@ async function requireProjectOwnerAccount(
   const ownerAccountIds = await projects.getOwnerAccountIds(projectId);
   if (!ownerAccountIds.includes(nearAccountId)) {
     throw new ORPCError("FORBIDDEN", {
+      data: { field: "nearAccountId" },
       message:
         ownerAccountIds.length > 0
           ? `Only the project owner's NEAR account (${ownerAccountIds.join(" or ")}) can register this nearbuilders.org project`
@@ -136,6 +137,7 @@ async function requireProjectOwnerAccount(
   }
   if (!linkedAccountIds.includes(nearAccountId)) {
     throw new ORPCError("FORBIDDEN", {
+      data: { field: "nearAccountId" },
       message: `Sign in with ${nearAccountId} to register this nearbuilders.org project`,
     });
   }

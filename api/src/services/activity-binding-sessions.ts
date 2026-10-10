@@ -94,17 +94,19 @@ export class ActivityBindingSessionsService {
     this.#globalLimit = options.globalLimit ?? BINDING_SESSION_GLOBAL_LIMIT;
   }
 
-  async #enforceRateLimit(requesterKeyHash: string) {
+  async #enforceRateLimit(requesterKeyHash: string | null) {
     const since = new Date(this.#now().getTime() - BINDING_SESSION_RATE_WINDOW_MS);
-    const [requester] = await this.#db
-      .select({ total: count() })
-      .from(sessionsTable)
-      .where(
-        and(
-          eq(sessionsTable.requesterKeyHash, requesterKeyHash),
-          gte(sessionsTable.createdAt, since),
-        ),
-      );
+    const [requester] = requesterKeyHash
+      ? await this.#db
+          .select({ total: count() })
+          .from(sessionsTable)
+          .where(
+            and(
+              eq(sessionsTable.requesterKeyHash, requesterKeyHash),
+              gte(sessionsTable.createdAt, since),
+            ),
+          )
+      : [];
     if ((requester?.total ?? 0) >= this.#requesterLimit) {
       throw new ORPCError("TOO_MANY_REQUESTS", {
         message: "Too many binding sessions started. Try again in a few minutes.",
@@ -137,7 +139,7 @@ export class ActivityBindingSessionsService {
   async create(
     input: ActivityBindingDraft,
     origin: string,
-    requesterKey: string,
+    requesterKey: string | null,
   ): Promise<{
     sessionId: string;
     url: string;
@@ -146,7 +148,7 @@ export class ActivityBindingSessionsService {
     expiresAt: string;
     draft: ActivityBindingDraft;
   }> {
-    const requesterKeyHash = hashToken(requesterKey);
+    const requesterKeyHash = requesterKey ? hashToken(requesterKey) : null;
     await this.#enforceRateLimit(requesterKeyHash);
     const draft = await this.prefill(input);
     const sessionToken = `abs_${randomBytes(32).toString("base64url")}`;

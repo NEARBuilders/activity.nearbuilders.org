@@ -13,6 +13,23 @@ export const NEAR_ACCOUNT_ID_REGEX =
 export const ACTIVITY_SOURCE_ID_REGEX = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
 export const MAX_ACTIVITY_SOURCES_PER_NEAR_ACCOUNT = 10;
 
+export const ActivitySourceFieldSchema = z.enum(["sourceId", "nearAccountId", "project"]);
+
+const SOURCE_FIELD_ERRORS = {
+  BAD_REQUEST: {
+    ...BAD_REQUEST,
+    data: BAD_REQUEST.data.extend({ field: ActivitySourceFieldSchema.optional() }),
+  },
+  FORBIDDEN: {
+    ...FORBIDDEN,
+    data: FORBIDDEN.data.extend({ field: ActivitySourceFieldSchema.optional() }),
+  },
+  CONFLICT: {
+    status: 409,
+    data: z.object({ field: ActivitySourceFieldSchema.optional() }),
+  },
+};
+
 export const ACTIVITY_EVENT_TYPE_NAME_REGEX = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
 export const GITHUB_OWNER_REGEX = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
 export const GITHUB_REPOSITORY_REGEX = /^[A-Za-z0-9._-]+$/;
@@ -549,7 +566,7 @@ export const contract = oc.router({
       }),
     )
     .output(ActivitySourceSchema)
-    .errors({ UNAUTHORIZED, FORBIDDEN, BAD_REQUEST, CONFLICT: { status: 409 } }),
+    .errors({ UNAUTHORIZED, ...SOURCE_FIELD_ERRORS }),
 
   listActivitySources: oc
     .route({ method: "GET", path: "/activity/sources" })
@@ -567,7 +584,7 @@ export const contract = oc.router({
       }),
     )
     .output(ActivitySourceSchema)
-    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST, CONFLICT: { status: 409 } }),
+    .errors({ UNAUTHORIZED, NOT_FOUND, ...SOURCE_FIELD_ERRORS }),
 
   listActivitySourcesForReview: oc
     .route({ method: "GET", path: "/activity/source-reviews" })
