@@ -73,6 +73,8 @@ export const Route = createFileRoute("/_layout/_authenticated")({
 });
 
 function AuthenticatedLayout() {
+  const { auth } = Route.useRouteContext();
+  if (!auth) return null;
   return (
     <div className="h-full flex flex-col">
       <Outlet />

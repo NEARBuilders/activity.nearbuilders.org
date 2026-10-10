@@ -211,6 +211,52 @@ function toOrpcError(error: unknown): ORPCError<string, unknown> {
     : new ORPCError("INTERNAL_SERVER_ERROR", { message: "Activity credential operation failed" });
 }
 
+export function activitySourceBindingKey(sourceId: string): string {
+  return `activity/${sourceId}`;
+}
+
+function legacyNostrBindingKey(nearAccountId: string): string {
+  return `nostr/${nearAccountId}`;
+}
+
+type OnChainBinding = { npub?: unknown; bound_at?: unknown; sourceId?: unknown };
+
+async function readOnChainBinding(
+  config: { kvApiUrl: string; contractId: string },
+  nearAccountId: string,
+  key: string,
+): Promise<OnChainBinding | null> {
+  const keyPath = key.split("/").map(encodeURIComponent).join("/");
+  const url = `${config.kvApiUrl.replace(/\/$/, "")}/v0/latest/${encodeURIComponent(config.contractId)}/${encodeURIComponent(nearAccountId)}/${keyPath}`;
+  let response: Response;
+  try {
+    response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
+  } catch {
+    return null;
+  }
+  if (!response.ok) return null;
+  const data = (await response.json().catch(() => null)) as {
+    entries?: Array<{ value?: unknown }>;
+  } | null;
+  const raw = data?.entries?.[0]?.value;
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(raw) as OnChainBinding;
+    } catch {
+      return null;
+    }
+  }
+  return raw && typeof raw === "object" ? (raw as OnChainBinding) : null;
+}
+
+function bindingMatches(
+  binding: OnChainBinding | null,
+  result: { source: { sourceId: string }; identity: { publicKey: string } },
+): binding is OnChainBinding {
+  if (!binding || binding.npub !== result.identity.publicKey) return false;
+  return binding.sourceId === undefined || binding.sourceId === result.source.sourceId;
+}
+
 export const ActivityCredentialsLive = (
   masterKeys: ActivityMasterKeys,
   bindingConfig: ActivityBindingConfig,
@@ -307,7 +353,7 @@ export const ActivityCredentialsLive = (
               linkedNearAccountIds,
             );
             const now = Math.floor(Date.now() / 1_000);
-            const challenge = `bind:${nearAccountId}:${now + 300}:near-nostr-bindings`;
+            const challenge = `bind:${nearAccountId}:${sourceId}:${now + 300}:activity-source`;
             const privateKey = decryptActivitySecret(
               {
                 ciphertext: result.identity.encryptedPrivateKey,
@@ -333,9 +379,11 @@ export const ActivityCredentialsLive = (
                 eventId: event.id,
                 verifiedBy: nearAccountId,
                 verifiedAt: now,
+                sourceId,
               });
-              const key = `nostr/${nearAccountId}`;
+              const key = activitySourceBindingKey(sourceId);
               const value = JSON.stringify({
+                sourceId,
                 npub: event.pubkey,
                 relay: bindingConfig.relay,
                 proof,
@@ -399,30 +447,24 @@ export const ActivityCredentialsLive = (
               result.source.nearAccountId,
               linkedNearAccountIds,
             );
-            const accountPath = encodeURIComponent(nearAccountId);
-            const bindingUrl = `${bindingConfig.kvApiUrl.replace(/\/$/, "")}/v0/latest/${encodeURIComponent(bindingConfig.contractId)}/${accountPath}/nostr/${accountPath}`;
-            let response: Response;
-            try {
-              response = await fetch(bindingUrl, { signal: AbortSignal.timeout(5_000) });
-            } catch {
+            const sourceBinding = await readOnChainBinding(
+              bindingConfig,
+              nearAccountId,
+              activitySourceBindingKey(result.source.sourceId),
+            );
+            const binding = bindingMatches(sourceBinding, result)
+              ? sourceBinding
+              : await readOnChainBinding(
+                  bindingConfig,
+                  nearAccountId,
+                  legacyNostrBindingKey(nearAccountId),
+                );
+            if (!binding || !bindingMatches(binding, result)) {
               throw new ORPCError("BAD_REQUEST", {
-                message: "The NEAR-to-Nostr binding is not available yet",
-              });
-            }
-            if (!response.ok) {
-              throw new ORPCError("BAD_REQUEST", {
-                message: "The NEAR-to-Nostr binding is not available yet",
-              });
-            }
-            const data = (await response.json()) as { entries?: Array<{ value?: unknown }> };
-            const rawBinding = data.entries?.[0]?.value;
-            const binding =
-              typeof rawBinding === "string"
-                ? (JSON.parse(rawBinding) as { npub?: unknown; bound_at?: unknown })
-                : (rawBinding as { npub?: unknown; bound_at?: unknown } | undefined);
-            if (!binding || binding.npub !== result.identity.publicKey) {
-              throw new ORPCError("BAD_REQUEST", {
-                message: "The NEAR-to-Nostr binding does not match this signing identity",
+                message:
+                  sourceBinding === null && binding === null
+                    ? "The NEAR-to-Nostr binding is not available yet"
+                    : "The NEAR-to-Nostr binding does not match this signing identity",
               });
             }
 

@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it, vi } from "vitest";
 import {
   adminContext,
   getPluginClient,
@@ -32,7 +32,7 @@ describe("Activity sources", () => {
     ).rejects.toThrow("NEAR authentication required");
   });
 
-  it("names the field that conflicts with an existing source", async () => {
+  it("names the conflicting Source ID and lets one NEAR account own several sources", async () => {
     const client = await getPluginClient(orgOwnerContext("conflict-owner", "org-conflict"));
     const eventTypes = [
       { name: "conflict.action", description: "A conflict test", enabled: true, pointValue: 1 },
@@ -55,11 +55,43 @@ describe("Activity sources", () => {
     await expect(
       client.createActivitySource({
         sourceId: "conflict-source-two",
-        displayName: "Duplicate account",
+        displayName: "Second source on the same account",
         nearAccountId: "conflict-source.near",
         eventTypes,
       }),
-    ).rejects.toThrow("The NEAR account conflict-source.near already owns an Activity Source");
+    ).resolves.toMatchObject({ sourceId: "conflict-source-two" });
+  });
+
+  it("caps how many sources one NEAR account can own", async () => {
+    const client = await getPluginClient(orgOwnerContext("cap-owner", "org-cap"));
+    const eventTypes = [{ name: "cap.action", description: "", enabled: true, pointValue: 1 }];
+    for (let index = 0; index < 10; index += 1) {
+      await client.createActivitySource({
+        sourceId: `cap-source-${index}`,
+        displayName: `Cap Source ${index}`,
+        nearAccountId: "cap-owner.near",
+        eventTypes,
+      });
+    }
+
+    await expect(
+      client.createActivitySource({
+        sourceId: "cap-source-10",
+        displayName: "One too many",
+        nearAccountId: "cap-owner.near",
+        eventTypes,
+      }),
+    ).rejects.toThrow(
+      "The NEAR account cap-owner.near already owns the maximum of 10 Activity Sources",
+    );
+    await expect(
+      client.createActivitySource({
+        sourceId: "cap-source-other-account",
+        displayName: "Different account",
+        nearAccountId: "cap-other.near",
+        eventTypes,
+      }),
+    ).resolves.toMatchObject({ sourceId: "cap-source-other-account" });
   });
 
   it("lets an organization owner register and retrieve a pending source", async () => {
@@ -364,31 +396,130 @@ describe("Activity sources", () => {
   });
 
   it("links a source to one nearbuilders.org project at most", async () => {
-    const first = await getPluginClient(
-      orgOwnerContext("project-link-owner", "org-project-link", "project-link.near"),
-    );
-    const linked = await first.createActivitySource({
-      sourceId: "project-link-source",
-      displayName: "Project Link Source",
-      nearAccountId: "project-link.near",
-      nearbuildersProjectId: "proj_linked_example",
-      eventTypes: [{ name: "linked.event", enabled: true, pointValue: 1 }],
+    const projects = mockNearbuildersProjects({
+      proj_linked_example: { ownerId: "project-link.near", apps: ["project-copy.near"] },
     });
-    expect(linked.nearbuildersProjectId).toBe("proj_linked_example");
-
-    const second = await getPluginClient(
-      orgOwnerContext("project-copy-owner", "org-project-copy", "project-copy.near"),
-    );
-    await expect(
-      second.createActivitySource({
-        sourceId: "project-copy-source",
-        displayName: "Project Copy Source",
-        nearAccountId: "project-copy.near",
+    try {
+      const first = await getPluginClient(
+        orgOwnerContext("project-link-owner", "org-project-link", "project-link.near"),
+      );
+      const linked = await first.createActivitySource({
+        sourceId: "project-link-source",
+        displayName: "Project Link Source",
+        nearAccountId: "project-link.near",
         nearbuildersProjectId: "proj_linked_example",
-        eventTypes: [{ name: "copy.event", enabled: true, pointValue: 1 }],
-      }),
-    ).rejects.toThrow(
-      "This nearbuilders.org project already has an Activity Source: project-link-source",
-    );
+        eventTypes: [{ name: "linked.event", enabled: true, pointValue: 1 }],
+      });
+      expect(linked.nearbuildersProjectId).toBe("proj_linked_example");
+
+      const second = await getPluginClient(
+        orgOwnerContext("project-copy-owner", "org-project-copy", "project-copy.near"),
+      );
+      await expect(
+        second.createActivitySource({
+          sourceId: "project-copy-source",
+          displayName: "Project Copy Source",
+          nearAccountId: "project-copy.near",
+          nearbuildersProjectId: "proj_linked_example",
+          eventTypes: [{ name: "copy.event", enabled: true, pointValue: 1 }],
+        }),
+      ).rejects.toThrow(
+        "This nearbuilders.org project already has an Activity Source: project-link-source",
+      );
+    } finally {
+      projects.mockRestore();
+    }
+  });
+
+  it("refuses to let anyone but the project owner claim a nearbuilders.org project", async () => {
+    const projects = mockNearbuildersProjects({
+      proj_owned: { ownerId: "real-owner.near", apps: [] },
+    });
+    try {
+      const squatter = await getPluginClient(
+        orgOwnerContext("squatter", "org-squatter", "squatter.near"),
+      );
+      await expect(
+        squatter.createActivitySource({
+          sourceId: "squatted-source",
+          displayName: "Squatted",
+          nearAccountId: "squatter.near",
+          nearbuildersProjectId: "proj_owned",
+          eventTypes: [{ name: "squat.event", enabled: true, pointValue: 1 }],
+        }),
+      ).rejects.toThrow(
+        "Only the project owner's NEAR account (real-owner.near) can register this nearbuilders.org project",
+      );
+      await expect(
+        squatter.createActivitySource({
+          sourceId: "squatted-source-two",
+          displayName: "Squatted with the owner's name",
+          nearAccountId: "real-owner.near",
+          nearbuildersProjectId: "proj_owned",
+          eventTypes: [{ name: "squat.event", enabled: true, pointValue: 1 }],
+        }),
+      ).rejects.toThrow("Sign in with real-owner.near to register this nearbuilders.org project");
+      await expect(
+        squatter.createActivitySource({
+          sourceId: "missing-project-source",
+          displayName: "Missing",
+          nearAccountId: "squatter.near",
+          nearbuildersProjectId: "proj_missing",
+          eventTypes: [{ name: "squat.event", enabled: true, pointValue: 1 }],
+        }),
+      ).rejects.toThrow('No nearbuilders.org project matches "proj_missing"');
+
+      const owner = await getPluginClient(
+        orgOwnerContext("real-owner", "org-real-owner", "real-owner.near"),
+      );
+      await expect(
+        owner.createActivitySource({
+          sourceId: "real-owner-source",
+          displayName: "Real Owner",
+          nearAccountId: "real-owner.near",
+          nearbuildersProjectId: "proj_owned",
+          eventTypes: [{ name: "owner.event", enabled: true, pointValue: 1 }],
+        }),
+      ).resolves.toMatchObject({ nearbuildersProjectId: "proj_owned" });
+      await expect(
+        owner.updateActivitySource({
+          sourceId: "real-owner-source",
+          nearAccountId: "squatter.near",
+        }),
+      ).rejects.toThrow(
+        "Only the project owner's NEAR account (real-owner.near) can register this nearbuilders.org project",
+      );
+    } finally {
+      projects.mockRestore();
+    }
   });
 });
+
+function mockNearbuildersProjects(
+  projects: Record<string, { ownerId: string | null; apps: string[] }>,
+) {
+  const originalFetch = globalThis.fetch;
+  return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    const match = url.match(/^https:\/\/nearbuilders\.org\/api\/v1\/projects\/([^/?]+)$/);
+    if (match) {
+      const id = decodeURIComponent(match[1] ?? "");
+      const project = projects[id];
+      if (!project) return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+      return new Response(
+        JSON.stringify({
+          data: {
+            id,
+            slug: id,
+            title: id,
+            domain: null,
+            ownerId: project.ownerId,
+            apps: project.apps.map((accountId) => ({ accountId })),
+          },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }
+    return originalFetch(input, init);
+  });
+}

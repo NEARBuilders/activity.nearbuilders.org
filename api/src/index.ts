@@ -116,6 +116,28 @@ function mainnetNearAccountIds(
     .map(({ accountId }) => accountId);
 }
 
+async function requireProjectOwnerAccount(
+  projects: { getOwnerAccountIds(projectId: string): Promise<string[]> },
+  projectId: string,
+  nearAccountId: string,
+  linkedAccountIds: string[],
+): Promise<void> {
+  const ownerAccountIds = await projects.getOwnerAccountIds(projectId);
+  if (!ownerAccountIds.includes(nearAccountId)) {
+    throw new ORPCError("FORBIDDEN", {
+      message:
+        ownerAccountIds.length > 0
+          ? `Only the project owner's NEAR account (${ownerAccountIds.join(" or ")}) can register this nearbuilders.org project`
+          : "This nearbuilders.org project has no NEAR account owner to register it",
+    });
+  }
+  if (!linkedAccountIds.includes(nearAccountId)) {
+    throw new ORPCError("FORBIDDEN", {
+      message: `Sign in with ${nearAccountId} to register this nearbuilders.org project`,
+    });
+  }
+}
+
 export default createPlugin.withPlugins<PluginsClient>()({
   variables: z.object({
     activityNostrBindingContract: z.string().default("contextual.near"),
@@ -471,6 +493,14 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .use(requireNearAuthentication)
         .handler(async ({ input, context }) => {
           validateAccountId(input.nearAccountId);
+          if (input.nearbuildersProjectId) {
+            await requireProjectOwnerAccount(
+              services.nearbuildersProjects,
+              input.nearbuildersProjectId,
+              input.nearAccountId,
+              mainnetNearAccountIds(context.near.linkedAccounts),
+            );
+          }
           return await services.activitySources.createSource({
             ...input,
             organizationId: context.organization.activeOrganizationId,
@@ -497,7 +527,22 @@ export default createPlugin.withPlugins<PluginsClient>()({
               message: "At least one source field must be updated",
             });
           }
-          if (input.nearAccountId !== undefined) validateAccountId(input.nearAccountId);
+          if (input.nearAccountId !== undefined) {
+            validateAccountId(input.nearAccountId);
+            const existing = (
+              await services.activitySources.listSourcesByOrganization(
+                context.organization.activeOrganizationId,
+              )
+            ).find(({ sourceId }) => sourceId === input.sourceId);
+            if (existing?.nearbuildersProjectId && existing.nearAccountId !== input.nearAccountId) {
+              await requireProjectOwnerAccount(
+                services.nearbuildersProjects,
+                existing.nearbuildersProjectId,
+                input.nearAccountId,
+                mainnetNearAccountIds(context.near?.linkedAccounts ?? []),
+              );
+            }
+          }
           return await services.activitySources.updateSource(
             context.organization.activeOrganizationId,
             input.sourceId,
@@ -680,6 +725,10 @@ export default createPlugin.withPlugins<PluginsClient>()({
           return services.activityBindingSessions.claim(input.sessionId, pollToken);
         },
       ),
+
+      searchNearbuildersProjects: builder.searchNearbuildersProjects
+        .use(requireAuth)
+        .handler(async ({ input }) => services.nearbuildersProjects.search(input.query)),
 
       lookupNearbuildersProject: builder.lookupNearbuildersProject
         .use(requireAuth)

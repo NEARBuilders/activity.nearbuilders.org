@@ -39,7 +39,8 @@ You will need:
 
 - A **mainnet NEAR account** for the source. One on-chain transaction from this exact account links
   it to the source's signing key. It attaches no deposit and costs about **0.0001 NEAR** in gas, so
-  any account holding **0.01 NEAR** has plenty. Each NEAR account can own only one source.
+  any account holding **0.01 NEAR** has plenty. One NEAR account can own up to 10 sources, each
+  linked separately.
 - An **organization** in Activity that you own.
 
 Budget for this realistically. Sending your first event once you hold an API key takes a couple of
@@ -160,7 +161,7 @@ details; the Source ID stays fixed.
      `github.nearbuilders.org`. It cannot be changed later.
    - **Display name** — shown on feed cards.
    - **NEAR account** — the exact mainnet account that will sign the on-chain link in step 5. It
-     defaults to the account you signed in with, and each account can own only one source.
+     defaults to the account you signed in with. One account can own up to 10 sources.
    - **Event Types** — at least one, lowercase, such as `feedback.submitted`. Each carries a point
      value used for scoring, an optional description, and can be enabled or disabled. Add every
      type you expect to publish; submitting a type that is missing or disabled returns `400`.

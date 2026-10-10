@@ -14,8 +14,21 @@ export interface NearbuildersProject {
   title: string;
   ownerId: string | null;
   domain: string | null;
+  logoUrl?: string | null;
   apps?: Array<{ accountId: string | null }>;
 }
+
+export interface NearbuildersProjectSummary {
+  id: string;
+  slug: string;
+  title: string;
+  url: string;
+  domain: string | null;
+  logoUrl: string | null;
+  ownerId: string | null;
+}
+
+export const NEARBUILDERS_PROJECT_SEARCH_LIMIT = 8;
 
 export type NearbuildersProjectReference =
   | { kind: "slug"; slug: string; fromLink?: boolean }
@@ -122,6 +135,38 @@ export class NearbuildersProjectsClient {
       return deriveNearbuildersProjectDraft(await this.#search(reference.slug, input));
     }
     return deriveNearbuildersProjectDraft(await this.#search(reference.name, input));
+  }
+
+  async getOwnerAccountIds(projectId: string): Promise<string[]> {
+    const project = await this.#getProject(
+      `/v1/projects/${encodeURIComponent(projectId)}`,
+      projectId,
+    );
+    return [
+      ...new Set(
+        [...(project.apps ?? []).map(({ accountId }) => accountId), project.ownerId].filter(
+          (accountId): accountId is string =>
+            typeof accountId === "string" && NEAR_ACCOUNT_ID_REGEX.test(accountId),
+        ),
+      ),
+    ];
+  }
+
+  async search(query: string): Promise<NearbuildersProjectSummary[]> {
+    const trimmed = query.trim().slice(0, 200);
+    if (trimmed.length < 2) return [];
+    const matches = await this.#request<NearbuildersProject[]>(
+      `/v1/projects?query=${encodeURIComponent(trimmed)}&kind=project&limit=${NEARBUILDERS_PROJECT_SEARCH_LIMIT}`,
+    );
+    return matches.slice(0, NEARBUILDERS_PROJECT_SEARCH_LIMIT).map((project) => ({
+      id: project.id,
+      slug: project.slug,
+      title: project.title,
+      url: `${NEARBUILDERS_SITE_URL}/projects/${project.slug}`,
+      domain: project.domain,
+      logoUrl: project.logoUrl ?? null,
+      ownerId: project.ownerId,
+    }));
   }
 
   async #search(query: string, input: string): Promise<NearbuildersProject> {

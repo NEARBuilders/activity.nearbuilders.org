@@ -11,6 +11,8 @@ import { z } from "every-plugin/zod";
 export const NEAR_ACCOUNT_ID_REGEX =
   /^(?=.{2,64}$)([a-z0-9]+(?:[-_][a-z0-9]+)*)(\.([a-z0-9]+(?:[-_][a-z0-9]+)*))*$/;
 export const ACTIVITY_SOURCE_ID_REGEX = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
+export const MAX_ACTIVITY_SOURCES_PER_NEAR_ACCOUNT = 10;
+
 export const ACTIVITY_EVENT_TYPE_NAME_REGEX = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
 export const GITHUB_OWNER_REGEX = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/;
 export const GITHUB_REPOSITORY_REGEX = /^[A-Za-z0-9._-]+$/;
@@ -387,6 +389,16 @@ export const NearbuildersProjectDraftSchema = z.object({
   nearAccountId: z.string().optional(),
 });
 
+export const NearbuildersProjectSummarySchema = z.object({
+  id: z.string(),
+  slug: z.string(),
+  title: z.string(),
+  url: z.string(),
+  domain: z.string().nullable(),
+  logoUrl: z.string().nullable(),
+  ownerId: z.string().nullable(),
+});
+
 export const ActivityBindingDraftSchema = z.object({
   project: z
     .object({
@@ -709,6 +721,12 @@ export const contract = oc.router({
       }),
     )
     .errors({ BAD_REQUEST, NOT_FOUND, SERVICE_UNAVAILABLE, TOO_MANY_REQUESTS: { status: 429 } }),
+
+  searchNearbuildersProjects: oc
+    .route({ method: "GET", path: "/activity/projects/search" })
+    .input(z.object({ query: z.string().trim().min(2).max(200) }))
+    .output(z.array(NearbuildersProjectSummarySchema))
+    .errors({ UNAUTHORIZED, BAD_REQUEST, SERVICE_UNAVAILABLE }),
 
   lookupNearbuildersProject: oc
     .route({ method: "POST", path: "/activity/projects/lookup" })

@@ -55,6 +55,7 @@ export const Route = createFileRoute("/_layout/_authenticated/activity-sources")
     meta: [{ title: "Activity Sources | NEAR Builders" }],
   }),
   loader: async ({ context }) => {
+    if (!context.auth) return;
     if (context.auth.activeOrganizationId) {
       await context.queryClient.ensureQueryData({
         queryKey: [
@@ -242,6 +243,8 @@ function ActivitySourcesPage() {
       embedded
       defaultNearAccountId={defaultNearAccountId}
       onImportProject={(reference) => apiClient.lookupNearbuildersProject({ reference })}
+      onSearchProjects={(query) => apiClient.searchNearbuildersProjects({ query })}
+      ownedAccountIds={linkedNearAccountIds}
       isSubmitting={createSource.isPending}
       onCreate={async (input) => {
         await createSource.mutateAsync(input);

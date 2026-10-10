@@ -1,6 +1,8 @@
-import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull } from "drizzle-orm";
 import { Context, Effect, Layer } from "every-plugin/effect";
 import { ORPCError } from "every-plugin/orpc";
+import { MAX_ACTIVITY_SOURCES_PER_NEAR_ACCOUNT } from "../contract";
+import type { Database } from "../db";
 import { DatabaseTag } from "../db/layer";
 import {
   type activitySourceApprovalStatus,
@@ -161,6 +163,21 @@ function toOrpcError(error: unknown): ORPCError<string, unknown> {
       });
 }
 
+async function requireSourceCapacity(
+  tx: Pick<Database, "select">,
+  nearAccountId: string,
+): Promise<void> {
+  const [row] = await tx
+    .select({ total: count() })
+    .from(sourcesTable)
+    .where(eq(sourcesTable.nearAccountId, nearAccountId));
+  if ((row?.total ?? 0) >= MAX_ACTIVITY_SOURCES_PER_NEAR_ACCOUNT) {
+    throw new ORPCError("CONFLICT", {
+      message: `The NEAR account ${nearAccountId} already owns the maximum of ${MAX_ACTIVITY_SOURCES_PER_NEAR_ACCOUNT} Activity Sources. Use another NEAR account for this one.`,
+    });
+  }
+}
+
 export const ActivitySourcesLive = Layer.effect(
   ActivitySourcesTag,
   Effect.gen(function* () {
@@ -197,6 +214,7 @@ export const ActivitySourcesLive = Layer.effect(
       createSource: async (input) => {
         try {
           const source = await db.transaction(async (tx) => {
+            await requireSourceCapacity(tx, input.nearAccountId);
             const [created] = await tx
               .insert(sourcesTable)
               .values({
@@ -226,7 +244,7 @@ export const ActivitySourcesLive = Layer.effect(
                   ? `The Source ID ${input.sourceId} is already taken`
                   : projectSource
                     ? `This nearbuilders.org project already has an Activity Source: ${projectSource.sourceId}`
-                    : `The NEAR account ${input.nearAccountId} already owns an Activity Source`,
+                    : "This Activity Source conflicts with an existing one",
               });
             }
             await tx.insert(eventTypesTable).values(
@@ -308,6 +326,9 @@ export const ActivitySourcesLive = Layer.effect(
             }
             const nearAccountChanged =
               input.nearAccountId !== undefined && input.nearAccountId !== existing.nearAccountId;
+            if (nearAccountChanged && input.nearAccountId) {
+              await requireSourceCapacity(tx, input.nearAccountId);
+            }
 
             const [updated] = await tx
               .update(sourcesTable)

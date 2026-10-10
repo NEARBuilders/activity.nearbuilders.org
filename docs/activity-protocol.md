@@ -226,12 +226,22 @@ Signing Identity history records who created and retired each key, when it was a
 rotation reason. This history is used to validate old events without accepting events signed outside
 a key's active window.
 
-A Binding Proof follows the shared `near-nostr` convention. The gateway signs a kind-27235 challenge
-with the custodied identity and prepares a mainnet `contextual.near.__fastdata_kv` write under
-`nostr/<source-account>`. The connected wallet must use the Activity Source's exact mainnet NEAR
-account. The wallet submits the transaction directly; no relayer is required. The gateway marks the
-identity bound only after FastNear mainnet returns the same public key from that account's binding
-path.
+A Binding Proof links one Activity Source to its NEAR account. The gateway signs a kind-27235
+challenge (`bind:<source-account>:<source-id>:<expiry>:activity-source`) with the custodied identity
+and prepares a mainnet `contextual.near.__fastdata_kv` write under `activity/<source-id>`, a slot for
+that source alone. The value records the source ID and the signing public key. The connected wallet
+must use the Activity Source's exact mainnet NEAR account, and only that account can write under its
+own namespace. The wallet submits the transaction directly; no relayer is required. The gateway marks
+the identity bound only after FastNear mainnet returns the same public key, and the same source ID,
+from `activity/<source-id>` under the source's account.
+
+Because each source has its own slot, one NEAR account can own up to 10 Activity Sources, each with
+its own signing key, and binding never touches the account's personal `nostr/<account>` identity
+record. Sources bound before this change used `nostr/<source-account>`; the gateway still accepts that
+record when it holds the source's exact public key, so they do not need to re-bind.
+
+To verify a source independently, read `activity/<source-id>` for the source's NEAR account on
+`contextual.near` and compare its public key with the key that signed the source's events.
 
 Source API keys contain 256 random bits and are persisted only as SHA-256 digests. They belong to
 exactly one Activity Source and always carry the single `event:write` permission. The full secret is
@@ -278,7 +288,7 @@ be completed within 30 minutes and claimed within 24 hours. Starting sessions is
 (300 per 10 minutes).
 
 A source records the nearbuilders.org project it was registered from, and each project can be linked
-to only one source.
+to only one source. A NEAR account can own up to 10 sources.
 
 ## Verification workflow
 

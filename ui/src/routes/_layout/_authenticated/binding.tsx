@@ -245,6 +245,8 @@ function BindingPage() {
               eventTypes: draft.eventTypes,
             }}
             onImportProject={(reference) => apiClient.lookupNearbuildersProject({ reference })}
+            onSearchProjects={(query) => apiClient.searchNearbuildersProjects({ query })}
+            ownedAccountIds={access.linkedNearAccountIds}
             isSubmitting={createSource.isPending}
             onCreate={async (input) => {
               await createSource.mutateAsync(input);

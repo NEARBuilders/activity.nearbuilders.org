@@ -184,3 +184,59 @@ describe("NearbuildersProjectsClient", () => {
     );
   });
 });
+
+describe("NearbuildersProjectsClient.search", () => {
+  it("asks for real projects only and returns linkable summaries", async () => {
+    const requested: string[] = [];
+    const client = new NearbuildersProjectsClient(
+      "https://nearbuilders.org/api/",
+      async (input) => {
+        requested.push(String(input));
+        return respond({
+          data: [{ ...activityProject, logoUrl: "https://example.com/logo.png" }],
+        });
+      },
+    );
+
+    const results = await client.search("  activity ");
+
+    expect(requested).toEqual([
+      "https://nearbuilders.org/api/v1/projects?query=activity&kind=project&limit=8",
+    ]);
+    expect(results).toEqual([
+      {
+        id: "proj_1791152600182_r4z661r",
+        slug: "activity-nearbuilders-org-2erd1k",
+        title: "activity.nearbuilders.org",
+        url: "https://nearbuilders.org/projects/activity-nearbuilders-org-2erd1k",
+        domain: null,
+        logoUrl: "https://example.com/logo.png",
+        ownerId: "nearbuilding.near",
+      },
+    ]);
+  });
+
+  it("skips the request for queries shorter than two characters", async () => {
+    let calls = 0;
+    const client = new NearbuildersProjectsClient("https://nearbuilders.org/api", async () => {
+      calls += 1;
+      return respond({ data: [] });
+    });
+
+    expect(await client.search(" a ")).toEqual([]);
+    expect(calls).toBe(0);
+  });
+
+  it("caps the results even when the site returns more", async () => {
+    const many = Array.from({ length: 12 }, (_, index) => ({
+      ...activityProject,
+      id: `proj_${index}`,
+      slug: `project-${index}`,
+    }));
+    const client = new NearbuildersProjectsClient("https://nearbuilders.org/api", async () =>
+      respond({ data: many }),
+    );
+
+    expect(await client.search("project")).toHaveLength(8);
+  });
+});

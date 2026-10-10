@@ -64,7 +64,7 @@ export const activitySources = pgTable(
     id: uuid("id").defaultRandom().primaryKey(),
     sourceId: text("source_id").notNull().unique(),
     displayName: text("display_name").notNull(),
-    nearAccountId: text("near_account_id").notNull().unique(),
+    nearAccountId: text("near_account_id").notNull(),
     nearbuildersProjectId: text("nearbuilders_project_id").unique(),
     organizationId: text("organization_id").notNull(),
     approvalStatus: activitySourceApprovalStatus("approval_status").default("pending").notNull(),
@@ -79,6 +79,7 @@ export const activitySources = pgTable(
   (table) => ({
     organizationIdIdx: index("activity_sources_organization_id_idx").on(table.organizationId),
     approvalStatusIdx: index("activity_sources_approval_status_idx").on(table.approvalStatus),
+    nearAccountIdIdx: index("activity_sources_near_account_id_idx").on(table.nearAccountId),
   }),
 );
 
