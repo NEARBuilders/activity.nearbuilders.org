@@ -29,7 +29,7 @@ export const Route = createFileRoute("/_layout/_authenticated/binding")({
     sessionToken: typeof search.sessionToken === "string" ? search.sessionToken : "",
   }),
   head: () => ({
-    meta: [{ title: "Connect your agent | NEAR Builders Activity" }],
+    meta: [{ title: "Set up Activity | NEAR Builders Activity" }],
   }),
   component: BindingPage,
 });
@@ -335,8 +335,16 @@ function BindingPage() {
               nearbuildersProjectId: draft.project?.id,
               eventTypes: draft.eventTypes,
             }}
-            onImportProject={(reference) => apiClient.lookupNearbuildersProject({ reference })}
-            onSearchProjects={(query) => apiClient.searchNearbuildersProjects({ query })}
+            onImportProject={
+              isPageDelivery
+                ? undefined
+                : (reference) => apiClient.lookupNearbuildersProject({ reference })
+            }
+            onSearchProjects={
+              isPageDelivery
+                ? undefined
+                : (query) => apiClient.searchNearbuildersProjects({ query })
+            }
             ownedAccountIds={access.linkedNearAccountIds}
             isSubmitting={createSource.isPending}
             onCreate={async (input) => {
