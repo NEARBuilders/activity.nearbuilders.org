@@ -13,6 +13,10 @@ export const NEAR_ACCOUNT_ID_REGEX =
 export const ACTIVITY_SOURCE_ID_REGEX = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
 export const MAX_ACTIVITY_SOURCES_PER_NEAR_ACCOUNT = 10;
 
+export const MAX_ACTIVITY_EVENT_TYPE_POINTS = 100;
+
+export const ACTIVITY_TEST_EVENT_TYPE = "activity.test";
+
 export const ActivitySourceFieldSchema = z.enum(["sourceId", "nearAccountId", "project"]);
 
 const SOURCE_FIELD_ERRORS = {
@@ -386,8 +390,12 @@ export const ActivityHealthSchema = z.object({
 export type ActivityHealthCheck = z.infer<typeof ActivityHealthCheckSchema>;
 export type ActivityHealth = z.infer<typeof ActivityHealthSchema>;
 
+const ActivityEventTypeInputSchema = ActivityEventTypeSchema.extend({
+  pointValue: z.number().int().min(0).max(MAX_ACTIVITY_EVENT_TYPE_POINTS),
+});
+
 const ActivityEventTypesInputSchema = z
-  .array(ActivityEventTypeSchema)
+  .array(ActivityEventTypeInputSchema)
   .min(1)
   .max(50)
   .refine((eventTypes) => new Set(eventTypes.map(({ name }) => name)).size === eventTypes.length, {
@@ -433,7 +441,10 @@ export const ActivityBindingDraftSchema = z.object({
   eventTypes: ActivityEventTypesInputSchema.optional(),
 });
 
+export const ActivityBindingDeliverySchema = z.enum(["agent", "page"]);
+
 export const ActivityBindingSessionSchema = z.object({
+  delivery: ActivityBindingDeliverySchema,
   matchCode: z.string(),
   status: z.enum(["waiting", "ready", "claimed", "expired"]),
   draft: ActivityBindingDraftSchema,
@@ -732,13 +743,21 @@ export const contract = oc.router({
       z.object({
         sessionId: z.string(),
         url: z.string(),
-        pollToken: z.string(),
+        pollToken: z.string().optional(),
+        delivery: ActivityBindingDeliverySchema,
         matchCode: z.string(),
         expiresAt: z.string(),
         draft: ActivityBindingDraftSchema,
       }),
     )
-    .errors({ BAD_REQUEST, NOT_FOUND, SERVICE_UNAVAILABLE, TOO_MANY_REQUESTS: { status: 429 } }),
+    .errors({
+      UNAUTHORIZED,
+      FORBIDDEN,
+      BAD_REQUEST,
+      NOT_FOUND,
+      SERVICE_UNAVAILABLE,
+      TOO_MANY_REQUESTS: { status: 429 },
+    }),
 
   searchNearbuildersProjects: oc
     .route({ method: "GET", path: "/activity/projects/search" })
@@ -782,6 +801,38 @@ export const contract = oc.router({
     .output(ActivityBindingSessionSchema)
     .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST, CONFLICT: { status: 409 } }),
 
+  revealActivityBindingSessionKey: oc
+    .route({ method: "POST", path: "/activity/binding-sessions/reveal" })
+    .input(z.object({ sessionToken: z.string().min(1).max(200) }))
+    .output(z.object({ sourceId: z.string(), secret: z.string(), apiKeyId: z.string() }))
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT: { status: 409 } }),
+
+  getActivitySourceTestStatus: oc
+    .route({ method: "GET", path: "/activity/sources/{sourceId}/test-status" })
+    .input(z.object({ sourceId: z.string().min(2).max(100) }))
+    .output(z.object({ lastTestEventAt: z.string().nullable() }))
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND }),
+
+  getNearbuildersProjectActivity: oc
+    .route({
+      method: "GET",
+      path: "/v1/projects/{projectId}/activity",
+      summary: "Activity status of a nearbuilders.org project",
+      description:
+        "Reports whether a nearbuilders.org project has an Activity Source, and whether it is tracked (has published events), under review, or rejected.",
+      tags: ["Activity"],
+    })
+    .input(z.object({ projectId: z.string().min(1).max(200) }))
+    .output(
+      z.object({
+        status: z.enum(["none", "connected", "tracked", "rejected"]),
+        sourceId: z.string().nullable(),
+        displayName: z.string().nullable(),
+        approvalStatus: z.enum(["pending", "approved", "rejected"]).nullable(),
+        reviewReason: z.string().nullable(),
+      }),
+    ),
+
   submitActivityEvent: oc
     .route({
       method: "POST",
@@ -792,7 +843,9 @@ export const contract = oc.router({
       tags: ["Activity"],
     })
     .input(ActivityEventSubmissionSchema)
-    .output(z.object({ eventId: z.string().regex(/^[a-f0-9]{64}$/) }))
+    .output(
+      z.object({ eventId: z.string().regex(/^[a-f0-9]{64}$/), test: z.literal(true).optional() }),
+    )
     .errors({
       UNAUTHORIZED,
       FORBIDDEN,

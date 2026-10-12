@@ -66,6 +66,7 @@ export const activitySources = pgTable(
     displayName: text("display_name").notNull(),
     nearAccountId: text("near_account_id").notNull(),
     nearbuildersProjectId: text("nearbuilders_project_id").unique(),
+    lastTestEventAt: timestamp("last_test_event_at", { mode: "date", withTimezone: true }),
     organizationId: text("organization_id").notNull(),
     approvalStatus: activitySourceApprovalStatus("approval_status").default("pending").notNull(),
     trustStatus: activitySourceTrustStatus("trust_status").default("standard").notNull(),
@@ -379,6 +380,10 @@ export const activityBindingSessions = pgTable(
     pollTokenHash: text("poll_token_hash").notNull(),
     matchCode: text("match_code").notNull(),
     draftJson: text("draft_json").notNull(),
+    delivery: text("delivery", { enum: ["agent", "page"] })
+      .default("agent")
+      .notNull(),
+    issuerSourceId: text("issuer_source_id"),
     requesterKeyHash: text("requester_key_hash"),
     sourceRecordId: uuid("source_record_id").references(() => activitySources.id, {
       onDelete: "cascade",

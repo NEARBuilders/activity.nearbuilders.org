@@ -78,6 +78,15 @@ export interface ActivitySourcesService {
     organizationId: string,
     sourceId: string,
   ): Promise<{ nearAccountId: string; nearbuildersProjectId: string | null } | null>;
+  getTestStatus(
+    organizationId: string,
+    sourceId: string,
+  ): Promise<{ lastTestEventAt: string | null }>;
+  recordTestEvent(sourceId: string): Promise<void>;
+  getSourceTrust(sourceId: string): Promise<{
+    trustStatus: "standard" | "trusted";
+    approvalStatus: ActivitySourceApprovalStatus;
+  } | null>;
   updateSource(
     organizationId: string,
     sourceId: string,
@@ -286,6 +295,52 @@ export const ActivitySourcesLive = Layer.effect(
           const eventTypes = await eventTypesFor([source.id]);
           const reviews = await reviewsFor([source.id]);
           return toRecord(source, eventTypes, reviews);
+        } catch (error) {
+          throw toOrpcError(error);
+        }
+      },
+
+      getTestStatus: async (organizationId, sourceId) => {
+        try {
+          const [source] = await db
+            .select({ lastTestEventAt: sourcesTable.lastTestEventAt })
+            .from(sourcesTable)
+            .where(
+              and(
+                eq(sourcesTable.sourceId, sourceId),
+                eq(sourcesTable.organizationId, organizationId),
+              ),
+            )
+            .limit(1);
+          if (!source) throw new ORPCError("NOT_FOUND", { message: "Activity Source not found" });
+          return { lastTestEventAt: source.lastTestEventAt?.toISOString() ?? null };
+        } catch (error) {
+          throw toOrpcError(error);
+        }
+      },
+
+      recordTestEvent: async (sourceId) => {
+        try {
+          await db
+            .update(sourcesTable)
+            .set({ lastTestEventAt: new Date() })
+            .where(eq(sourcesTable.sourceId, sourceId));
+        } catch (error) {
+          throw toOrpcError(error);
+        }
+      },
+
+      getSourceTrust: async (sourceId) => {
+        try {
+          const [source] = await db
+            .select({
+              trustStatus: sourcesTable.trustStatus,
+              approvalStatus: sourcesTable.approvalStatus,
+            })
+            .from(sourcesTable)
+            .where(eq(sourcesTable.sourceId, sourceId))
+            .limit(1);
+          return source ?? null;
         } catch (error) {
           throw toOrpcError(error);
         }

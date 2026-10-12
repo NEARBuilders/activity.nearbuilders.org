@@ -288,6 +288,22 @@ be completed within 30 minutes and claimed within 24 hours. Starting sessions is
 (10 per 10 minutes, keyed by a digest of the nearest proxy-reported client address) and globally
 (300 per 10 minutes).
 
+**Partner sessions.** A trusted partner, such as nearbuilders.org, can start a binding session on a
+project owner's behalf by authenticating `POST /api/v1/binding-sessions` with the Source API Key of
+an approved, trusted source. A partner session must name a nearbuilders.org project and returns no
+poll token: its key is shown once, on the `/binding` page, to the signed-in owner who completed
+it (`POST /api/activity/binding-sessions/reveal`). A second reveal is refused.
+
+**Connection tests.** Any source may submit the reserved `activity.test` Event Type without
+registering it. The gateway records when it last received one (`GET
+/api/activity/sources/{sourceId}/test-status`) and does not store, sign, publish, or score it.
+
+**Project status.** `GET /api/v1/projects/{projectId}/activity` reports whether a nearbuilders.org
+project has no source, a connected source with no published events yet, a tracked source, or a
+rejected source with its review reason.
+
+Event Type point values range from 0 to 100.
+
 A source records the nearbuilders.org project it was registered from, and each project can be linked
 to only one source. The gateway looks the project up itself and accepts it only when the source's
 NEAR account is the project's owner or its linked app account, and that account is linked to the

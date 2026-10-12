@@ -8,6 +8,7 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { useApiClient, useAuthClient } from "@/app";
+import { ActivityBindingKeyReveal } from "@/components/activity-binding-key-reveal";
 import { ActivityLinkOnChainAction } from "@/components/activity-setup-actions";
 import { ActivitySourceRegistration } from "@/components/activity-source-registration";
 import { ActivitySourceRegistrationAction } from "@/components/activity-source-registration-action";
@@ -28,7 +29,7 @@ export const Route = createFileRoute("/_layout/_authenticated/binding")({
     sessionToken: typeof search.sessionToken === "string" ? search.sessionToken : "",
   }),
   head: () => ({
-    meta: [{ title: "Connect your agent | NEAR Builders Activity" }],
+    meta: [{ title: "Set up Activity | NEAR Builders Activity" }],
   }),
   component: BindingPage,
 });
@@ -56,6 +57,7 @@ function BindingPage() {
   const { sessionToken } = Route.useSearch();
   const access = useActivitySetupAccess(auth);
   const [registeredSourceId, setRegisteredSourceId] = useState<string | null>(null);
+  const [revealed, setRevealed] = useState<{ secret: string; at: number } | null>(null);
 
   const sessionQuery = useQuery({
     queryKey: bindingSessionQueryKey(sessionToken),
@@ -66,6 +68,13 @@ function BindingPage() {
   const session = sessionQuery.data ?? null;
   const draft = session?.draft ?? {};
   const projectName = draft.project?.title ?? draft.displayName ?? "your project";
+  const isPageDelivery = session?.delivery === "page";
+  const expectedNearAccountId = isPageDelivery ? (draft.nearAccountId ?? null) : null;
+  const signedInWithWrongAccount = Boolean(
+    expectedNearAccountId &&
+      access.linkedNearAccounts !== undefined &&
+      !access.linkedNearAccountIds.includes(expectedNearAccountId),
+  );
 
   const sourcesQuery = useQuery({
     queryKey: ["activity-sources", auth.user?.id, access.activeOrganizationId],
@@ -77,6 +86,47 @@ function BindingPage() {
     (sourcesQuery.data ?? []).find(({ sourceId }) => sourceId === targetSourceId) ?? null;
   const credentials = useActivitySourceCredentials(source, source !== null);
   const isBound = credentials.identity?.bindingStatus === "bound";
+
+  const revealKey = useMutation({
+    mutationFn: () => apiClient.revealActivityBindingSessionKey({ sessionToken }),
+    onSuccess: (result) => setRevealed({ secret: result.secret, at: Date.now() }),
+    onError: async (error: Error) => {
+      toast.error(error.message || "Failed to show the API key");
+      await queryClient.invalidateQueries({ queryKey: bindingSessionQueryKey(sessionToken) });
+    },
+  });
+
+  const testStatusQuery = useQuery({
+    queryKey: ["activity-source-test-status", session?.sourceId],
+    queryFn: () => apiClient.getActivitySourceTestStatus({ sourceId: session?.sourceId ?? "" }),
+    enabled: Boolean(revealed && session?.sourceId),
+    refetchInterval: (query) => {
+      const at = query.state.data?.lastTestEventAt;
+      return revealed && at && Date.parse(at) >= revealed.at - 5_000 ? false : 3_000;
+    },
+  });
+  const lastTestEventAt = testStatusQuery.data?.lastTestEventAt;
+  const connectionWorks = Boolean(
+    revealed && lastTestEventAt && Date.parse(lastTestEventAt) >= revealed.at - 5_000,
+  );
+
+  const switchAccount = useMutation({
+    mutationFn: async () => {
+      const { error } = await authClient.signOut();
+      if (error) throw new Error(error.message || "Failed to sign out");
+      await authClient.near.disconnect().catch(() => {});
+    },
+    onSuccess: async () => {
+      queryClient.setQueryData(["session"], null);
+      await queryClient.invalidateQueries();
+      await router.navigate({
+        to: "/login",
+        search: { redirect: `/binding?sessionToken=${encodeURIComponent(sessionToken)}` },
+        replace: true,
+      });
+    },
+    onError: (error: Error) => toast.error(error.message || "Failed to switch account"),
+  });
 
   const refreshSession = () =>
     queryClient.invalidateQueries({ queryKey: bindingSessionQueryKey(sessionToken) });
@@ -114,7 +164,7 @@ function BindingPage() {
     mutationFn: (sourceId: string) =>
       apiClient.completeActivityBindingSession({ sessionToken, sourceId }),
     onSuccess: async () => {
-      toast.success("Your agent can now collect its API key");
+      toast.success(isPageDelivery ? "Source linked" : "Your agent can now collect its API key");
       await refreshSession();
     },
     onError: (error: Error) => toast.error(error.message || "Failed to finish the binding session"),
@@ -170,6 +220,26 @@ function BindingPage() {
     );
   }
 
+  if ((session.status === "ready" || session.status === "claimed") && isPageDelivery) {
+    const siteUrl = typeof window === "undefined" ? "" : window.location.origin;
+    return (
+      <BindingShell>
+        <ActivityBindingKeyReveal
+          status={revealed ? "ready" : session.status}
+          sourceId={session.sourceId ?? ""}
+          actor={draft.nearAccountId ?? source?.nearAccountId ?? "your-account.near"}
+          eventTypes={source?.eventTypes ?? draft.eventTypes ?? []}
+          apiBaseUrl={`${siteUrl}/api`}
+          siteUrl={siteUrl}
+          secret={revealed?.secret ?? null}
+          isRevealing={revealKey.isPending}
+          connectionWorks={connectionWorks}
+          onReveal={() => revealKey.mutate()}
+        />
+      </BindingShell>
+    );
+  }
+
   if (session.status === "ready" || session.status === "claimed") {
     return (
       <BindingShell>
@@ -196,6 +266,23 @@ function BindingPage() {
   }
 
   const renderStep = () => {
+    if (signedInWithWrongAccount && expectedNearAccountId) {
+      const signedInAs = access.linkedNearAccountIds.join(", ") || "an account without NEAR";
+      return (
+        <StepCard
+          title={`Sign in as ${expectedNearAccountId}`}
+          description={`This project belongs to ${expectedNearAccountId} on nearbuilders.org, so the same NEAR account has to register it here. You are signed in as ${signedInAs}.`}
+        >
+          <Button
+            type="button"
+            onClick={() => switchAccount.mutate()}
+            disabled={switchAccount.isPending}
+          >
+            {switchAccount.isPending ? "Signing out…" : `Switch to ${expectedNearAccountId}`}
+          </Button>
+        </StepCard>
+      );
+    }
     if (access.registrationAccess === null) return <Skeleton className="h-24 w-full" />;
     if (access.registrationAccess === "near-required") {
       return (
@@ -231,7 +318,11 @@ function BindingPage() {
       return (
         <StepCard
           title="Check the details"
-          description="Your agent filled these in. Adjust anything, then register the source."
+          description={
+            isPageDelivery
+              ? "nearbuilders.org filled these in from your project. Adjust anything, then register the source."
+              : "Your agent filled these in. Adjust anything, then register the source."
+          }
         >
           <ActivitySourceRegistration
             access="allowed"
@@ -244,8 +335,16 @@ function BindingPage() {
               nearbuildersProjectId: draft.project?.id,
               eventTypes: draft.eventTypes,
             }}
-            onImportProject={(reference) => apiClient.lookupNearbuildersProject({ reference })}
-            onSearchProjects={(query) => apiClient.searchNearbuildersProjects({ query })}
+            onImportProject={
+              isPageDelivery
+                ? undefined
+                : (reference) => apiClient.lookupNearbuildersProject({ reference })
+            }
+            onSearchProjects={
+              isPageDelivery
+                ? undefined
+                : (query) => apiClient.searchNearbuildersProjects({ query })
+            }
             ownedAccountIds={access.linkedNearAccountIds}
             isSubmitting={createSource.isPending}
             onCreate={async (input) => {
@@ -259,7 +358,11 @@ function BindingPage() {
       return (
         <StepCard
           title="Link your source on-chain"
-          description={`Approve one transaction from ${source.nearAccountId}. It costs well under 0.001 NEAR. Your agent receives its API key as soon as it is confirmed.`}
+          description={`Approve one transaction from ${source.nearAccountId}. It costs well under 0.001 NEAR. ${
+            isPageDelivery
+              ? "Your API key is shown right after it is confirmed."
+              : "Your agent receives its API key as soon as it is confirmed."
+          }`}
         >
           <ActivityLinkOnChainAction
             requiredAccountId={source.nearAccountId}
@@ -277,15 +380,23 @@ function BindingPage() {
     }
     return (
       <StepCard
-        title="Send the API key to your agent"
-        description={`${source.sourceId} is linked on-chain. Finish to let your agent collect its API key.`}
+        title={isPageDelivery ? "Finish setup" : "Send the API key to your agent"}
+        description={
+          isPageDelivery
+            ? `${source.sourceId} is linked on-chain. Finish to get your API key.`
+            : `${source.sourceId} is linked on-chain. Finish to let your agent collect its API key.`
+        }
       >
         <Button
           type="button"
           onClick={() => completeSession.mutate(source.sourceId)}
           disabled={completeSession.isPending}
         >
-          {completeSession.isPending ? "Finishing…" : "Send key to agent"}
+          {completeSession.isPending
+            ? "Finishing…"
+            : isPageDelivery
+              ? "Finish setup"
+              : "Send key to agent"}
         </Button>
       </StepCard>
     );
@@ -294,11 +405,23 @@ function BindingPage() {
   return (
     <BindingShell>
       <div className="space-y-1">
-        <h1 className="text-xl font-semibold text-foreground">Connect {projectName} to Activity</h1>
+        <h1 className="text-xl font-semibold text-foreground">
+          {isPageDelivery
+            ? `Register activity for ${projectName}`
+            : `Connect ${projectName} to Activity`}
+        </h1>
         <p className="text-sm text-muted-foreground">
-          Your coding agent asked to set up Activity for this project. You sign in, confirm the
-          details, and approve one wallet transaction. The agent does the rest.
+          {isPageDelivery
+            ? "Confirm the details and approve one wallet transaction. You get your API key, a command to test it, and a prompt for your coding agent."
+            : "Your coding agent asked to set up Activity for this project. You sign in, confirm the details, and approve one wallet transaction. The agent does the rest."}
         </p>
+        {expectedNearAccountId && (
+          <p className="text-sm text-muted-foreground">
+            Sign in with{" "}
+            <span className="font-mono font-medium text-foreground">{expectedNearAccountId}</span>,
+            the NEAR account you use on nearbuilders.org.
+          </p>
+        )}
         {draft.project?.url && (
           <p className="text-sm text-muted-foreground">
             Project:{" "}
@@ -314,18 +437,20 @@ function BindingPage() {
           </p>
         )}
       </div>
-      <Card className="flex-row items-center gap-4 p-5" aria-label="Match code">
-        <Robot className="size-8 shrink-0 text-muted-foreground" />
-        <div className="space-y-1">
-          <p className="text-sm text-muted-foreground">
-            Check that this code matches the one your agent showed you. If it does not, close this
-            page.
-          </p>
-          <p className="font-mono text-2xl font-semibold tracking-widest text-foreground">
-            {session.matchCode}
-          </p>
-        </div>
-      </Card>
+      {!isPageDelivery && (
+        <Card className="flex-row items-center gap-4 p-5" aria-label="Match code">
+          <Robot className="size-8 shrink-0 text-muted-foreground" />
+          <div className="space-y-1">
+            <p className="text-sm text-muted-foreground">
+              Check that this code matches the one your agent showed you. If it does not, close this
+              page.
+            </p>
+            <p className="font-mono text-2xl font-semibold tracking-widest text-foreground">
+              {session.matchCode}
+            </p>
+          </div>
+        </Card>
+      )}
       {renderStep()}
     </BindingShell>
   );

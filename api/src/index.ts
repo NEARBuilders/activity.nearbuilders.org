@@ -715,12 +715,51 @@ export default createPlugin.withPlugins<PluginsClient>()({
 
       createActivityBindingSession: builder.createActivityBindingSession.handler(
         async ({ input, context }) => {
+          const partnerKey = context.reqHeaders
+            ?.get("authorization")
+            ?.match(/^Bearer\s+(.+)$/i)?.[1];
+          let issuer: { sourceId: string } | null = null;
+          if (partnerKey) {
+            const credential =
+              await services.activityCredentials.authenticateEventWriteKey(partnerKey);
+            const trust = await services.activitySources.getSourceTrust(credential.sourceId);
+            if (trust?.trustStatus !== "trusted" || trust.approvalStatus !== "approved") {
+              throw new ORPCError("FORBIDDEN", {
+                message:
+                  "Only approved, trusted Activity Sources can start partner binding sessions",
+              });
+            }
+            issuer = { sourceId: credential.sourceId };
+          }
           return services.activityBindingSessions.create(
             input,
             requestOrigin(context.reqHeaders),
             requestClientKey(context.reqHeaders),
+            issuer,
           );
         },
+      ),
+
+      revealActivityBindingSessionKey: builder.revealActivityBindingSessionKey
+        .use(requireOrgRole("owner"))
+        .handler(async ({ input, context }) =>
+          services.activityBindingSessions.reveal({
+            sessionToken: input.sessionToken,
+            organizationId: context.organization.activeOrganizationId,
+          }),
+        ),
+
+      getActivitySourceTestStatus: builder.getActivitySourceTestStatus
+        .use(requireOrgRole("owner", "admin", "member"))
+        .handler(async ({ input, context }) =>
+          services.activitySources.getTestStatus(
+            context.organization.activeOrganizationId,
+            input.sourceId,
+          ),
+        ),
+
+      getNearbuildersProjectActivity: builder.getNearbuildersProjectActivity.handler(
+        async ({ input }) => services.activityBindingSessions.projectActivity(input.projectId),
       ),
 
       claimActivityBindingSession: builder.claimActivityBindingSession.handler(

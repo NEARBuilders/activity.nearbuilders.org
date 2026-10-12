@@ -78,6 +78,24 @@ Once you are publishing, this is what happens to an event:
 Activity never edits or deletes an accepted event. Everything you read back later — the feed, the
 live stream, the leaderboard — is derived from that signed record.
 
+## Register from nearbuilders.org
+
+If your project is on nearbuilders.org, open its page while signed in as the project owner and
+choose **Register Activity**. The button shows on active, approved, public or private projects.
+
+1. Add the events your app will report, each with a name and points (0 to 100).
+2. Choose **Next**. Activity opens with your project's details filled in.
+3. Sign in as the project owner's NEAR account, check the details, and approve one wallet
+   transaction.
+4. Choose **Show my API key**. It is shown **once**: store it as the `ACTIVITY_API_KEY` secret on
+   your server. If you lose it, create a new key on `/activity-sources`.
+5. Run the test command shown on the page. It sends an `activity.test` event, and the page switches
+   to **Connection works**. Test events never appear in the feed and never score.
+6. Copy the agent prompt into your coding agent to write the integration. The prompt never contains
+   your key.
+
+The project page then shows **Activity Tracked** once your app sends its first real event.
+
 ## Set it up with a coding agent
 
 The fastest path is to ask your coding agent: *"Integrate activity.nearbuilders.org in this project,

@@ -17,7 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { formatRelativeTime } from "@/lib/relative-time";
 
-async function copyText(text: string, label: string) {
+export async function copyText(text: string, label: string) {
   try {
     await navigator.clipboard.writeText(text);
     toast.success(`${label} copied`);
