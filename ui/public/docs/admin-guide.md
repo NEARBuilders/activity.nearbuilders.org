@@ -9,6 +9,7 @@ Redis, and backups should read [`activity-infrastructure.md`](https://github.com
 | Visitor | anyone, signed out | Read the public feed and leaderboards |
 | Signed-in user | any NEAR account | Endorse events |
 | Organization owner | the owner of the organization that registered a source | Register and edit that source, create its Signing Identity and API keys, configure GitHub polling, retract its own events |
+| Trusted partner | an approved source marked `trusted`, such as nearbuilders.org | Start setup sessions for nearbuilders.org projects with its Source API Key, so their owners can register a source on `/binding` |
 | Platform Administrator | a user whose account `role` is `admin` | Everything above, plus review sources, set source trust, and hide any event |
 
 A Platform Administrator is a property of the **user account**, not of an organization. The role is
@@ -93,6 +94,12 @@ that will have to sign the on-chain binding, and events are attributed to that s
 The **Source trust controls** section on the same page designates a source `standard` or `trusted`
 and sets its score multiplier. Trust is independent of approval: a pending source can be designated
 in advance, and a trusted source still stays off leaderboards until it is approved.
+
+> **Trust also makes a source a partner.** An approved, `trusted` source can use its Source API Key
+> to start setup sessions on behalf of nearbuilders.org project owners; this is how nearbuilders.org's
+> **Register Activity** button works. The owner still signs in, confirms the details, and signs the
+> on-chain link themselves, and the new source starts under review. Grant `trusted` only to sources
+> whose operators you would let start setup for other people.
 
 | Designation | Multiplier | Meaning |
 | --- | --- | --- |

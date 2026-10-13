@@ -50,6 +50,11 @@ The service is intended to become shared plumbing for reputation, loyalty points
 | `POST` | `/api/v1/events` | Available | Submit an event using a Source API Key. |
 | `GET` | `/api/v1/events` | Available | Query signature-verified events by source, type, actor, limit, and opaque cursor. |
 | `GET` | `/api/v1/events/stream` | Available | Subscribe to new events over resumable SSE, optionally filtered by source, type, or actor. |
+| `POST` | `/api/v1/binding-sessions` | Available | Start a binding session: an agent gets a `/binding` link, match code, and poll token; a trusted partner's Source API Key starts a partner session for a nearbuilders.org project. |
+| `POST` | `/api/v1/binding-sessions/{sessionId}/claim` | Available (poll token) | Claim the new source's API key once, after the person completes `/binding`. |
+| `POST` | `/api/activity/binding-sessions/reveal` | Available (owner) | Show a partner session's API key once to the owner who completed it. |
+| `GET` | `/api/activity/sources/{sourceId}/test-status` | Available (organization member) | Read when the source last sent an `activity.test` connection test. |
+| `GET` | `/api/v1/projects/{projectId}/activity` | Available | Report whether a nearbuilders.org project's source is `none`, `connected`, `tracked`, or `rejected`. |
 | `POST` | `/api/activity/events/{eventId}/hide` | Available (admin) | Hide an immutable event from service-controlled public views. |
 | `POST` | `/api/v1/events/{eventId}/retract` | Available (Source API Key) | Hide an event your own source published, for compensation and revocation. |
 | `GET` | `/api/activity/hidden-events` | Available (admin) | Inspect hidden events and their moderation history. |
@@ -146,14 +151,19 @@ Leaderboard reads multiply counts by each event type's current point value and t
 
 ### Activity Source onboarding
 
-1. A Source Owner authenticates with NEAR and selects the owning organization.
-2. The owner registers an Activity Source and defines valid Event Types.
-3. A Platform Administrator approves or rejects the source with an auditable reason.
-4. The source creates or links a Nostr signing identity.
-5. The source creates an API key.
-6. It starts submitting events to `POST /api/v1/events`.
+1. A Source Owner authenticates with NEAR and selects the owning organization. Setup can also
+   start from a coding agent (`POST /api/v1/binding-sessions`) or from **Register Activity** on a
+   nearbuilders.org project, both of which hand the owner a prefilled `/binding` page.
+2. The owner registers an Activity Source and defines valid Event Types (0 to 100 points each).
+   One NEAR account can own up to 10 sources.
+3. The source creates or links a Nostr signing identity and binds it on-chain under
+   `activity/<source-id>`.
+4. The source creates an API key and can send an `activity.test` event to check the connection.
+5. It starts submitting events to `POST /api/v1/events`. Until a Platform Administrator approves
+   the source, its events are marked **Under review**, kept off leaderboards, and limited to 500 a
+   day; approval adds them, including earlier ones, to leaderboards. Rejection stops ingestion.
 
-Approved Source Owners manage credentials from the Activity Sources page. Creating a Signing
+Source Owners manage credentials from the Activity Sources page. Creating a Signing
 Identity returns only its Nostr public key; its private key is encrypted by the gateway. The owner
 must connect the Activity Source's exact mainnet NEAR account and authorize the prepared FastNear
 KV binding before creating a Source API Key. This is a direct wallet
