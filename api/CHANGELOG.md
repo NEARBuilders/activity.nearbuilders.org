@@ -1,5 +1,38 @@
 # api
 
+## 3.1.0
+
+### Minor Changes
+
+- 15c4d41: One NEAR account can now own up to 10 Activity Sources. Each source is bound under its own
+  `activity/<source-id>` slot on `contextual.near` instead of the account's `nostr/<account>` record,
+  which is still accepted for sources bound before this change. A nearbuilders.org project can have
+  only one source, and only the project owner's NEAR account (or the project's linked app account)
+  can register it. The registration form
+  searches nearbuilders.org projects and marks the ones you own.
+
+  Registration errors now carry a `field` code (`sourceId`, `nearAccountId`, or `project`) so the form
+  shows each error under the right field. Binding-session rate limits no longer pool every caller
+  without a known address into one bucket; the global limit still applies to everyone.
+
+- 15c4d41: Let nearbuilders.org start Activity setup for a project owner ("Register Activity"). An approved,
+  trusted source can authenticate `POST /api/v1/binding-sessions` with its Source API Key to start a
+  partner session for a nearbuilders.org project, optionally naming the owner's NEAR account. Partner
+  sessions return no poll token: the owner completes setup on `/binding`, which asks them to sign in
+  with that NEAR account when one is given, and the Source API Key is shown once on that page through
+  `POST /api/activity/binding-sessions/reveal`. A second reveal is refused.
+
+  Any source can send the reserved `activity.test` Event Type to check its connection. Test events
+  are never stored, signed, published, or scored; they only update the source's last test time,
+  readable from `GET /api/activity/sources/{sourceId}/test-status`, which `/binding` uses to show
+  "Connection works".
+
+  `GET /api/v1/projects/{projectId}/activity` reports whether a nearbuilders.org project's source is
+  `none`, `connected`, `tracked` (has published events), or `rejected` (with the review reason).
+
+  Event Type point values are now capped at 100. Registering or editing a source with a higher point
+  value returns a validation error; existing Event Types are unchanged.
+
 ## 3.0.0
 
 ### Major Changes
