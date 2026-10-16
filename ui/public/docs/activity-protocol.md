@@ -249,8 +249,13 @@ ingestion authentication boundary rejects revoked keys, rejected sources, and so
 bound active Signing Identity.
 
 Source approval and source trust are independent controls. A pending source can ingest, up to a
-daily limit, and its events carry `provenance.approvalStatus: "pending"`; only approved sources count
-on leaderboards, and rejected sources cannot ingest. A Platform Administrator can separately set `standard` or `trusted` weighting and
+daily limit (`activityPendingSourceDailyEventLimit`), and its events carry
+`provenance.approvalStatus: "pending"`. Approved sources with `standard` trust are subject to a separate
+rolling 24-hour cap (`activityApprovedSourceDailyEventLimit`). `trusted` sources may use an optional
+higher cap (`activityTrustedSourceDailyEventLimit`); when that variable is unset, trusted sources have
+no application-layer daily ingestion cap. Distinct idempotency keys count toward these limits; retries
+with the same key do not. Only approved sources count on leaderboards, and rejected sources cannot
+ingest. A Platform Administrator can separately set `standard` or `trusted` weighting and
 a current score multiplier through `POST /api/activity/sources/{sourceId}/trust`. Every change records
 the administrator, old and new values, reason, and timestamp in an append-only audit history.
 
