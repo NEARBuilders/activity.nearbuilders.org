@@ -240,6 +240,20 @@ export class ActivityGithubService {
     });
     const configuration = await this.getConfiguration(organizationId, sourceId);
     if (!configuration) throw new Error("GitHub integration was not returned");
+    const [integration] = await this.#db
+      .select()
+      .from(integrationsTable)
+      .where(eq(integrationsTable.sourceRecordId, source.id))
+      .limit(1);
+    if (integration?.enabled) {
+      const actorByLogin = new Map(
+        configuration.actorMappings.map(({ githubLogin, nearAccountId }) => [
+          githubLogin.toLowerCase(),
+          nearAccountId,
+        ]),
+      );
+      await this.#replayQuarantine(sourceId, integration, actorByLogin, emptyPollResult());
+    }
     return configuration;
   }
 

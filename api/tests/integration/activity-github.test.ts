@@ -247,15 +247,18 @@ describe("Activity GitHub integration", () => {
       mappingValidationFetch.mockRestore();
     }
 
+    expect(getTestRelayEvents()).toHaveLength(2);
+    expect(getTestRelayEvents()[1]?.tags).toContainEqual(["n", "bob.near"]);
+    expect((await owner.getActivityGithubIntegration({ sourceId }))?.quarantineCount).toBe(0);
+    expect(await owner.listActivityGithubQuarantine({ sourceId })).toEqual([]);
+
     const beforeInterval = await owner.pollActivityGithubIntegration({ sourceId });
     expect(beforeInterval).toMatchObject({
       repositoriesPolled: 0,
-      published: 1,
+      published: 0,
       notModified: 0,
       failed: 0,
     });
-    expect(getTestRelayEvents()).toHaveLength(2);
-    expect((await owner.getActivityGithubIntegration({ sourceId }))?.quarantineCount).toBe(0);
 
     const firstNextPollAt = (await owner.getActivityGithubIntegration({ sourceId }))
       ?.repositories[0]?.nextPollAt;
