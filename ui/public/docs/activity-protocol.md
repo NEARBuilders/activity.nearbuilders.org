@@ -172,8 +172,12 @@ state or emit the same Activity event again.
 
 Merged pull requests credit the GitHub actor who performed the merge, and closed issues credit the
 actor who closed the issue. A record is published only when that GitHub login has an explicit NEAR
-mapping. Unmapped records are stored in a per-source quarantine and are retried after the mapping is
-added. Stable idempotency
+mapping. Unmapped records are stored in a per-source quarantine and are retried when a mapping is
+added (on `PUT /api/activity/sources/{sourceId}/github` save) and at the start of each repository
+poll. Saving settings always persists the configuration; quarantine replay during that request is
+best-effort—if a row cannot publish, it remains quarantined until a later save or poll succeeds.
+Configure-time and poll-time replay scan the full quarantine table with no documented per-request
+cap; a very large quarantine can make a save or poll slow. Stable idempotency
 keys use `github:<owner>/<repository>:<event-type>:<github-object-id>`, so different GitHub delivery
 event IDs for the same pull request or issue still produce one Activity event. Published records
 appear in the normal public feed with a GitHub badge.
