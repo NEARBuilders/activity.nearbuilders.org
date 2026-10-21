@@ -238,6 +238,23 @@ export class ActivityGithubService {
           });
       }
     });
+    const [integration] = await this.#db
+      .select()
+      .from(integrationsTable)
+      .where(eq(integrationsTable.sourceRecordId, source.id))
+      .limit(1);
+    if (integration?.enabled) {
+      const mappings = await this.#db
+        .select()
+        .from(mappingsTable)
+        .where(eq(mappingsTable.integrationId, integration.id));
+      const actorByLogin = new Map(
+        mappings.map(({ githubLogin, nearAccountId }) => [githubLogin, nearAccountId]),
+      );
+      await this.#replayQuarantine(sourceId, integration, actorByLogin, emptyPollResult(), {
+        bestEffort: true,
+      });
+    }
     const configuration = await this.getConfiguration(organizationId, sourceId);
     if (!configuration) throw new Error("GitHub integration was not returned");
     return configuration;
@@ -480,6 +497,7 @@ export class ActivityGithubService {
     integration: IntegrationRow,
     actorByLogin: Map<string, string>,
     result: ActivityGithubPollResult,
+    options?: { bestEffort?: boolean },
   ): Promise<void> {
     const records = await this.#db
       .select()
@@ -487,7 +505,14 @@ export class ActivityGithubService {
       .where(eq(quarantineTable.integrationId, integration.id));
     for (const record of records) {
       const candidate = JSON.parse(record.payloadJson) as GithubActivityCandidate;
-      if (actorByLogin.has(candidate.githubLogin.toLowerCase())) {
+      if (!actorByLogin.has(candidate.githubLogin.toLowerCase())) continue;
+      if (options?.bestEffort) {
+        try {
+          await this.#deliverCandidate(sourceId, integration.id, candidate, actorByLogin, result);
+        } catch {
+          /* row stays quarantined for a later save or poll */
+        }
+      } else {
         await this.#deliverCandidate(sourceId, integration.id, candidate, actorByLogin, result);
       }
     }
