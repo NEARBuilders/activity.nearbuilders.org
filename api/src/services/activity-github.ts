@@ -508,13 +508,7 @@ export class ActivityGithubService {
       if (!actorByLogin.has(candidate.githubLogin.toLowerCase())) continue;
       if (options?.bestEffort) {
         try {
-          await this.#deliverCandidate(
-            sourceId,
-            integration.id,
-            candidate,
-            actorByLogin,
-            result,
-          );
+          await this.#deliverCandidate(sourceId, integration.id, candidate, actorByLogin, result);
         } catch {
           /* row stays quarantined for a later save or poll */
         }
