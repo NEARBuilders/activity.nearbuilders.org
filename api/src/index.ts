@@ -35,6 +35,7 @@ import { ActivityGithubService } from "./services/activity-github";
 import { ActivityHealthService } from "./services/activity-health";
 import {
   ActivityIngestionService,
+  APPROVED_SOURCE_DAILY_EVENT_LIMIT,
   PENDING_SOURCE_DAILY_EVENT_LIMIT,
 } from "./services/activity-ingestion";
 import {
@@ -155,6 +156,12 @@ export default createPlugin.withPlugins<PluginsClient>()({
       .int()
       .positive()
       .default(PENDING_SOURCE_DAILY_EVENT_LIMIT),
+    activityApprovedSourceDailyEventLimit: z
+      .number()
+      .int()
+      .positive()
+      .default(APPROVED_SOURCE_DAILY_EVENT_LIMIT),
+    activityTrustedSourceDailyEventLimit: z.number().int().positive().optional(),
     nearbuildersApiUrl: z.string().default("https://nearbuilders.org/api"),
   }),
 
@@ -230,7 +237,11 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activitySourcesService,
         activityRelay,
         activityLeaderboard,
-        { pendingSourceDailyEventLimit: config.variables.activityPendingSourceDailyEventLimit },
+        {
+          pendingSourceDailyEventLimit: config.variables.activityPendingSourceDailyEventLimit,
+          approvedSourceDailyEventLimit: config.variables.activityApprovedSourceDailyEventLimit,
+          trustedSourceDailyEventLimit: config.variables.activityTrustedSourceDailyEventLimit,
+        },
       );
       const activityGithubService = new ActivityGithubService({
         db: database,

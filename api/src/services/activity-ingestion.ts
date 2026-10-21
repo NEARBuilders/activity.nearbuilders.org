@@ -28,9 +28,12 @@ export interface ActivityEventSubmission {
 export const ACTIVITY_EVENT_PAYLOAD_MAX_BYTES = 16 * 1_024;
 
 export const PENDING_SOURCE_DAILY_EVENT_LIMIT = 500;
+export const APPROVED_SOURCE_DAILY_EVENT_LIMIT = 10_000;
 
 export interface ActivityIngestionOptions {
   pendingSourceDailyEventLimit?: number;
+  approvedSourceDailyEventLimit?: number;
+  trustedSourceDailyEventLimit?: number;
   now?: () => Date;
 }
 
@@ -41,6 +44,8 @@ export class ActivityIngestionService {
   readonly #relay: ActivityRelay;
   readonly #leaderboard: ActivityLeaderboard;
   readonly #pendingSourceDailyEventLimit: number;
+  readonly #approvedSourceDailyEventLimit: number;
+  readonly #trustedSourceDailyEventLimit: number | undefined;
   readonly #now: () => Date;
 
   constructor(
@@ -58,6 +63,9 @@ export class ActivityIngestionService {
     this.#leaderboard = leaderboard;
     this.#pendingSourceDailyEventLimit =
       options.pendingSourceDailyEventLimit ?? PENDING_SOURCE_DAILY_EVENT_LIMIT;
+    this.#approvedSourceDailyEventLimit =
+      options.approvedSourceDailyEventLimit ?? APPROVED_SOURCE_DAILY_EVENT_LIMIT;
+    this.#trustedSourceDailyEventLimit = options.trustedSourceDailyEventLimit;
     this.#now = options.now ?? (() => new Date());
   }
 
@@ -77,7 +85,40 @@ export class ActivityIngestionService {
     return this.#submitWithCredential(credential, input);
   }
 
-  async #enforcePendingSourceLimit(sourceRecordId: string, idempotencyKey: string) {
+  #resolveDailySubmissionQuota(source: {
+    approvalStatus: "pending" | "approved" | "rejected";
+    trustStatus: "standard" | "trusted";
+  }): { limit: number; message: string } | null {
+    if (source.approvalStatus === "pending") {
+      return {
+        limit: this.#pendingSourceDailyEventLimit,
+        message: `Activity Sources under review may submit up to ${this.#pendingSourceDailyEventLimit} events per day`,
+      };
+    }
+    if (source.approvalStatus !== "approved") {
+      return null;
+    }
+    if (source.trustStatus === "trusted") {
+      if (this.#trustedSourceDailyEventLimit === undefined) {
+        return null;
+      }
+      return {
+        limit: this.#trustedSourceDailyEventLimit,
+        message: `Trusted Activity Sources may submit up to ${this.#trustedSourceDailyEventLimit} events per day`,
+      };
+    }
+    return {
+      limit: this.#approvedSourceDailyEventLimit,
+      message: `Approved Activity Sources may submit up to ${this.#approvedSourceDailyEventLimit} events per day`,
+    };
+  }
+
+  async #enforceDailySubmissionLimit(
+    sourceRecordId: string,
+    idempotencyKey: string,
+    limit: number,
+    message: string,
+  ) {
     const [existing] = await this.#db
       .select({ id: submissionsTable.id })
       .from(submissionsTable)
@@ -99,10 +140,8 @@ export class ActivityIngestionService {
           gte(submissionsTable.createdAt, since),
         ),
       );
-    if ((recent?.total ?? 0) >= this.#pendingSourceDailyEventLimit) {
-      throw new ORPCError("TOO_MANY_REQUESTS", {
-        message: `Activity Sources under review may submit up to ${this.#pendingSourceDailyEventLimit} events per day`,
-      });
+    if ((recent?.total ?? 0) >= limit) {
+      throw new ORPCError("TOO_MANY_REQUESTS", { message });
     }
   }
 
@@ -142,8 +181,14 @@ export class ActivityIngestionService {
     if (!sourceRow) {
       throw new ORPCError("NOT_FOUND", { message: "Activity Source not found" });
     }
-    if (source.approvalStatus === "pending") {
-      await this.#enforcePendingSourceLimit(sourceRow.id, input.idempotencyKey);
+    const quota = this.#resolveDailySubmissionQuota(source);
+    if (quota) {
+      await this.#enforceDailySubmissionLimit(
+        sourceRow.id,
+        input.idempotencyKey,
+        quota.limit,
+        quota.message,
+      );
     }
     const requestHash = hashSubmission(input);
     const [created] = await this.#db

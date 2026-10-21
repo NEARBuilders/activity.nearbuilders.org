@@ -405,4 +405,66 @@ describe("Activity event ingestion", () => {
       true,
     );
   });
+
+  it("enforces a daily limit for approved standard sources", async () => {
+    const { secret } = await provisionIngestionSource({
+      sourceId: "approved-ingestion-source",
+      ownerId: "approved-ingestion-owner",
+      organizationId: "org-approved-ingestion",
+      eventType: "approved.recorded",
+    });
+    const gateway = await getPluginClient(undefined, {
+      authorization: `Bearer ${secret}`,
+    });
+    const submit = (sequence: number) =>
+      gateway.submitActivityEvent({
+        eventType: "approved.recorded",
+        actor: "approved-actor.near",
+        idempotencyKey: `approved:${sequence}`,
+        payload: { sequence },
+      });
+    resetTestRelayEvents();
+
+    for (let sequence = 1; sequence <= 10; sequence += 1) {
+      await submit(sequence);
+    }
+    await expect(submit(11)).rejects.toThrow(
+      "Approved Activity Sources may submit up to 10 events per day",
+    );
+    const tenth = await submit(10);
+    expect(tenth).toMatchObject({ eventId: expect.any(String) });
+    expect(getTestRelayEvents()).toHaveLength(10);
+  });
+
+  it("does not cap trusted approved sources when no trusted daily limit is configured", async () => {
+    const { secret } = await provisionIngestionSource({
+      sourceId: "trusted-ingestion-source",
+      ownerId: "trusted-ingestion-owner",
+      organizationId: "org-trusted-ingestion",
+      eventType: "trusted.recorded",
+    });
+    const administrator = await getPluginClient(adminContext());
+    await administrator.updateActivitySourceTrust({
+      sourceId: "trusted-ingestion-source",
+      trustStatus: "trusted",
+      scoreMultiplier: 1,
+      reason: "Trusted ingestion test source",
+    });
+    const gateway = await getPluginClient(undefined, {
+      authorization: `Bearer ${secret}`,
+    });
+    const submit = (sequence: number) =>
+      gateway.submitActivityEvent({
+        eventType: "trusted.recorded",
+        actor: "trusted-actor.near",
+        idempotencyKey: `trusted:${sequence}`,
+        payload: { sequence },
+      });
+    resetTestRelayEvents();
+
+    for (let sequence = 1; sequence <= 11; sequence += 1) {
+      await submit(sequence);
+    }
+    expect(getTestRelayEvents()).toHaveLength(11);
+  });
 });
