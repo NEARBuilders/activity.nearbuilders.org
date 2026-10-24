@@ -37,6 +37,70 @@ function signedActivityEvent(
 }
 
 describe("ActivityFeedService", () => {
+  it("suppresses replay overlap within the retained window and redelivers after eviction", async () => {
+    const trustedKey = generateSecretKey();
+    const baseline = signedActivityEvent(trustedKey, {
+      source: "resume-window-source",
+      eventType: "feed.event",
+      actor: "alice.near",
+      idempotencyKey: "resume-window:baseline",
+      payload: { sequence: 0 },
+      createdAt: 1_788_400_000,
+    });
+    const replayed = [1, 2].map((sequence) =>
+      signedActivityEvent(trustedKey, {
+        source: "resume-window-source",
+        eventType: "feed.event",
+        actor: "alice.near",
+        idempotencyKey: `resume-window:${sequence}`,
+        payload: { sequence },
+        createdAt: 1_788_400_000 + sequence,
+      }),
+    );
+    const live = signedActivityEvent(trustedKey, {
+      source: "resume-window-source",
+      eventType: "feed.event",
+      actor: "alice.near",
+      idempotencyKey: "resume-window:live",
+      payload: { sequence: 3 },
+      createdAt: 1_788_400_003,
+    });
+    let emit: ((event: Event) => void) | undefined;
+    const adapter: ActivityRelayAdapter = {
+      publish: async () => "",
+      query: async () => [replayed[1]!, replayed[0]!, baseline],
+      subscribe: (_filter, onEvent) => {
+        emit = onEvent;
+        onEvent(replayed[0]!);
+        onEvent(replayed[1]!);
+        return { close: () => {} };
+      },
+      close: () => {},
+    };
+    const service = new ActivityFeedService(new ActivityRelay(adapter, { scanLimit: 100 }), {
+      listBound: async () => [
+        { sourceId: "resume-window-source", publicKey: getPublicKey(trustedKey) },
+      ],
+    });
+    const stream = service.stream(
+      { source: "resume-window-source" },
+      { lastEventId: baseline.id, deduplicationLimit: 2 },
+    );
+
+    try {
+      await expect(stream.next()).resolves.toMatchObject({ value: { id: replayed[0]!.id } });
+      await expect(stream.next()).resolves.toMatchObject({ value: { id: replayed[1]!.id } });
+
+      emit?.(live);
+      await expect(stream.next()).resolves.toMatchObject({ value: { id: live.id } });
+
+      emit?.(replayed[0]!);
+      await expect(stream.next()).resolves.toMatchObject({ value: { id: replayed[0]!.id } });
+    } finally {
+      await stream.return(undefined);
+    }
+  });
+
   it.each(["abort", "failure"])("closes live delivery on identity lookup %s", async (outcome) => {
     const key = generateSecretKey();
     const event = signedActivityEvent(key, {

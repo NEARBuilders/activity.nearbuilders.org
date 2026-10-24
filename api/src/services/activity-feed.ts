@@ -5,6 +5,7 @@ import {
   type ActivityQuery,
   type ActivityRelay,
 } from "../activity/activity-relay";
+import { BoundedEventIdSet } from "../activity/bounded-event-id-set";
 import {
   ACTIVITY_EVENT_TYPE_NAME_REGEX,
   ACTIVITY_SOURCE_ID_REGEX,
@@ -266,14 +267,20 @@ export class ActivityFeedService {
 
   async *stream(
     input: ActivityQuery,
-    options: { lastEventId?: string; signal?: AbortSignal; onReady?: () => void } = {},
+    options: {
+      lastEventId?: string;
+      signal?: AbortSignal;
+      onReady?: () => void;
+      deduplicationLimit?: number;
+    } = {},
   ): AsyncGenerator<ActivityFeedEvent> {
     if (options.lastEventId !== undefined && !/^[a-f0-9]{64}$/.test(options.lastEventId)) {
       throw new ActivityResumeError();
     }
     const queued: Event[] = [];
     let streamFailure: Error | undefined;
-    const deliveredIds = new Set(options.lastEventId ? [options.lastEventId] : []);
+    const deliveredIds = new BoundedEventIdSet(options.deduplicationLimit);
+    if (options.lastEventId) deliveredIds.add(options.lastEventId);
     let wake: (() => void) | undefined;
     const wakeStream = () => {
       wake?.();
@@ -335,6 +342,8 @@ export class ActivityFeedService {
     } finally {
       options.signal?.removeEventListener("abort", wakeStream);
       subscription.close();
+      deliveredIds.clear();
+      queued.length = 0;
     }
   }
 

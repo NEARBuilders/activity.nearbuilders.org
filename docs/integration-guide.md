@@ -301,6 +301,12 @@ consumer finishes processing that event. Use exponential backoff with jitter for
 and `503` responses. A `400` for `Last-Event-ID` means the value is malformed or no longer available
 in relay history; recover by querying `GET /v1/events` and establishing a new checkpoint.
 
+Each active stream retains the most recent 4,096 distinct event IDs for duplicate suppression.
+The direct relay adapter uses the same limit across reconnects. If an older ID is evicted and that
+event is delivered again, it may appear again in the live stream. This limit affects only
+in-memory duplicate suppression; it does not remove events from relay history or limit historical
+queries and Last-Event-ID replay.
+
 ## 5. Read scoring
 
 `GET /v1/leaderboard?period=weekly|monthly|all-time` returns current rankings. Optional `source` and
