@@ -1,6 +1,6 @@
+import { ORPCError } from "@orpc/server";
 import { and, eq, inArray, not } from "drizzle-orm";
-import { Context, Effect, Layer } from "every-plugin/effect";
-import { ORPCError } from "every-plugin/orpc";
+import { Context, Effect, Layer } from "effect";
 import { DatabaseTag } from "../db/layer";
 import { type tenantStatus, tenants as tenantsTable } from "../db/schema";
 
@@ -43,7 +43,7 @@ export interface TenantsService {
   deleteTenantById(id: string): Promise<boolean>;
 }
 
-export class TenantsTag extends Context.Tag("api/Tenants")<TenantsService, TenantsService>() {}
+export class TenantsTag extends Context.Service<TenantsTag, TenantsService>()("api/Tenants") {}
 
 type TenantRow = typeof tenantsTable.$inferSelect;
 

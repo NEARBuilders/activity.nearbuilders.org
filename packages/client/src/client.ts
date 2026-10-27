@@ -8,14 +8,15 @@ export interface ActivityClientOptions {
 }
 
 export function createActivityClient(baseUrl: string, options?: ActivityClientOptions) {
-  const url = `${baseUrl.replace(/\/+$/, "")}/api/rpc`;
+  const origin = baseUrl.replace(/\/+$/, "");
   const headers: Record<string, string> = {};
   if (options?.apiKey) {
     headers.Authorization = `Bearer ${options.apiKey}`;
   }
 
   const link = new RPCLink({
-    url,
+    origin,
+    url: "/api/rpc",
     headers,
     fetch: (requestUrl, requestOptions) =>
       fetch(requestUrl, { ...requestOptions, credentials: "include" }),

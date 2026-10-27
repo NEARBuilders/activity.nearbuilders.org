@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
+import { ORPCError } from "@orpc/server";
 import { and, eq, isNull } from "drizzle-orm";
-import { Context, Effect, Layer } from "every-plugin/effect";
-import { ORPCError } from "every-plugin/orpc";
+import { Context, Effect, Layer } from "effect";
 import {
   type Event,
   type EventTemplate,
@@ -119,10 +119,10 @@ export interface ActivityBindingConfig {
   kvApiUrl: string;
 }
 
-export class ActivityCredentialsTag extends Context.Tag("api/ActivityCredentials")<
-  ActivityCredentialsService,
+export class ActivityCredentialsTag extends Context.Service<
+  ActivityCredentialsTag,
   ActivityCredentialsService
->() {}
+>()("api/ActivityCredentials") {}
 
 function toIsoTimestamp(value: Date | string): string {
   return value instanceof Date ? value.toISOString() : String(value);

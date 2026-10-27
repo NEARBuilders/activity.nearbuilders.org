@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
+import { ORPCError } from "@orpc/server";
 import { and, count, eq, gte, isNull } from "drizzle-orm";
-import { ORPCError } from "every-plugin/orpc";
 import { type Event, validateEvent, verifyEvent } from "nostr-tools/pure";
 import { ACTIVITY_EVENT_KIND, type ActivityRelay } from "../activity/activity-relay";
 import { ACTIVITY_TEST_EVENT_TYPE } from "../contract";

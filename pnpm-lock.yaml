@@ -209,6 +209,9 @@ catalogs:
     '@orpc/openapi':
       specifier: 2.0.0-beta.35
       version: 2.0.0-beta.35
+    '@orpc/publisher':
+      specifier: 2.0.0-beta.35
+      version: 2.0.0-beta.35
     '@orpc/server':
       specifier: 2.0.0-beta.35
       version: 2.0.0-beta.35
@@ -411,6 +414,12 @@ importers:
       '@orpc/contract':
         specifier: 'catalog:'
         version: 2.0.0-beta.35
+      '@orpc/openapi':
+        specifier: 'catalog:'
+        version: 2.0.0-beta.35
+      '@orpc/publisher':
+        specifier: 'catalog:'
+        version: 2.0.0-beta.35(redis@6.2.1(@opentelemetry/api@1.10.0))
       '@orpc/server':
         specifier: 'catalog:'
         version: 2.0.0-beta.35
@@ -451,9 +460,6 @@ importers:
       '@module-federation/node':
         specifier: 'catalog:'
         version: 2.7.52(@rspack/core@2.2.8(@module-federation/runtime-tools@2.9.2)(@swc/helpers@0.5.23))(typescript@7.0.2)
-      '@orpc/openapi':
-        specifier: 'catalog:'
-        version: 2.0.0-beta.35
       '@proj-airi/unplugin-drizzle-orm-migrations':
         specifier: ^0.1.4
         version: 0.1.6(vite@8.3.5(@types/node@25.9.9)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
@@ -493,9 +499,15 @@ importers:
       '@orpc/contract':
         specifier: 'catalog:'
         version: 2.0.0-beta.35
+      '@orpc/openapi':
+        specifier: 'catalog:'
+        version: 2.0.0-beta.35
       every-plugin:
         specifier: 'catalog:'
         version: 3.0.0-rc.14(@orpc/contract@2.0.0-beta.35)(@orpc/server@2.0.0-beta.35)(@orpc/tanstack-query@2.0.0-beta.35(@tanstack/query-core@5.104.5))(@orpc/zod@2.0.0-beta.35(zod@4.6.5))(@proj-airi/unplugin-drizzle-orm-migrations@0.1.6(vite@8.3.5(@types/node@25.9.9)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0)))(@rspack/core@2.2.8(@module-federation/runtime-tools@2.9.2)(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.45(react-dom@19.2.9(react@19.2.9))(react@19.2.9))(@tanstack/router-generator@1.167.33)(@types/react@19.3.0)(effect@4.0.0-rc.117)(esbuild@0.28.2)(react-dom@19.2.9(react@19.2.9))(react@19.2.9)(redis@6.2.1(@opentelemetry/api@1.10.0))(rolldown@1.2.15)(typescript@7.0.2)(vite@8.3.5(@types/node@25.9.9)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))(zod@4.6.5)
+      zod:
+        specifier: 'catalog:'
+        version: 4.6.5
     devDependencies:
       typescript:
         specifier: 'catalog:'

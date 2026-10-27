@@ -1,9 +1,8 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { PluginIdTag } from "every-plugin";
-import { Cause, Effect, Exit, Layer } from "every-plugin/effect";
-import { ORPCError } from "every-plugin/orpc";
+import { ORPCError } from "@orpc/server";
+import { Cause, Effect, Exit, Layer } from "effect";
 import { afterEach, describe, expect, it } from "vitest";
 import { DatabaseLive } from "@/db/layer";
 import { TenantsLive, type TenantsService, TenantsTag } from "@/services/tenants";
@@ -20,16 +19,13 @@ afterEach(() => {
 function freshLayer() {
   const dir = mkdtempSync(join(tmpdir(), "api-tenants-"));
   activeDir = dir;
-  return TenantsLive.pipe(
-    Layer.provide(DatabaseLive(`pglite:${dir}`)),
-    Layer.provide(Layer.succeed(PluginIdTag, "api")),
-  );
+  return TenantsLive.pipe(Layer.provide(DatabaseLive(`pglite:${dir}`, "api")));
 }
 
 const MISSING_ID = "00000000-0000-0000-0000-000000000000";
 
 async function runService<A>(
-  layer: Layer.Layer<TenantsService, unknown, never>,
+  layer: Layer.Layer<TenantsTag, unknown, never>,
   fn: (svc: TenantsService) => Promise<A>,
 ): Promise<A> {
   const effect = Effect.gen(function* () {
@@ -40,7 +36,7 @@ async function runService<A>(
 }
 
 async function squashServiceError<A>(
-  layer: Layer.Layer<TenantsService, unknown, never>,
+  layer: Layer.Layer<TenantsTag, unknown, never>,
   fn: (svc: TenantsService) => Promise<A>,
 ): Promise<unknown> {
   const effect = Effect.gen(function* () {
