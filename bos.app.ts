@@ -37,12 +37,5 @@ export default App({
       "ACTIVITY_RELAY_URL",
     ],
   },
-  plugins: {
-    nostr: {
-      extends: "bos://nearbuilding.near/nostr.nearbuilders.org#plugins.nostr",
-      variables: {
-        clientName: "activity.nearbuilders.org",
-      },
-    },
-  },
+  plugins: {},
 });
