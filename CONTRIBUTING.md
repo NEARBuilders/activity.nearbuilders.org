@@ -5,8 +5,8 @@ Thank you for contributing to everything-dev! 🎉
 ## Quick Setup
 
 ```bash
-bun install              # Install dependencies
-bun db:migrate           # Run database migrations
+pnpm install              # Install dependencies
+pnpm db:migrate           # Run database migrations
 bos dev                  # Start development (host mode auto-detected)
 ```
 
@@ -18,10 +18,10 @@ Visit http://localhost:3003 (UI), http://localhost:3001 (API), and http://localh
 
 ### Making Changes
 
-- **UI Changes**: Edit `ui/src/` → hot reload automatically → deploy with `bun run build:ui`
-- **API Changes**: Edit `api/src/` → hot reload automatically → deploy with `bun run build:api`
+- **UI Changes**: Edit `ui/src/` → hot reload automatically → deploy with `pnpm run build:ui`
+- **API Changes**: Edit `api/src/` → hot reload automatically → deploy with `pnpm run build:api`
 - **Plugin Changes**: Edit `plugins/*/src/` → hot reload automatically → deploy per plugin
-- **Host Changes**: Edit `host/src/` or `bos.config.json` → deploy with `bun run build:host`
+- **Host Changes**: Edit `host/src/` or `bos.config.json` → deploy with `pnpm run build:host`
 
 ### Plugin Architecture
 
@@ -47,8 +47,8 @@ Plugins are accessible both directly via HTTP (`/api/{key}/*`) and in-process vi
 All runtime URLs are configured in `bos.config.json` - no rebuild needed! Switch environments:
 
 ```bash
-NODE_ENV=development bun dev:host  # Use local services (default)
-NODE_ENV=production bun dev:host   # Use production CDN URLs
+NODE_ENV=development pnpm dev:host  # Use local services (default)
+NODE_ENV=production pnpm dev:host   # Use production CDN URLs
 ```
 
 Secrets go in `.env` (see [.env.example](./.env.example) for required variables).
@@ -116,7 +116,7 @@ We use [Changesets](https://github.com/changesets/changesets) for versioning.
 
 **Create a changeset:**
 ```bash
-bun run changeset
+pnpm run changeset
 # Follow prompts to select packages and write description
 ```
 
@@ -139,9 +139,9 @@ Added new endpoint for user profiles
 
 1. **Before creating PR:**
    ```bash
-   bun run test    # Run all tests
-   bun typecheck   # Type check all packages
-   bun lint        # Run linting
+   pnpm run test    # Run all tests
+   pnpm typecheck   # Type check all packages
+   pnpm lint        # Run linting
    ```
 
 2. **Create PR from your fork:**
@@ -166,8 +166,8 @@ Added new endpoint for user profiles
 2. **Clone** your fork locally
 3. **Create** a feature branch: `git checkout -b feature/amazing-feature`
 4. **Make** your changes
-5. **Test** thoroughly: `bun run test` and `bun typecheck`
-6. **Add changeset** if needed: `bun run changeset`
+5. **Test** thoroughly: `pnpm run test` and `pnpm typecheck`
+6. **Add changeset** if needed: `pnpm run changeset`
 7. **Commit** using [Semantic Commits](https://gist.github.com/joshbuchea/6f47e86d2510bce28f8e7f42ae84c716)
 8. **Push** to your fork: `git push origin feature/amazing-feature`
 9. **Open** a Pull Request to the main repository
@@ -186,9 +186,9 @@ Added new endpoint for user profiles
 We use [Biome](https://biomejs.dev/) for linting and formatting:
 
 ```bash
-bun lint        # Check linting
-bun lint:fix    # Fix auto-fixable issues
-bun format      # Format code
+pnpm lint        # Check linting
+pnpm lint:fix    # Fix auto-fixable issues
+pnpm format      # Format code
 ```
 
 ## Reporting Issues

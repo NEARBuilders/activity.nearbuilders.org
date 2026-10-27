@@ -1,5 +1,5 @@
-#!/usr/bin/env bun
-// `bun run seed:demo` — populates a local dev environment with a demo Activity
+#!/usr/bin/env -S pnpm exec tsx
+// `pnpm run seed:demo` — populates a local dev environment with a demo Activity
 // Source, event types, a bound signing identity, and a handful of published
 // events, so the UI has something to show. Uses the real ingestion pipeline
 // (POST /v1/events) for the events themselves so relay publish + leaderboard
@@ -7,6 +7,7 @@
 // bootstrap (which normally requires a live NEAR wallet binding proof) is
 // seeded directly in Postgres.
 import { createHash, randomBytes } from "node:crypto";
+import { readFileSync } from "node:fs";
 import { generateSecretKey, getPublicKey } from "nostr-tools/pure";
 import { Client } from "pg";
 import {
@@ -16,12 +17,12 @@ import {
 
 const root = new URL("..", import.meta.url);
 const envPath = new URL(".env", root);
-const envContent = await Bun.file(envPath).text();
+const envContent = readFileSync(envPath, "utf8");
 
 function envValue(key: string): string {
   const line = envContent.split("\n").find((l) => l.startsWith(`${key}=`));
   const value = line?.slice(key.length + 1) ?? "";
-  if (!value) throw new Error(`${key} is not set in .env — run \`bun run first-run\` first.`);
+  if (!value) throw new Error(`${key} is not set in .env — run \`pnpm run first-run\` first.`);
   return value;
 }
 

@@ -241,7 +241,7 @@ ACTIVITY_SOURCE_ID='your-source' \
 ACTIVITY_EVENT_TYPE='feedback.submitted' \
 ACTIVITY_ACTOR='alice.near' \
 ACTIVITY_EXAMPLE_RUN_ID='local-001' \
-bun examples/run-activity-example.ts
+pnpm exec tsx examples/run-activity-example.ts
 ```
 
 The configured source must have the selected Event Type enabled. Keep `ACTIVITY_EXAMPLE_RUN_ID`
@@ -386,14 +386,14 @@ a substitute for Signing Identity rotation.
 ## 10. API reference and CI proof
 
 The generated interactive OpenAPI reference is available at `/api` on the Activity host and at the
-API service's displayed **Docs** URL during `bun run dev`. Its public Activity operations are derived
+API service's displayed **Docs** URL during `pnpm run dev`. Its public Activity operations are derived
 directly from `api/src/contract.ts`: event submission, filtered feed, SSE, endorsements, leaderboard,
 and leaderboard status.
 
 The repository runs the same dependency-free example in CI with:
 
 ```bash
-bun run test:integration-guide
+pnpm run test:integration-guide
 ```
 
 The smoke test provisions a fresh approved and bound fixture source, receives its one-time API key,

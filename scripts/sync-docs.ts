@@ -2,7 +2,7 @@
  * Publishes selected files from `docs/` to `ui/public/docs/`, so the website can render the same
  * Markdown the repository reviews. `docs/` stays the single source of truth.
  *
- * Run `bun run docs:sync` after editing a published document. CI fails if the output is stale.
+ * Run `pnpm run docs:sync` after editing a published document. CI fails if the output is stale.
  *
  * Relative links are rewritten: a link to a published document becomes a site route, and anything
  * else (unpublished documents, source files) becomes a GitHub link, so no link 404s on the site.
@@ -156,6 +156,6 @@ function main(): void {
   console.log(`Published ${PUBLISHED_DOCS.length} documents to ui/public/docs/`);
 }
 
-if (import.meta.main) {
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
   main();
 }
