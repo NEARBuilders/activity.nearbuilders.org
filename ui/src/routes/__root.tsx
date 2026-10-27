@@ -21,6 +21,7 @@ import { getSocialImageMeta } from "everything-dev/ui/metadata";
 import { ThemeProvider } from "next-themes";
 import type { RouterContext } from "@/app";
 import { getBaseStyles } from "@/app";
+import { AppShell } from "@/components/layout/app-shell";
 import { Toaster } from "@/components/ui/sonner";
 import { useMediaQuery } from "@/hooks";
 import { sessionQueryKey } from "@/lib/auth";
@@ -154,7 +155,9 @@ function RootComponent() {
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem nonce={cspNonce}>
           <div id="root">
-            <Outlet />
+            <AppShell>
+              <Outlet />
+            </AppShell>
           </div>
           <Toaster position={isDesktop ? "bottom-right" : "top-center"} closeButton />
         </ThemeProvider>

@@ -185,7 +185,7 @@ bun lint        # Run linting
 
 Routes requiring auth use `_authenticated.tsx` layout:
 ```typescript
-export const Route = createFileRoute('/_layout/_authenticated')({
+export const Route = createFileRoute('/_authenticated')({
   beforeLoad: async ({ location }) => {
     const { data: session } = await authClient.getSession();
     if (!session?.user) {
