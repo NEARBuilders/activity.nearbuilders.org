@@ -1,26 +1,13 @@
 {
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "rsbuild.config.ts"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist"
-  ],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "rsbuild.config.ts"],
+  "exclude": ["node_modules", "dist"],
   "compilerOptions": {
     "target": "ES2022",
     "jsx": "react-jsx",
     "module": "ESNext",
-    "lib": [
-      "ES2022",
-      "DOM",
-      "DOM.Iterable"
-    ],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "moduleResolution": "bundler",
-    "customConditions": [
-      "development"
-    ],
+    "customConditions": ["development"],
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "noEmit": true,
@@ -32,12 +19,7 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true,
     "paths": {
-      "@/*": [
-        "./src/*"
-      ],
-      "everything-dev/ui/router-client": [
-        "./src/router-client"
-      ]
+      "@/*": ["./src/*"]
     }
   }
 }

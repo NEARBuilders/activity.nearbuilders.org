@@ -23,6 +23,7 @@ import type { ClientRuntimeConfig } from "everything-dev/types";
 import { getRuntimeConfig } from "everything-dev/ui/runtime";
 import type { Auth } from "./auth-types.gen";
 
+export { requireSession, resolveSessionFromCache } from "everything-dev/ui/auth";
 export type * from "./auth-types.gen";
 
 type RuntimeAuthVariables = {

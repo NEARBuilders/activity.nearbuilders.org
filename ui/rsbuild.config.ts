@@ -109,7 +109,6 @@ function createClientConfig() {
     }),
   ];
 
-  
   return defineConfig({
     plugins,
     source: {
@@ -201,7 +200,6 @@ function createServerConfig() {
     },
   });
 
-  
   return defineConfig({
     plugins,
     source: {

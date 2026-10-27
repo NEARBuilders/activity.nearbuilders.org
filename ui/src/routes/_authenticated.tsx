@@ -1,51 +1,22 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { type SessionData, sessionQueryOptions } from "@/app";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 import { resolveActiveOrganizationMembership } from "@/lib/activity-source-permissions";
 import { ensureShellData } from "@/lib/app-shell";
-
-interface AuthContext {
-  isAuthenticated: boolean;
-  user: SessionData["user"] | null;
-  session: SessionData["session"] | null;
-  activeOrganizationId: string | null;
-  activeOrganizationRole: string | null;
-  hasNearAccount: boolean;
-  isAnonymous: boolean;
-  isAdmin: boolean;
-  isBanned: boolean;
-}
+import { requireSession } from "@/lib/auth";
 
 const ACTIVE_ROLE_STALE_MS = 60 * 1000;
 
 export const Route = createFileRoute("/_authenticated")({
-  beforeLoad: async ({ context, location }) => {
+  beforeLoad: async (args) => {
+    const { context } = args;
     const { queryClient, authClient } = context;
     await ensureShellData(context);
+    const { auth, session } = await requireSession(args);
 
-    const session = await queryClient.fetchQuery(sessionQueryOptions(authClient));
-
-    if (!session?.user) {
-      throw redirect({
-        to: "/login",
-        search: {
-          redirect: location.href,
-        },
-      });
-    }
-
-    if (session.user.banned) {
-      throw redirect({
-        to: "/login",
-        hash: "banned",
-      });
-    }
-
-    const activeOrganizationId = session.session?.activeOrganizationId ?? null;
     const activeOrganization = await resolveActiveOrganizationMembership({
-      activeOrganizationId,
+      activeOrganizationId: auth.activeOrganizationId,
       getActiveMemberRole: () =>
         queryClient.fetchQuery({
-          queryKey: ["active-organization-role", activeOrganizationId],
+          queryKey: ["active-organization-role", auth.activeOrganizationId],
           queryFn: async () => {
             const { data, error } = await authClient.organization.getActiveMember();
             if (error) throw new Error(error.message || "Failed to read the active workspace role");
@@ -55,19 +26,13 @@ export const Route = createFileRoute("/_authenticated")({
         }),
     });
 
-    const auth: AuthContext = {
-      isAuthenticated: true,
-      user: session.user,
-      session: session.session,
-      activeOrganizationId: activeOrganization.activeOrganizationId,
-      activeOrganizationRole: activeOrganization.activeOrganizationRole,
-      hasNearAccount: Boolean(authClient.near.getAccountId()),
-      isAnonymous: session.user.isAnonymous || false,
-      isAdmin: session.user.role === "admin",
-      isBanned: session.user.banned || false,
-    };
     return {
-      auth,
+      auth: {
+        ...auth,
+        activeOrganizationId: activeOrganization.activeOrganizationId,
+        activeOrganizationRole: activeOrganization.activeOrganizationRole,
+        hasNearAccount: Boolean(authClient.near.getAccountId()),
+      },
       session,
     };
   },

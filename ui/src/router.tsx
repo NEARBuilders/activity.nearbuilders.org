@@ -9,6 +9,7 @@
  * (ADR 0023). Edit the policy defaults after the `...opts` spread freely.
  */
 
+import { QueryClient } from "@tanstack/react-query";
 import { createRouter as createCoreRouter } from "everything-dev/ui/router-client";
 import type { ApiClient, CreateRouterOptions, SessionData } from "./app";
 import { routeTree } from "./routeTree.gen";
@@ -24,6 +25,12 @@ export function createRouter(opts: CreateRouterOptions) {
   return createCoreRouter<ApiClient, SessionData, typeof routeTree>({
     ...opts,
     defaultRouteTree: routeTree,
+  });
+}
+
+export function createQueryClient(): QueryClient {
+  return new QueryClient({
+    defaultOptions: { queries: { staleTime: 5 * 60 * 1000, gcTime: 30 * 60 * 1000 } },
   });
 }
 

@@ -69,7 +69,10 @@
     "lucide-react": "^1.14.0",
     "nanoid": "^5.1.11",
     "near-social-js": "^2.0.4",
-    "zustand": "^5.0.9"
+    "zustand": "^5.0.9",
+    "@lingui/core": "catalog:",
+    "@lingui/react": "catalog:",
+    "@lingui/message-utils": "catalog:"
   },
   "peerDependencies": {
     "@tanstack/react-query": "catalog:",
