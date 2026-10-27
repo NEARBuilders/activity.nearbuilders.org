@@ -352,3 +352,6 @@ node_modules/.federation
 .bos/sync-backup/
 
 .claude/
+
+# every-plugin synthesized build config
+.every-plugin/

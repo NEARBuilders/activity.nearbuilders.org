@@ -1,0 +1,49 @@
+{
+  "name": "@every-plugin/nostr",
+  "version": "1.1.0",
+  "description": "Nostr integration plugin — NEAR account binding, comments, relay operations",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./contract": {
+      "types": "./src/contract.ts",
+      "default": "./src/contract.ts"
+    }
+  },
+  "peerDependencies": {
+    "typescript": "catalog:"
+  },
+  "dependencies": {
+    "@orpc/contract": "catalog:",
+    "@orpc/openapi": "catalog:",
+    "@orpc/server": "catalog:",
+    "effect": "catalog:",
+    "nostr-tools": "2.24.1",
+    "ws": "8.21.3",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@effect/language-service": "^0.85.1",
+    "@module-federation/node": "catalog:",
+    "@orpc/client": "catalog:",
+    "@rspack/cli": "catalog:",
+    "@rspack/core": "catalog:",
+    "@types/node": "catalog:",
+    "@types/ws": "8.18.1",
+    "dotenv": "^17.2.3",
+    "every-plugin": "catalog:",
+    "everything-dev": "catalog:",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "catalog:"
+  },
+  "scripts": {
+    "build": "every-plugin build",
+    "dev": "every-plugin dev",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "test:bundle": "pnpm run build && vitest run --config vitest.bundle.config.ts"
+  }
+}

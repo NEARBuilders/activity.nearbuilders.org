@@ -4,7 +4,7 @@
 // below. Nav labels are runtime-only (route options, not manifests).
 // See docs/agents/runtime-map.md for the investigation workflows.
 
-export const RUNTIME_MAP_GENERATED_AT = "2026-10-27T02:51:56.421Z";
+export const RUNTIME_MAP_GENERATED_AT = "2026-10-27T12:07:53.383Z";
 export const RUNTIME_MAP_ENV = "development";
 export const RUNTIME_PLATFORM = "2.0.0-rc.24";
 
@@ -58,6 +58,13 @@ export const RUNTIME_BACKENDS = [
     "integrity": "sha384-oNZlEdLD12/zXX5TGwgYPwNFRfyqwNMdzSQ80PE8e6lBXGnIJTUZTSHvDy7TL5Pc",
     "pluginVersion": "2.0.0-rc.8",
     "contractSha256": "2524f91d117547338683a78486cf88acc76eafda84b1f5b4665c08f6921eccee"
+  },
+  {
+    "key": "nostr",
+    "kind": "plugin",
+    "name": "@every-plugin/nostr",
+    "source": "local",
+    "location": "plugins/nostr"
   }
 ] as const;
 export type RuntimeBackend = (typeof RUNTIME_BACKENDS)[number];

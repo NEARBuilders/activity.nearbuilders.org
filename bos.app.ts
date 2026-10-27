@@ -37,5 +37,15 @@ export default App({
       "ACTIVITY_RELAY_URL",
     ],
   },
-  plugins: {},
+  plugins: {
+    nostr: {
+      path: "plugins/nostr",
+      variables: {
+        clientName: "activity.nearbuilders.org",
+        STANDARD_RELAYS:
+          "wss://relay.nearbuilders.org,wss://relay.damus.io,wss://nos.lol,wss://relay.primal.net",
+      },
+      secrets: ["BUZZ_NSEC"],
+    },
+  },
 });
