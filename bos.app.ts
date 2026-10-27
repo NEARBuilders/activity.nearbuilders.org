@@ -4,7 +4,7 @@ import { App } from "everything-dev/descriptor";
 // from this file; dev-only overrides live in bos.dev.ts (never published).
 export default App({
   "name": "activity.nearbuilders.org",
-  "extends": "bos://dev.everything.near/dev.everything.dev",
+  "extends": "bos://dev.everything.near/everything.dev",
   "account": "nearbuilding.near",
   "domain": "activity.nearbuilders.org",
   "title": "Activity | NearBuilders",
