@@ -9,89 +9,39 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as PublicRouteImport } from './routes/_public'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
-import { Route as PublicIndexRouteImport } from './routes/_public/index'
-import { Route as PublicSkillRouteImport } from './routes/_public/skill'
-import { Route as PublicLoginRouteImport } from './routes/_public/login'
-import { Route as PublicActivityRouteImport } from './routes/_public/activity'
-import { Route as PublicAboutRouteImport } from './routes/_public/about'
-import { Route as AuthenticatedTenantsRouteImport } from './routes/_authenticated/tenants'
-import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
-import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
-import { Route as AuthenticatedBindingRouteImport } from './routes/_authenticated/binding'
-import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as PublicRouteImport } from './routes/_public'
 import { Route as AuthenticatedActivitySourcesRouteImport } from './routes/_authenticated/activity-sources'
-import { Route as PublicDocsIndexRouteImport } from './routes/_public/docs/index'
-import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
-import { Route as AuthenticatedOrganizationsIndexRouteImport } from './routes/_authenticated/organizations/index'
-import { Route as PublicDocsSlugRouteImport } from './routes/_public/docs/$slug'
-import { Route as AuthenticatedTenantNewRouteImport } from './routes/_authenticated/tenant/new'
-import { Route as AuthenticatedTenantTenantIdRouteImport } from './routes/_authenticated/tenant/$tenantId'
-import { Route as AuthenticatedSettingsSecurityRouteImport } from './routes/_authenticated/settings/security'
-import { Route as AuthenticatedSettingsProfileRouteImport } from './routes/_authenticated/settings/profile'
-import { Route as AuthenticatedSettingsAuthMethodsRouteImport } from './routes/_authenticated/settings/auth-methods'
-import { Route as AuthenticatedOrganizationsNewRouteImport } from './routes/_authenticated/organizations/new'
-import { Route as AuthenticatedOrganizationsSlugRouteImport } from './routes/_authenticated/organizations/$slug'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
+import { Route as AuthenticatedBindingRouteImport } from './routes/_authenticated/binding'
+import { Route as AuthenticatedHomeRouteImport } from './routes/_authenticated/home'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedTenantsRouteImport } from './routes/_authenticated/tenants'
+import { Route as PublicIndexRouteImport } from './routes/_public/index'
+import { Route as PublicAboutRouteImport } from './routes/_public/about'
+import { Route as PublicActivityRouteImport } from './routes/_public/activity'
+import { Route as PublicLoginRouteImport } from './routes/_public/login'
+import { Route as PublicSkillRouteImport } from './routes/_public/skill'
 import { Route as AuthenticatedAcceptInvitationIdRouteImport } from './routes/_authenticated/accept-invitation.$id'
+import { Route as AuthenticatedOrganizationsIndexRouteImport } from './routes/_authenticated/organizations/index'
+import { Route as AuthenticatedOrganizationsSlugRouteImport } from './routes/_authenticated/organizations/$slug'
+import { Route as AuthenticatedOrganizationsNewRouteImport } from './routes/_authenticated/organizations/new'
+import { Route as AuthenticatedSettingsIndexRouteImport } from './routes/_authenticated/settings/index'
+import { Route as AuthenticatedSettingsAuthMethodsRouteImport } from './routes/_authenticated/settings/auth-methods'
+import { Route as AuthenticatedSettingsProfileRouteImport } from './routes/_authenticated/settings/profile'
+import { Route as AuthenticatedSettingsSecurityRouteImport } from './routes/_authenticated/settings/security'
+import { Route as AuthenticatedTenantTenantIdRouteImport } from './routes/_authenticated/tenant/$tenantId'
+import { Route as AuthenticatedTenantNewRouteImport } from './routes/_authenticated/tenant/new'
+import { Route as PublicDocsIndexRouteImport } from './routes/_public/docs/index'
+import { Route as PublicDocsSlugRouteImport } from './routes/_public/docs/$slug'
 
-const PublicRoute = PublicRouteImport.update({
-  id: '/_public',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthenticatedRoute = AuthenticatedRouteImport.update({
   id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
-const PublicIndexRoute = PublicIndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => PublicRoute,
-} as any)
-const PublicSkillRoute = PublicSkillRouteImport.update({
-  id: '/skill',
-  path: '/skill',
-  getParentRoute: () => PublicRoute,
-} as any)
-const PublicLoginRoute = PublicLoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => PublicRoute,
-} as any)
-const PublicActivityRoute = PublicActivityRouteImport.update({
-  id: '/activity',
-  path: '/activity',
-  getParentRoute: () => PublicRoute,
-} as any)
-const PublicAboutRoute = PublicAboutRouteImport.update({
-  id: '/about',
-  path: '/about',
-  getParentRoute: () => PublicRoute,
-} as any)
-const AuthenticatedTenantsRoute = AuthenticatedTenantsRouteImport.update({
-  id: '/tenants',
-  path: '/tenants',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedHomeRoute = AuthenticatedHomeRouteImport.update({
-  id: '/home',
-  path: '/home',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedBindingRoute = AuthenticatedBindingRouteImport.update({
-  id: '/binding',
-  path: '/binding',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => AuthenticatedRoute,
+const PublicRoute = PublicRouteImport.update({
+  id: '/_public',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedActivitySourcesRoute =
   AuthenticatedActivitySourcesRouteImport.update({
@@ -99,61 +49,66 @@ const AuthenticatedActivitySourcesRoute =
     path: '/activity-sources',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const PublicDocsIndexRoute = PublicDocsIndexRouteImport.update({
-  id: '/docs/',
-  path: '/docs/',
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedBindingRoute = AuthenticatedBindingRouteImport.update({
+  id: '/binding',
+  path: '/binding',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedHomeRoute = AuthenticatedHomeRouteImport.update({
+  id: '/home',
+  path: '/home',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedTenantsRoute = AuthenticatedTenantsRouteImport.update({
+  id: '/tenants',
+  path: '/tenants',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const PublicIndexRoute = PublicIndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => PublicRoute,
 } as any)
-const AuthenticatedSettingsIndexRoute =
-  AuthenticatedSettingsIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => AuthenticatedSettingsRoute,
+const PublicAboutRoute = PublicAboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => PublicRoute,
+} as any)
+const PublicActivityRoute = PublicActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
+  getParentRoute: () => PublicRoute,
+} as any)
+const PublicLoginRoute = PublicLoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => PublicRoute,
+} as any)
+const PublicSkillRoute = PublicSkillRouteImport.update({
+  id: '/skill',
+  path: '/skill',
+  getParentRoute: () => PublicRoute,
+} as any)
+const AuthenticatedAcceptInvitationIdRoute =
+  AuthenticatedAcceptInvitationIdRouteImport.update({
+    id: '/accept-invitation/$id',
+    path: '/accept-invitation/$id',
+    getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedOrganizationsIndexRoute =
   AuthenticatedOrganizationsIndexRouteImport.update({
     id: '/organizations/',
     path: '/organizations/',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const PublicDocsSlugRoute = PublicDocsSlugRouteImport.update({
-  id: '/docs/$slug',
-  path: '/docs/$slug',
-  getParentRoute: () => PublicRoute,
-} as any)
-const AuthenticatedTenantNewRoute = AuthenticatedTenantNewRouteImport.update({
-  id: '/tenant/new',
-  path: '/tenant/new',
-  getParentRoute: () => AuthenticatedRoute,
-} as any)
-const AuthenticatedTenantTenantIdRoute =
-  AuthenticatedTenantTenantIdRouteImport.update({
-    id: '/tenant/$tenantId',
-    path: '/tenant/$tenantId',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedSettingsSecurityRoute =
-  AuthenticatedSettingsSecurityRouteImport.update({
-    id: '/security',
-    path: '/security',
-    getParentRoute: () => AuthenticatedSettingsRoute,
-  } as any)
-const AuthenticatedSettingsProfileRoute =
-  AuthenticatedSettingsProfileRouteImport.update({
-    id: '/profile',
-    path: '/profile',
-    getParentRoute: () => AuthenticatedSettingsRoute,
-  } as any)
-const AuthenticatedSettingsAuthMethodsRoute =
-  AuthenticatedSettingsAuthMethodsRouteImport.update({
-    id: '/auth-methods',
-    path: '/auth-methods',
-    getParentRoute: () => AuthenticatedSettingsRoute,
-  } as any)
-const AuthenticatedOrganizationsNewRoute =
-  AuthenticatedOrganizationsNewRouteImport.update({
-    id: '/organizations/new',
-    path: '/organizations/new',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedOrganizationsSlugRoute =
@@ -162,12 +117,57 @@ const AuthenticatedOrganizationsSlugRoute =
     path: '/organizations/$slug',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
-const AuthenticatedAcceptInvitationIdRoute =
-  AuthenticatedAcceptInvitationIdRouteImport.update({
-    id: '/accept-invitation/$id',
-    path: '/accept-invitation/$id',
+const AuthenticatedOrganizationsNewRoute =
+  AuthenticatedOrganizationsNewRouteImport.update({
+    id: '/organizations/new',
+    path: '/organizations/new',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedSettingsIndexRoute =
+  AuthenticatedSettingsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => AuthenticatedSettingsRoute,
+  } as any)
+const AuthenticatedSettingsAuthMethodsRoute =
+  AuthenticatedSettingsAuthMethodsRouteImport.update({
+    id: '/auth-methods',
+    path: '/auth-methods',
+    getParentRoute: () => AuthenticatedSettingsRoute,
+  } as any)
+const AuthenticatedSettingsProfileRoute =
+  AuthenticatedSettingsProfileRouteImport.update({
+    id: '/profile',
+    path: '/profile',
+    getParentRoute: () => AuthenticatedSettingsRoute,
+  } as any)
+const AuthenticatedSettingsSecurityRoute =
+  AuthenticatedSettingsSecurityRouteImport.update({
+    id: '/security',
+    path: '/security',
+    getParentRoute: () => AuthenticatedSettingsRoute,
+  } as any)
+const AuthenticatedTenantTenantIdRoute =
+  AuthenticatedTenantTenantIdRouteImport.update({
+    id: '/tenant/$tenantId',
+    path: '/tenant/$tenantId',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
+const AuthenticatedTenantNewRoute = AuthenticatedTenantNewRouteImport.update({
+  id: '/tenant/new',
+  path: '/tenant/new',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const PublicDocsIndexRoute = PublicDocsIndexRouteImport.update({
+  id: '/docs/',
+  path: '/docs/',
+  getParentRoute: () => PublicRoute,
+} as any)
+const PublicDocsSlugRoute = PublicDocsSlugRouteImport.update({
+  id: '/docs/$slug',
+  path: '/docs/$slug',
+  getParentRoute: () => PublicRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof PublicIndexRoute
@@ -332,13 +332,6 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_public': {
-      id: '/_public'
-      path: ''
-      fullPath: '/'
-      preLoaderRoute: typeof PublicRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_authenticated': {
       id: '/_authenticated'
       path: ''
@@ -346,67 +339,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_public/': {
-      id: '/_public/'
-      path: '/'
+    '/_public': {
+      id: '/_public'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof PublicIndexRouteImport
-      parentRoute: typeof PublicRoute
+      preLoaderRoute: typeof PublicRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_public/skill': {
-      id: '/_public/skill'
-      path: '/skill'
-      fullPath: '/skill'
-      preLoaderRoute: typeof PublicSkillRouteImport
-      parentRoute: typeof PublicRoute
-    }
-    '/_public/login': {
-      id: '/_public/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof PublicLoginRouteImport
-      parentRoute: typeof PublicRoute
-    }
-    '/_public/activity': {
-      id: '/_public/activity'
-      path: '/activity'
-      fullPath: '/activity'
-      preLoaderRoute: typeof PublicActivityRouteImport
-      parentRoute: typeof PublicRoute
-    }
-    '/_public/about': {
-      id: '/_public/about'
-      path: '/about'
-      fullPath: '/about'
-      preLoaderRoute: typeof PublicAboutRouteImport
-      parentRoute: typeof PublicRoute
-    }
-    '/_authenticated/tenants': {
-      id: '/_authenticated/tenants'
-      path: '/tenants'
-      fullPath: '/tenants'
-      preLoaderRoute: typeof AuthenticatedTenantsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/settings': {
-      id: '/_authenticated/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/home': {
-      id: '/_authenticated/home'
-      path: '/home'
-      fullPath: '/home'
-      preLoaderRoute: typeof AuthenticatedHomeRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/binding': {
-      id: '/_authenticated/binding'
-      path: '/binding'
-      fullPath: '/binding'
-      preLoaderRoute: typeof AuthenticatedBindingRouteImport
+    '/_authenticated/activity-sources': {
+      id: '/_authenticated/activity-sources'
+      path: '/activity-sources'
+      fullPath: '/activity-sources'
+      preLoaderRoute: typeof AuthenticatedActivitySourcesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/admin': {
@@ -416,81 +360,81 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAdminRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/activity-sources': {
-      id: '/_authenticated/activity-sources'
-      path: '/activity-sources'
-      fullPath: '/activity-sources'
-      preLoaderRoute: typeof AuthenticatedActivitySourcesRouteImport
+    '/_authenticated/binding': {
+      id: '/_authenticated/binding'
+      path: '/binding'
+      fullPath: '/binding'
+      preLoaderRoute: typeof AuthenticatedBindingRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_public/docs/': {
-      id: '/_public/docs/'
-      path: '/docs'
-      fullPath: '/docs/'
-      preLoaderRoute: typeof PublicDocsIndexRouteImport
+    '/_authenticated/home': {
+      id: '/_authenticated/home'
+      path: '/home'
+      fullPath: '/home'
+      preLoaderRoute: typeof AuthenticatedHomeRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/tenants': {
+      id: '/_authenticated/tenants'
+      path: '/tenants'
+      fullPath: '/tenants'
+      preLoaderRoute: typeof AuthenticatedTenantsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_public/': {
+      id: '/_public/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof PublicIndexRouteImport
       parentRoute: typeof PublicRoute
     }
-    '/_authenticated/settings/': {
-      id: '/_authenticated/settings/'
-      path: '/'
-      fullPath: '/settings/'
-      preLoaderRoute: typeof AuthenticatedSettingsIndexRouteImport
-      parentRoute: typeof AuthenticatedSettingsRoute
+    '/_public/about': {
+      id: '/_public/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof PublicAboutRouteImport
+      parentRoute: typeof PublicRoute
+    }
+    '/_public/activity': {
+      id: '/_public/activity'
+      path: '/activity'
+      fullPath: '/activity'
+      preLoaderRoute: typeof PublicActivityRouteImport
+      parentRoute: typeof PublicRoute
+    }
+    '/_public/login': {
+      id: '/_public/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof PublicLoginRouteImport
+      parentRoute: typeof PublicRoute
+    }
+    '/_public/skill': {
+      id: '/_public/skill'
+      path: '/skill'
+      fullPath: '/skill'
+      preLoaderRoute: typeof PublicSkillRouteImport
+      parentRoute: typeof PublicRoute
+    }
+    '/_authenticated/accept-invitation/$id': {
+      id: '/_authenticated/accept-invitation/$id'
+      path: '/accept-invitation/$id'
+      fullPath: '/accept-invitation/$id'
+      preLoaderRoute: typeof AuthenticatedAcceptInvitationIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/organizations/': {
       id: '/_authenticated/organizations/'
       path: '/organizations'
       fullPath: '/organizations/'
       preLoaderRoute: typeof AuthenticatedOrganizationsIndexRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_public/docs/$slug': {
-      id: '/_public/docs/$slug'
-      path: '/docs/$slug'
-      fullPath: '/docs/$slug'
-      preLoaderRoute: typeof PublicDocsSlugRouteImport
-      parentRoute: typeof PublicRoute
-    }
-    '/_authenticated/tenant/new': {
-      id: '/_authenticated/tenant/new'
-      path: '/tenant/new'
-      fullPath: '/tenant/new'
-      preLoaderRoute: typeof AuthenticatedTenantNewRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/tenant/$tenantId': {
-      id: '/_authenticated/tenant/$tenantId'
-      path: '/tenant/$tenantId'
-      fullPath: '/tenant/$tenantId'
-      preLoaderRoute: typeof AuthenticatedTenantTenantIdRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/settings/security': {
-      id: '/_authenticated/settings/security'
-      path: '/security'
-      fullPath: '/settings/security'
-      preLoaderRoute: typeof AuthenticatedSettingsSecurityRouteImport
-      parentRoute: typeof AuthenticatedSettingsRoute
-    }
-    '/_authenticated/settings/profile': {
-      id: '/_authenticated/settings/profile'
-      path: '/profile'
-      fullPath: '/settings/profile'
-      preLoaderRoute: typeof AuthenticatedSettingsProfileRouteImport
-      parentRoute: typeof AuthenticatedSettingsRoute
-    }
-    '/_authenticated/settings/auth-methods': {
-      id: '/_authenticated/settings/auth-methods'
-      path: '/auth-methods'
-      fullPath: '/settings/auth-methods'
-      preLoaderRoute: typeof AuthenticatedSettingsAuthMethodsRouteImport
-      parentRoute: typeof AuthenticatedSettingsRoute
-    }
-    '/_authenticated/organizations/new': {
-      id: '/_authenticated/organizations/new'
-      path: '/organizations/new'
-      fullPath: '/organizations/new'
-      preLoaderRoute: typeof AuthenticatedOrganizationsNewRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/organizations/$slug': {
@@ -500,12 +444,68 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOrganizationsSlugRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
-    '/_authenticated/accept-invitation/$id': {
-      id: '/_authenticated/accept-invitation/$id'
-      path: '/accept-invitation/$id'
-      fullPath: '/accept-invitation/$id'
-      preLoaderRoute: typeof AuthenticatedAcceptInvitationIdRouteImport
+    '/_authenticated/organizations/new': {
+      id: '/_authenticated/organizations/new'
+      path: '/organizations/new'
+      fullPath: '/organizations/new'
+      preLoaderRoute: typeof AuthenticatedOrganizationsNewRouteImport
       parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/settings/': {
+      id: '/_authenticated/settings/'
+      path: '/'
+      fullPath: '/settings/'
+      preLoaderRoute: typeof AuthenticatedSettingsIndexRouteImport
+      parentRoute: typeof AuthenticatedSettingsRoute
+    }
+    '/_authenticated/settings/auth-methods': {
+      id: '/_authenticated/settings/auth-methods'
+      path: '/auth-methods'
+      fullPath: '/settings/auth-methods'
+      preLoaderRoute: typeof AuthenticatedSettingsAuthMethodsRouteImport
+      parentRoute: typeof AuthenticatedSettingsRoute
+    }
+    '/_authenticated/settings/profile': {
+      id: '/_authenticated/settings/profile'
+      path: '/profile'
+      fullPath: '/settings/profile'
+      preLoaderRoute: typeof AuthenticatedSettingsProfileRouteImport
+      parentRoute: typeof AuthenticatedSettingsRoute
+    }
+    '/_authenticated/settings/security': {
+      id: '/_authenticated/settings/security'
+      path: '/security'
+      fullPath: '/settings/security'
+      preLoaderRoute: typeof AuthenticatedSettingsSecurityRouteImport
+      parentRoute: typeof AuthenticatedSettingsRoute
+    }
+    '/_authenticated/tenant/$tenantId': {
+      id: '/_authenticated/tenant/$tenantId'
+      path: '/tenant/$tenantId'
+      fullPath: '/tenant/$tenantId'
+      preLoaderRoute: typeof AuthenticatedTenantTenantIdRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/tenant/new': {
+      id: '/_authenticated/tenant/new'
+      path: '/tenant/new'
+      fullPath: '/tenant/new'
+      preLoaderRoute: typeof AuthenticatedTenantNewRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_public/docs/': {
+      id: '/_public/docs/'
+      path: '/docs'
+      fullPath: '/docs/'
+      preLoaderRoute: typeof PublicDocsIndexRouteImport
+      parentRoute: typeof PublicRoute
+    }
+    '/_public/docs/$slug': {
+      id: '/_public/docs/$slug'
+      path: '/docs/$slug'
+      fullPath: '/docs/$slug'
+      preLoaderRoute: typeof PublicDocsSlugRouteImport
+      parentRoute: typeof PublicRoute
     }
   }
 }

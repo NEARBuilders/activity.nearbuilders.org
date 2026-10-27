@@ -6,15 +6,15 @@
   "scripts": {
     "dev": "rsbuild dev",
     "dev:ssr": "BUILD_TARGET=server rsbuild dev",
-    "build": "bun run build:client && bun run build:ssr",
-    "deploy": "DEPLOY=true bun run build",
+    "build": "pnpm run build:client && pnpm run build:ssr",
+    "deploy": "DEPLOY=true pnpm run build",
     "build:client": "BUILD_TARGET=client rsbuild build",
     "build:ssr": "BUILD_TARGET=server rsbuild build",
     "preview": "rsbuild preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "build:types": "tsc --declaration --emitDeclarationOnly --outDir dist/types",
-    "generate-metadata": "bun run ./scripts/generate-metadata.ts"
+    "generate-metadata": "pnpm run ./scripts/generate-metadata.ts"
   },
   "dependencies": {
     "@better-auth/api-key": "catalog:",
@@ -96,7 +96,6 @@
     "tailwindcss": "^4.1.17",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "zephyr-rsbuild-plugin": "catalog:",
     "sharp": "^0.34.5"
   }
 }

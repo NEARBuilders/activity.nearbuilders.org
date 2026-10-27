@@ -1,9 +1,9 @@
 import type { ContractType as nostrContract } from "../../../.bos/generated/plugins/nostr/contract.d.ts";
 import type { ContractType as authContract } from "../../../.bos/generated/auth/contract.d.ts";
-import type { ContractRouterClient, AnyContractRouter } from "@orpc/contract";
-type ClientFactory<C extends AnyContractRouter> = (context?: Record<string, unknown>) => ContractRouterClient<C>;
+import type { RouterContract } from "@orpc/contract";
+import type { PluginClientEntry } from "every-plugin";
 
 export type PluginsClient = {
-  nostr: ClientFactory<nostrContract>;
-  auth: ClientFactory<authContract>;
+  nostr: PluginClientEntry<nostrContract>;
+  auth: PluginClientEntry<authContract>;
 };

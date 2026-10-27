@@ -159,6 +159,7 @@ export declare const contract: {
             targetType: z.ZodString;
             nearAccountId: z.ZodNullable<z.ZodOptional<z.ZodString>>;
             parentEventId: z.ZodNullable<z.ZodOptional<z.ZodString>>;
+            rootEventId: z.ZodNullable<z.ZodOptional<z.ZodString>>;
             createdAt: z.ZodNumber;
             tags: z.ZodOptional<z.ZodArray<z.ZodArray<z.ZodString>>>;
             source: z.ZodEnum<{
@@ -411,6 +412,68 @@ export declare const contract: {
                     message: z.ZodString;
                     code: z.ZodOptional<z.ZodString>;
                 }, z.core.$strip>>>;
+            }, z.core.$strip>;
+        };
+    }>>, Record<never, never>>;
+    vaultPut: import("@orpc/contract").ContractProcedure<z.ZodObject<{
+        nsec: z.ZodString;
+    }, z.core.$strip>, z.ZodObject<{
+        createdAt: z.ZodString;
+    }, z.core.$strip>, import("@orpc/contract").MergedErrorMap<Record<never, never>, import("@orpc/contract").MergedErrorMap<Record<never, never>, {
+        BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: z.ZodObject<{
+                invalidFields: z.ZodOptional<z.ZodArray<z.ZodString>>;
+                validationErrors: z.ZodOptional<z.ZodArray<z.ZodObject<{
+                    field: z.ZodString;
+                    message: z.ZodString;
+                    code: z.ZodOptional<z.ZodString>;
+                }, z.core.$strip>>>;
+            }, z.core.$strip>;
+        };
+        UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: z.ZodObject<{
+                apiKeyProvided: z.ZodBoolean;
+                provider: z.ZodOptional<z.ZodString>;
+                authType: z.ZodOptional<z.ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, z.core.$strip>;
+        };
+    }>>, Record<never, never>>;
+    vaultGet: import("@orpc/contract").ContractProcedure<z.ZodObject<{}, z.core.$strip>, z.ZodNullable<z.ZodObject<{
+        nsec: z.ZodString;
+        createdAt: z.ZodString;
+    }, z.core.$strip>>, import("@orpc/contract").MergedErrorMap<Record<never, never>, import("@orpc/contract").MergedErrorMap<Record<never, never>, {
+        UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: z.ZodObject<{
+                apiKeyProvided: z.ZodBoolean;
+                provider: z.ZodOptional<z.ZodString>;
+                authType: z.ZodOptional<z.ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, z.core.$strip>;
+        };
+    }>>, Record<never, never>>;
+    vaultDelete: import("@orpc/contract").ContractProcedure<z.ZodObject<{}, z.core.$strip>, z.ZodObject<{
+        deleted: z.ZodBoolean;
+    }, z.core.$strip>, import("@orpc/contract").MergedErrorMap<Record<never, never>, import("@orpc/contract").MergedErrorMap<Record<never, never>, {
+        UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: z.ZodObject<{
+                apiKeyProvided: z.ZodBoolean;
+                provider: z.ZodOptional<z.ZodString>;
+                authType: z.ZodOptional<z.ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
             }, z.core.$strip>;
         };
     }>>, Record<never, never>>;
