@@ -30,7 +30,7 @@ bos dev --api remote    # Isolate UI work
 
 ## Configuration
 
-`bos.config.json` only needs the UI runtime URLs and package metadata. Build-time module exposes stay in `ui/rsbuild.config.ts`.
+`bos.app.ts` only needs the UI workspace path. `every-plugin build` produces the web and SSR bundles and their module exposes.
 
 ## Route protection
 

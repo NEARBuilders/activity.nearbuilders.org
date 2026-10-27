@@ -4,7 +4,7 @@
 // below. Nav labels are runtime-only (route options, not manifests).
 // See docs/agents/runtime-map.md for the investigation workflows.
 
-export const RUNTIME_MAP_GENERATED_AT = "2026-10-27T00:59:03.664Z";
+export const RUNTIME_MAP_GENERATED_AT = "2026-10-27T02:51:56.421Z";
 export const RUNTIME_MAP_ENV = "development";
 export const RUNTIME_PLATFORM = "2.0.0-rc.24";
 
@@ -58,20 +58,6 @@ export const RUNTIME_BACKENDS = [
     "integrity": "sha384-oNZlEdLD12/zXX5TGwgYPwNFRfyqwNMdzSQ80PE8e6lBXGnIJTUZTSHvDy7TL5Pc",
     "pluginVersion": "2.0.0-rc.8",
     "contractSha256": "2524f91d117547338683a78486cf88acc76eafda84b1f5b4665c08f6921eccee"
-  },
-  {
-    "key": "nostr",
-    "kind": "plugin",
-    "name": "@every-plugin/nostr",
-    "source": "remote",
-    "location": "https://elliot-braem-9131-every-plugin-nostr-nostr-nearbu-dcbd78779-ze.zephyrcloud.app",
-    "pluginManifestUrl": "https://elliot-braem-9131-every-plugin-nostr-nostr-nearbu-dcbd78779-ze.zephyrcloud.app/plugin.manifest.json",
-    "integrity": "sha384-el2M3zK9udcHe5+jiDbsFOGz63H9FZAVhS4gKW33KZFbctD9hIb9r3KvGxawav9V",
-    "dependsOn": [
-      "auth"
-    ],
-    "pluginVersion": "1.1.0",
-    "contractSha256": "28eedc9616747d7ae95811d30936d76961f0fd651510df96c15bee20412f1bcf"
   }
 ] as const;
 export type RuntimeBackend = (typeof RUNTIME_BACKENDS)[number];
@@ -177,11 +163,5 @@ export const SHADOWED_ROUTES = [
   }
 ] as const;
 
-export const UNRESOLVED_SOURCES = [
-  {
-    "key": "nostr",
-    "kind": "plugin-ui",
-    "reason": "fetch https://elliot-braem-9129-ui-nostr-nearbuilders-org-nearb-b7951b19d-ze.zephyrcloud.app/manifest.gen.json failed: HTTP 404 "
-  }
-] as const;
+export const UNRESOLVED_SOURCES = [] as const;
 export type UnresolvedSource = (typeof UNRESOLVED_SOURCES)[number];
