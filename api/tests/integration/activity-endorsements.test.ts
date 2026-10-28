@@ -106,10 +106,13 @@ describe("Activity event endorsements", () => {
       publicClient.getActivityEventEndorsements({ eventIds: [submitted.eventId] }),
     ).resolves.toEqual({});
     const replayController = new AbortController();
-    const replay = await alice.streamActivityEventEndorsements({}, {
-      signal: replayController.signal,
-      lastEventId: "0",
-    });
+    const replay = await alice.streamActivityEventEndorsements(
+      {},
+      {
+        signal: replayController.signal,
+        lastEventId: "0",
+      },
+    );
     await expect(withTestTimeout(replay[Symbol.asyncIterator]().next(), 100)).rejects.toThrow(
       "Timed out waiting for streamed Activity event",
     );
