@@ -325,7 +325,8 @@ Content-Type: application/json
 The response maps each event ID to `{ eventId, totalCount, endorsedByCurrentUser }`, where
 `endorsedByCurrentUser` reflects the session making the request and is `false` when signed out.
 A signed-in user endorses with `POST /v1/events/{eventId}/endorsement` and withdraws with `DELETE`
-on the same path; both are idempotent and return the updated total.
+on the same path; both are idempotent, require a visible event, and return the updated total.
+Requests for hidden events return `404`.
 
 ## 7. Check service health
 
