@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, it } from "vitest";
-import { authedContext, getPluginClient, teardown } from "../setup";
+import { adminContext, authedContext, getPluginClient, teardown } from "../setup";
 import { withTestTimeout } from "./activity-stream-test-helpers";
 import { provisionIngestionSource } from "./activity-test-helpers";
 
@@ -95,5 +95,27 @@ describe("Activity event endorsements", () => {
       totalCount: 1,
       endorsedByCurrentUser: false,
     });
+
+    const administrator = await getPluginClient(adminContext("endorsement-moderator"));
+    await administrator.hideActivityEvent({
+      eventId: submitted.eventId,
+      reason: "Hidden endorsement regression test",
+      idempotencyKey: "endorsement-hide-v1",
+    });
+    await expect(
+      publicClient.getActivityEventEndorsements({ eventIds: [submitted.eventId] }),
+    ).resolves.toEqual({});
+    const replayController = new AbortController();
+    const replay = await alice.streamActivityEventEndorsements({}, {
+      signal: replayController.signal,
+      lastEventId: "0",
+    });
+    await expect(withTestTimeout(replay[Symbol.asyncIterator]().next(), 100)).rejects.toThrow(
+      "Timed out waiting for streamed Activity event",
+    );
+    replayController.abort();
+    await expect(bob.unendorseActivityEvent({ eventId: submitted.eventId })).rejects.toThrow(
+      "Activity event not found",
+    );
   });
 });

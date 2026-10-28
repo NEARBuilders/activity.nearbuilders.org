@@ -258,6 +258,15 @@ export class ActivityModerationService {
     return this.#store.listHidden();
   }
 
+  async excludeHiddenEventIds(eventIds: readonly string[]): Promise<string[]> {
+    const hidden = await this.#store.findHiddenEventIds(eventIds);
+    return eventIds.filter((eventId) => !hidden.has(eventId));
+  }
+
+  isHidden(eventId: string): Promise<boolean> {
+    return this.#store.isHidden(eventId);
+  }
+
   async #result(request: RequestRow, requestReplayed: boolean): Promise<HideActivityEventResult> {
     const hiddenEvent = await this.#store.getHidden(request.eventId);
     if (!hiddenEvent) throw new Error("Hidden Activity event was not persisted");

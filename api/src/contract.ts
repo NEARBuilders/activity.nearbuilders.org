@@ -898,7 +898,7 @@ export const contract = oc.router({
     })
     .input(z.object({ eventId: z.string().regex(/^[a-f0-9]{64}$/) }))
     .output(ActivityEventEndorsementSchema)
-    .errors({ UNAUTHORIZED }),
+    .errors({ UNAUTHORIZED, NOT_FOUND, SERVICE_UNAVAILABLE }),
 
   getActivityEventEndorsements: oc
     .route({

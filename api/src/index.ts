@@ -851,13 +851,21 @@ export default createPlugin.withPlugins<PluginsClient>()({
 
       unendorseActivityEvent: builder.unendorseActivityEvent
         .use(requireAuth)
-        .handler(async ({ input, context }) =>
-          services.activityEndorsements.unendorse(input.eventId, context.userId),
-        ),
+        .handler(async ({ input, context }) => {
+          await requireVisibleActivityEvent(input.eventId);
+          return services.activityEndorsements.unendorse(input.eventId, context.userId);
+        }),
 
       getActivityEventEndorsements: builder.getActivityEventEndorsements.handler(
-        async ({ input, context }) =>
-          services.activityEndorsements.getStates(input.eventIds, context.userId ?? undefined),
+        async ({ input, context }) => {
+          const visibleEventIds = await services.activityModeration.excludeHiddenEventIds(
+            input.eventIds,
+          );
+          return services.activityEndorsements.getStates(
+            visibleEventIds,
+            context.userId ?? undefined,
+          );
+        },
       ),
 
       streamActivityEventEndorsements: builder.streamActivityEventEndorsements.handler(
@@ -867,6 +875,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
             lastEventId,
           });
           for await (const update of iterator) {
+            if (await services.activityModeration.isHidden(update.eventId)) continue;
             yield {
               operation: update.operation,
               eventId: update.eventId,

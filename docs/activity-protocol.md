@@ -133,8 +133,9 @@ modify the immutable Nostr event and they are not negative votes.
 
 `POST /api/v1/events/{eventId}/endorsement` adds the current user's endorsement and
 `DELETE /api/v1/events/{eventId}/endorsement` removes it. Both operations are idempotent and return
-the current total plus `endorsedByCurrentUser`. Adding an endorsement first verifies that the event
-is still available in the public feed.
+the current total plus `endorsedByCurrentUser`; both require the event to remain visible and return
+`404` for a hidden event. Adding an endorsement first verifies that the event is still available in
+the public feed.
 
 Clients fetch counts and current-user state for up to 100 visible events with one request:
 
