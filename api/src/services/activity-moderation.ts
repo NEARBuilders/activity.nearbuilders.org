@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
+import { ORPCError } from "@orpc/server";
 import { and, asc, desc, eq, inArray } from "drizzle-orm";
-import { ORPCError } from "every-plugin/orpc";
 import {
   type ActivityFeedEvent,
   ActivityFeedEventSchema,

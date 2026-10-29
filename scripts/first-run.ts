@@ -1,10 +1,11 @@
-#!/usr/bin/env bun
-// `bun run first-run` — the only setup step a new contributor should need
-// beyond `bun install`. Bootstraps .env, mints a local signing key if none
+#!/usr/bin/env -S pnpm exec tsx
+// `pnpm run first-run` — the only setup step a new contributor should need
+// beyond `pnpm install`. Bootstraps .env, mints a local signing key if none
 // exists, wires the app at the local relay/redis instead of the unresolvable
-// production hostnames in bos.config.json (see docs/research/activity-relay-503.md),
+// production hostnames in bos.app.ts (see docs/research/activity-relay-503.md),
 // and brings up the local infra. Safe to re-run: every step is additive,
 // never overwriting a value an operator already set.
+import { spawnSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
@@ -15,7 +16,7 @@ import {
   setEnvValueIfBlank,
 } from "./lib/env-file";
 
-const root = join(import.meta.dir, "..");
+const root = join(import.meta.dirname, "..");
 const envPath = join(root, ".env");
 const envExamplePath = join(root, ".env.example");
 const composeFile = join(root, "compose.activity.yml");
@@ -34,10 +35,7 @@ function writeEnv(content: string): void {
 
 function logContainerLogs(): void {
   console.error("Container log:");
-  Bun.spawnSync(["docker", "compose", "-f", composeFile, "logs"], {
-    stdout: "inherit",
-    stderr: "inherit",
-  });
+  spawnSync("docker", ["compose", "-f", composeFile, "logs"], { stdio: "inherit" });
 }
 
 // 1. Bootstrap .env
@@ -59,15 +57,16 @@ if (!existsSync(envPath)) {
 // 2. Generate or accept master keys
 if (isEnvValueBlank(envContent, "ACTIVITY_SIGNING_MASTER_KEYS")) {
   console.log("No signing keyring found — generating one with scripts/keys-gen.ts (version v1)...");
-  const keysGen = Bun.spawnSync(["bun", "run", join(root, "scripts", "keys-gen.ts")], {
-    stdout: "pipe",
-    stderr: "inherit",
+  const keysGen = spawnSync("pnpm", ["exec", "tsx", join(root, "scripts", "keys-gen.ts")], {
+    cwd: root,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "inherit"],
   });
-  if (keysGen.exitCode !== 0) {
+  if (keysGen.status !== 0) {
     console.error("scripts/keys-gen.ts failed; aborting first-run.");
     process.exit(1);
   }
-  const output = keysGen.stdout.toString().split("\n");
+  const output = keysGen.stdout.split("\n");
   const keysLine = output.find((line) => line.startsWith("ACTIVITY_SIGNING_MASTER_KEYS="));
   const versionLine = output.find((line) =>
     line.startsWith("ACTIVITY_SIGNING_ACTIVE_KEY_VERSION="),
@@ -110,40 +109,27 @@ if (isEnvValueBlank(envContent, "ACTIVITY_SIGNING_MASTER_KEYS")) {
 
 // 4. Start local infra and wait for both healthchecks
 console.log("Starting local infra (activity relay on :7447, redis on :6379)...");
-const infra = Bun.spawn(["bun", "run", "dev:activity-infra"], {
+const infra = spawnSync("pnpm", ["run", "dev:activity-infra"], {
   cwd: root,
-  stdout: "inherit",
-  stderr: "inherit",
+  stdio: "inherit",
+  timeout: infraTimeoutMs,
 });
-let timeoutHandle: Timer | undefined;
-const timedOut = await Promise.race([
-  infra.exited.then(() => false),
-  new Promise<boolean>((resolve) => {
-    timeoutHandle = setTimeout(() => resolve(true), infraTimeoutMs);
-  }),
-]);
-clearTimeout(timeoutHandle);
-if (timedOut) {
-  infra.kill();
+if ((infra.error as NodeJS.ErrnoException | undefined)?.code === "ETIMEDOUT") {
   console.error(`Local infra did not report healthy within ${infraTimeoutMs / 1000}s.`);
   logContainerLogs();
   process.exit(1);
 }
-if (infra.exitCode !== 0) {
-  console.error(`dev:activity-infra exited with code ${infra.exitCode}.`);
+if (infra.status !== 0) {
+  console.error(`dev:activity-infra exited with code ${infra.status}.`);
   logContainerLogs();
   process.exit(1);
 }
 
 // 5. Delegate to setup:check, then hand off
-const check = Bun.spawnSync(["bun", "run", "setup:check"], {
-  cwd: root,
-  stdout: "inherit",
-  stderr: "inherit",
-});
-if (check.exitCode !== 0) {
-  process.exit(check.exitCode ?? 1);
+const check = spawnSync("pnpm", ["run", "setup:check"], { cwd: root, stdio: "inherit" });
+if (check.status !== 0) {
+  process.exit(check.status ?? 1);
 }
 
 console.log("Local relay and Redis are wired in and healthy.");
-console.log("bun run dev");
+console.log("pnpm run dev");

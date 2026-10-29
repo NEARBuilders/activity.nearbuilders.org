@@ -21,14 +21,16 @@ import { getSocialImageMeta } from "everything-dev/ui/metadata";
 import { ThemeProvider } from "next-themes";
 import type { RouterContext } from "@/app";
 import { getBaseStyles } from "@/app";
+import { AppShell } from "@/components/layout/app-shell";
 import { Toaster } from "@/components/ui/sonner";
 import { useMediaQuery } from "@/hooks";
-import { sessionQueryKey } from "@/lib/auth";
+import { AppI18nProvider } from "@/i18n/runtime";
+import { resolveSessionFromCache, sessionQueryKey } from "@/lib/auth";
 import TanStackQueryDevtools from "../integrations/tanstack-query/devtools";
 
 export const Route = createRootRouteWithContext<RouterContext>()({
   beforeLoad: async ({ context }) => {
-    const session = context.session;
+    const session = resolveSessionFromCache(context.queryClient, context.session);
 
     return {
       runtimeConfig: context.runtimeConfig,
@@ -38,9 +40,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   },
   loader: async ({ context }) => {
     const { queryClient } = context;
-    const session = context.session;
+    const session = resolveSessionFromCache(queryClient, context.session);
 
-    if (session && queryClient) {
+    if (session !== undefined && queryClient) {
       queryClient.setQueryData(sessionQueryKey, session);
     }
 
@@ -154,7 +156,11 @@ function RootComponent() {
       <body>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem nonce={cspNonce}>
           <div id="root">
-            <Outlet />
+            <AppI18nProvider>
+              <AppShell>
+                <Outlet />
+              </AppShell>
+            </AppI18nProvider>
           </div>
           <Toaster position={isDesktop ? "bottom-right" : "top-center"} closeButton />
         </ThemeProvider>

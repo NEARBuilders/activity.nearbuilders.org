@@ -64,18 +64,22 @@ describe("clean-room Activity client example", () => {
       name: "Clean-room smoke test",
     });
 
-    const { stdout, stderr } = await execFileAsync("bun", ["examples/run-activity-example.ts"], {
-      cwd: resolve(import.meta.dirname, "../../.."),
-      env: {
-        ...process.env,
-        ACTIVITY_API_BASE_URL: await getPluginBaseUrl(),
-        ACTIVITY_API_KEY: credential.secret,
-        ACTIVITY_SOURCE_ID: sourceId,
-        ACTIVITY_EVENT_TYPE: "example.activity",
-        ACTIVITY_ACTOR: "example.near",
-        ACTIVITY_EXAMPLE_RUN_ID: suffix,
+    const { stdout, stderr } = await execFileAsync(
+      "pnpm",
+      ["exec", "tsx", "examples/run-activity-example.ts"],
+      {
+        cwd: resolve(import.meta.dirname, "../../.."),
+        env: {
+          ...process.env,
+          ACTIVITY_API_BASE_URL: await getPluginBaseUrl(),
+          ACTIVITY_API_KEY: credential.secret,
+          ACTIVITY_SOURCE_ID: sourceId,
+          ACTIVITY_EVENT_TYPE: "example.activity",
+          ACTIVITY_ACTOR: "example.near",
+          ACTIVITY_EXAMPLE_RUN_ID: suffix,
+        },
       },
-    });
+    );
     const result = JSON.parse(stdout);
 
     expect(`${stdout}${stderr}`).not.toContain(credential.secret);

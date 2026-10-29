@@ -1,5 +1,5 @@
+import { MemoryPublisher } from "@orpc/publisher/memory";
 import { and, count, eq, inArray } from "drizzle-orm";
-import { MemoryPublisher } from "every-plugin/orpc";
 import type { ActivityEventEndorsement } from "../contract";
 import type { Database } from "../db";
 import { activityEventEndorsements as endorsementsTable } from "../db/schema";
@@ -18,7 +18,7 @@ type ActivityEndorsementEvents = {
 
 export class ActivityEndorsementsService {
   readonly publisher = new MemoryPublisher<ActivityEndorsementEvents>({
-    resumeRetentionSeconds: 120,
+    resume: { enabled: true, seconds: 120 },
   });
   readonly #db: Database;
 

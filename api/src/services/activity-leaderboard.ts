@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { eq } from "drizzle-orm";
-import { Context, Effect, Layer } from "every-plugin/effect";
+import { Context, Effect, Layer } from "effect";
 import { createClient, type RedisClientType } from "redis";
 import type { ActivityLeaderboardPeriod, ActivityLeaderboardResult } from "../contract";
 import type { Database } from "../db";
@@ -553,13 +553,13 @@ export async function createRedisActivityLeaderboard(
   );
 }
 
-export class ActivityLeaderboardTag extends Context.Tag("api/ActivityLeaderboard")<
-  ActivityLeaderboard,
+export class ActivityLeaderboardTag extends Context.Service<
+  ActivityLeaderboardTag,
   ActivityLeaderboard
->() {}
+>()("api/ActivityLeaderboard") {}
 
 export function ActivityLeaderboardLive(input: ActivityLeaderboardOptions) {
-  return Layer.scoped(
+  return Layer.effect(
     ActivityLeaderboardTag,
     Effect.acquireRelease(
       Effect.promise(() => Promise.resolve(createActivityLeaderboard(input))),

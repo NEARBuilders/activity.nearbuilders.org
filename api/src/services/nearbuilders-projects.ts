@@ -1,4 +1,4 @@
-import { ORPCError } from "every-plugin/orpc";
+import { ORPCError } from "@orpc/server";
 import { ACTIVITY_SOURCE_ID_REGEX, NEAR_ACCOUNT_ID_REGEX } from "../contract";
 
 export const NEARBUILDERS_SITE_URL = "https://nearbuilders.org";

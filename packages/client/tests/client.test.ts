@@ -6,9 +6,9 @@ afterEach(() => {
 });
 
 it("targets the Activity RPC endpoint and sends a Source API Key", async () => {
-  const requests: Array<{ request: Request; options: RequestInit }> = [];
-  vi.stubGlobal("fetch", async (request: Request, options: RequestInit) => {
-    requests.push({ request, options });
+  const requests: Array<{ url: string; options: RequestInit }> = [];
+  vi.stubGlobal("fetch", async (url: string, options: RequestInit) => {
+    requests.push({ url, options });
     throw new Error("offline");
   });
 
@@ -19,18 +19,16 @@ it("targets the Activity RPC endpoint and sends a Source API Key", async () => {
   await expect(client.listActivityEvents({ limit: 5 })).rejects.toThrow();
 
   expect(requests).toHaveLength(1);
-  expect(requests[0]?.request.url).toBe(
-    "https://activity.nearbuilders.org/api/rpc/listActivityEvents",
-  );
-  expect(requests[0]?.request.method).toBe("POST");
-  expect(requests[0]?.request.headers.get("authorization")).toBe("Bearer act_test");
+  expect(requests[0]?.url).toBe("https://activity.nearbuilders.org/api/rpc/listActivityEvents");
+  expect(requests[0]?.options.method).toBe("POST");
+  expect(new Headers(requests[0]?.options.headers).get("authorization")).toBe("Bearer act_test");
   expect(requests[0]?.options.credentials).toBe("include");
 });
 
 it("uses session credentials without an authorization header when no key is supplied", async () => {
-  const requests: Array<{ request: Request; options: RequestInit }> = [];
-  vi.stubGlobal("fetch", async (request: Request, options: RequestInit) => {
-    requests.push({ request, options });
+  const requests: Array<{ url: string; options: RequestInit }> = [];
+  vi.stubGlobal("fetch", async (url: string, options: RequestInit) => {
+    requests.push({ url, options });
     throw new Error("offline");
   });
 
@@ -39,6 +37,6 @@ it("uses session credentials without an authorization header when no key is supp
   await expect(client.listActivityEvents({ limit: 5 })).rejects.toThrow();
 
   expect(requests).toHaveLength(1);
-  expect(requests[0]?.request.headers.has("authorization")).toBe(false);
+  expect(new Headers(requests[0]?.options.headers).has("authorization")).toBe(false);
   expect(requests[0]?.options.credentials).toBe("include");
 });

@@ -1,0 +1,387 @@
+{
+  "generatedAt": "2026-10-29T04:19:39.445Z",
+  "env": "development",
+  "platform": "2.0.0-rc.27",
+  "extends": "/Users/elliot.braem/workspace/product/activity.nearbuilders.org/bos.app.ts → bos://dev.everything.near/everything.dev",
+  "sources": [
+    {
+      "key": "ui",
+      "kind": "core",
+      "source": "local",
+      "location": "ui",
+      "manifestUrl": null,
+      "pin": null,
+      "note": null
+    },
+    {
+      "key": "auth",
+      "kind": "auth-ui",
+      "source": "remote",
+      "location": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/auth-ui",
+      "manifestUrl": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/auth-ui/manifest.gen.json",
+      "pin": null,
+      "note": null
+    }
+  ],
+  "backends": [
+    {
+      "key": "host",
+      "kind": "host",
+      "name": "host",
+      "source": "remote",
+      "location": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/host",
+      "integrity": "sha384-RvX5W5lE9IB3nZ1ir+Szat65HznPrbrXsK1P06YbeBQCeGYuAT5Ybv0LUbxQgxAW"
+    },
+    {
+      "key": "api",
+      "kind": "api",
+      "name": "api",
+      "source": "local",
+      "location": "api"
+    },
+    {
+      "key": "auth",
+      "kind": "auth",
+      "name": "@everything-dev/auth-plugin",
+      "source": "remote",
+      "location": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/auth",
+      "pluginManifestUrl": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/auth/plugin.manifest.json",
+      "integrity": "sha384-I/p+o3D7aI9NX4np1RZ9pohg4ULFNPtUeYVpiwFsHkjmFzLLPKkCmmZ6JSvia6cM",
+      "pluginVersion": "2.0.0-rc.8",
+      "contractSha256": "2524f91d117547338683a78486cf88acc76eafda84b1f5b4665c08f6921eccee"
+    }
+  ],
+  "unresolved": [],
+  "mounts": [
+    {
+      "id": "authenticated",
+      "declaredBy": "ui",
+      "recordId": "_authenticated"
+    },
+    {
+      "id": "public",
+      "declaredBy": "ui",
+      "recordId": "_public"
+    }
+  ],
+  "routes": [
+    {
+      "id": "_authenticated/activity-sources",
+      "owner": "ui",
+      "mount": "authenticated",
+      "type": "route",
+      "path": "/activity-sources",
+      "fullPath": "/activity-sources",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_authenticated/admin",
+      "owner": "ui",
+      "mount": "authenticated",
+      "type": "route",
+      "path": "/admin",
+      "fullPath": "/admin",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_authenticated/binding",
+      "owner": "ui",
+      "mount": "authenticated",
+      "type": "route",
+      "path": "/binding",
+      "fullPath": "/binding",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_authenticated/home",
+      "owner": "ui",
+      "mount": "authenticated",
+      "type": "route",
+      "path": "/home",
+      "fullPath": "/home",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_authenticated/settings",
+      "owner": "ui",
+      "mount": "authenticated",
+      "type": "route",
+      "path": "/settings",
+      "fullPath": "/settings",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_authenticated/tenants",
+      "owner": "ui",
+      "mount": "authenticated",
+      "type": "route",
+      "path": "/tenants",
+      "fullPath": "/tenants",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_public/about",
+      "owner": "ui",
+      "mount": "public",
+      "type": "route",
+      "path": "/about",
+      "fullPath": "/about",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_public/activity",
+      "owner": "ui",
+      "mount": "public",
+      "type": "route",
+      "path": "/activity",
+      "fullPath": "/activity",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_public/login",
+      "owner": "ui",
+      "mount": "public",
+      "type": "route",
+      "path": "/login",
+      "fullPath": "/login",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_public/skill",
+      "owner": "ui",
+      "mount": "public",
+      "type": "route",
+      "path": "/skill",
+      "fullPath": "/skill",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_public/",
+      "owner": "ui",
+      "mount": "public",
+      "type": "index",
+      "path": "/",
+      "fullPath": "/",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_authenticated/accept-invitation/$id",
+      "owner": "ui",
+      "mount": "authenticated",
+      "type": "route",
+      "path": "/accept-invitation/$id",
+      "fullPath": "/accept-invitation/$id",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_authenticated/organizations/$slug",
+      "owner": "ui",
+      "mount": "authenticated",
+      "type": "route",
+      "path": "/organizations/$slug",
+      "fullPath": "/organizations/$slug",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_authenticated/organizations/new",
+      "owner": "ui",
+      "mount": "authenticated",
+      "type": "route",
+      "path": "/organizations/new",
+      "fullPath": "/organizations/new",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_authenticated/settings/auth-methods",
+      "owner": "ui",
+      "mount": "authenticated",
+      "type": "route",
+      "path": "/auth-methods",
+      "fullPath": "/settings/auth-methods",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_authenticated/settings/profile",
+      "owner": "ui",
+      "mount": "authenticated",
+      "type": "route",
+      "path": "/profile",
+      "fullPath": "/settings/profile",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_authenticated/settings/security",
+      "owner": "ui",
+      "mount": "authenticated",
+      "type": "route",
+      "path": "/security",
+      "fullPath": "/settings/security",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_authenticated/tenant/$tenantId",
+      "owner": "ui",
+      "mount": "authenticated",
+      "type": "route",
+      "path": "/tenant/$tenantId",
+      "fullPath": "/tenant/$tenantId",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_authenticated/tenant/new",
+      "owner": "ui",
+      "mount": "authenticated",
+      "type": "route",
+      "path": "/tenant/new",
+      "fullPath": "/tenant/new",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_public/docs/$slug",
+      "owner": "ui",
+      "mount": "public",
+      "type": "route",
+      "path": "/docs/$slug",
+      "fullPath": "/docs/$slug",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_authenticated/organizations/",
+      "owner": "ui",
+      "mount": "authenticated",
+      "type": "route",
+      "path": "/organizations/",
+      "fullPath": "/organizations/",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_authenticated/settings/",
+      "owner": "ui",
+      "mount": "authenticated",
+      "type": "index",
+      "path": "/",
+      "fullPath": "/settings",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_public/docs/",
+      "owner": "ui",
+      "mount": "public",
+      "type": "route",
+      "path": "/docs/",
+      "fullPath": "/docs/",
+      "core": true,
+      "nav": null
+    },
+    {
+      "id": "_public/onboard",
+      "owner": "auth",
+      "mount": "public",
+      "type": "route",
+      "path": "/onboard",
+      "fullPath": "/onboard",
+      "core": false,
+      "nav": null
+    },
+    {
+      "id": "_authenticated/admin/users",
+      "owner": "auth",
+      "mount": "authenticated",
+      "type": "route",
+      "path": "/admin/users",
+      "fullPath": "/admin/users",
+      "core": false,
+      "nav": null
+    }
+  ],
+  "shadowed": [
+    {
+      "id": "_authenticated/settings",
+      "owner": "auth",
+      "kind": "route",
+      "reason": "path \"/settings\" is claimed by \"ui:_authenticated/settings\""
+    },
+    {
+      "id": "_public/login",
+      "owner": "auth",
+      "kind": "route",
+      "reason": "path \"/login\" is claimed by \"ui:_public/login\""
+    },
+    {
+      "id": "_authenticated/settings/api-keys",
+      "owner": "auth",
+      "kind": "route",
+      "reason": "parent \"_authenticated/settings\" is shadowed"
+    },
+    {
+      "id": "_authenticated/settings/auth-methods",
+      "owner": "auth",
+      "kind": "route",
+      "reason": "parent \"_authenticated/settings\" is shadowed"
+    },
+    {
+      "id": "_authenticated/settings/profile",
+      "owner": "auth",
+      "kind": "route",
+      "reason": "parent \"_authenticated/settings\" is shadowed"
+    },
+    {
+      "id": "_authenticated/settings/referrals",
+      "owner": "auth",
+      "kind": "route",
+      "reason": "parent \"_authenticated/settings\" is shadowed"
+    },
+    {
+      "id": "_authenticated/settings/security",
+      "owner": "auth",
+      "kind": "route",
+      "reason": "parent \"_authenticated/settings\" is shadowed"
+    },
+    {
+      "id": "_authenticated/settings/",
+      "owner": "auth",
+      "kind": "route",
+      "reason": "parent \"_authenticated/settings\" is shadowed"
+    },
+    {
+      "id": "_public/login/",
+      "owner": "auth",
+      "kind": "route",
+      "reason": "parent \"_public/login\" is shadowed"
+    },
+    {
+      "id": "_public/login/device/approve",
+      "owner": "auth",
+      "kind": "route",
+      "reason": "parent \"_public/login\" is shadowed"
+    },
+    {
+      "id": "_public/login/device/",
+      "owner": "auth",
+      "kind": "route",
+      "reason": "parent \"_public/login\" is shadowed"
+    }
+  ]
+}

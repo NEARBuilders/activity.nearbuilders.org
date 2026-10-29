@@ -1,7 +1,7 @@
-import { createPlugin } from "every-plugin";
-import { Effect, Layer } from "every-plugin/effect";
-import { ORPCError, withEventMeta } from "every-plugin/orpc";
-import { z } from "every-plugin/zod";
+import { ORPCError, withEventMeta } from "@orpc/server";
+import { Context, Effect, Layer } from "effect";
+import { buildScoped, createPlugin } from "every-plugin";
+import { z } from "zod";
 import { resolveActivityRelayUrl } from "./activity/activity-config";
 import {
   assertMasterKeysConfigured,
@@ -17,13 +17,18 @@ import {
 } from "./activity/activity-relay";
 import { SharedNostrRelayAdapter } from "./activity/shared-nostr-relay";
 import { type ActivityFeedEvent, contract, NEAR_ACCOUNT_ID_REGEX } from "./contract";
+import type { Database } from "./db";
 import { DatabaseLive, DatabaseTag } from "./db/layer";
 import { createActivitySseStream } from "./lib/activity-sse";
 import { createAuthMiddleware } from "./lib/auth";
 import { ContextSchema } from "./lib/context";
 import type { PluginsClient } from "./lib/plugins-types.gen";
 import { ActivityBindingSessionsService } from "./services/activity-binding-sessions";
-import { ActivityCredentialsLive, ActivityCredentialsTag } from "./services/activity-credentials";
+import {
+  ActivityCredentialsLive,
+  type ActivityCredentialsService,
+  ActivityCredentialsTag,
+} from "./services/activity-credentials";
 import { ActivityEndorsementsService } from "./services/activity-endorsements";
 import {
   ActivityFeedService,
@@ -39,6 +44,7 @@ import {
   PENDING_SOURCE_DAILY_EVENT_LIMIT,
 } from "./services/activity-ingestion";
 import {
+  type ActivityLeaderboard,
   ActivityLeaderboardLive,
   ActivityLeaderboardTag,
   DatabaseActivityPointValueProvider,
@@ -48,9 +54,13 @@ import {
   ActivityModerationService,
   DatabaseActivityModerationStore,
 } from "./services/activity-moderation";
-import { ActivitySourcesLive, ActivitySourcesTag } from "./services/activity-sources";
+import {
+  ActivitySourcesLive,
+  type ActivitySourcesService,
+  ActivitySourcesTag,
+} from "./services/activity-sources";
 import { NearbuildersProjectsClient } from "./services/nearbuilders-projects";
-import { TenantsLive, TenantsTag } from "./services/tenants";
+import { TenantsLive, type TenantsService, TenantsTag } from "./services/tenants";
 
 const SUBDOMAIN_SEGMENT_REGEX = /^[a-z0-9]+(?:[-_][a-z0-9]+)*$/;
 const RESERVED_SUBDOMAINS = new Set([
@@ -144,6 +154,36 @@ async function requireProjectOwnerAccount(
   }
 }
 
+export type ApiServices = {
+  database: Database;
+  tenants: TenantsService;
+  activitySources: ActivitySourcesService;
+  activityCredentials: ActivityCredentialsService;
+  activityIngestion: ActivityIngestionService;
+  activityGithub: ActivityGithubService;
+  activityFeed: ActivityFeedService;
+  activityEndorsements: ActivityEndorsementsService;
+  activityBindingSessions: ActivityBindingSessionsService;
+  nearbuildersProjects: NearbuildersProjectsClient;
+  activityModeration: ActivityModerationService;
+  activityLeaderboard: ActivityLeaderboard;
+  activityRelay: ActivityRelay;
+  activityHealth: ActivityHealthService;
+};
+
+export class ApiServicesTag extends Context.Service<ApiServicesTag, ApiServices>()(
+  "api/ApiServices",
+) {}
+
+let runtime: ApiServices | undefined;
+
+function getServices(): ApiServices {
+  if (!runtime) {
+    throw new ORPCError("INTERNAL_SERVER_ERROR", { message: "API services not initialized" });
+  }
+  return runtime;
+}
+
 export default createPlugin.withPlugins<PluginsClient>()({
   variables: z.object({
     activityNostrBindingContract: z.string().default("contextual.near"),
@@ -177,18 +217,18 @@ export default createPlugin.withPlugins<PluginsClient>()({
 
   contract,
 
-  initialize: (config, _plugins, tools) =>
+  initialize: (config, _plugins) =>
     Effect.gen(function* () {
-      const database = yield* tools.buildService(
+      const database = yield* buildScoped(
         DatabaseTag,
-        DatabaseLive(config.secrets.API_DATABASE_URL),
+        DatabaseLive(config.secrets.API_DATABASE_URL, config.pluginId),
       );
       const databaseLayer = Layer.succeed(DatabaseTag, database);
-      const tenantsService = yield* tools.buildService(
+      const tenantsService = yield* buildScoped(
         TenantsTag,
         TenantsLive.pipe(Layer.provide(databaseLayer)),
       );
-      const activitySourcesService = yield* tools.buildService(
+      const activitySourcesService = yield* buildScoped(
         ActivitySourcesTag,
         ActivitySourcesLive.pipe(Layer.provide(databaseLayer)),
       );
@@ -198,7 +238,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         masterKeysRaw,
         config.secrets.ACTIVITY_SIGNING_ACTIVE_KEY_VERSION,
       );
-      const activityCredentialsService = yield* tools.buildService(
+      const activityCredentialsService = yield* buildScoped(
         ActivityCredentialsTag,
         ActivityCredentialsLive(masterKeys, {
           contractId: config.variables.activityNostrBindingContract,
@@ -224,7 +264,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         },
       );
       const activityPointValues = new DatabaseActivityPointValueProvider(database);
-      const activityLeaderboard = yield* tools.buildService(
+      const activityLeaderboard = yield* buildScoped(
         ActivityLeaderboardTag,
         ActivityLeaderboardLive({
           redisUrl: config.secrets.ACTIVITY_REDIS_URL,
@@ -297,7 +337,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         relay: activityRelay,
       });
 
-      return {
+      const services: ApiServices = {
         database,
         tenants: tenantsService,
         activitySources: activitySourcesService,
@@ -313,15 +353,20 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityRelay,
         activityHealth: activityHealthService,
       };
+
+      yield* Effect.addFinalizer(() =>
+        Effect.sync(() => {
+          services.activityGithub.stop();
+          services.activityRelay.close();
+          if (runtime === services) runtime = undefined;
+        }),
+      );
+
+      runtime = services;
+      return Layer.succeed(ApiServicesTag, services);
     }),
 
-  shutdown: (services) =>
-    Effect.sync(() => {
-      services.activityGithub.stop();
-      services.activityRelay.close();
-    }),
-
-  createRouter: (services, builder) => {
+  createRouter: (builder) => {
     const { requireAdmin, requireAuth, requireOrganization, requireOrgRole } =
       createAuthMiddleware(builder);
     const requireNearAuthentication = builder.middleware(async ({ context, next }) => {
@@ -338,7 +383,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       context: { organization: { activeOrganizationId: string } },
     ) => {
       const activeOrgId = context.organization.activeOrganizationId;
-      const tenant = await services.tenants.resolveTenantById(input.tenantId);
+      const tenant = await getServices().tenants.resolveTenantById(input.tenantId);
       if (!tenant) {
         throw new ORPCError("NOT_FOUND", {
           message: "Tenant not found",
@@ -354,7 +399,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
     };
     const requireVisibleActivityEvent = async (eventId: string) => {
       try {
-        const result = await services.activityFeed.list({ eventId, limit: 1 });
+        const result = await getServices().activityFeed.list({ eventId, limit: 1 });
         if (!result.data[0]) {
           throw new ORPCError("NOT_FOUND", { message: "Activity event not found" });
         }
@@ -386,7 +431,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .use(requireAuth)
         .use(requireOrganization)
         .handler(async ({ context }) =>
-          services.tenants.listTenantsByOrgIds([context.organization.activeOrganizationId]),
+          getServices().tenants.listTenantsByOrgIds([context.organization.activeOrganizationId]),
         ),
 
       createTenant: builder.createTenant
@@ -401,7 +446,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
               data: { subdomain: input.subdomain, accountId: input.accountId },
             });
           }
-          return await services.tenants.createTenant({
+          return await getServices().tenants.createTenant({
             subdomain: input.subdomain,
             name: input.name,
             accountId: input.accountId,
@@ -417,7 +462,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
           const tenant = await authorizedTenant(input, context);
           if (input.subdomain !== undefined) validateSubdomain(input.subdomain);
           if (input.accountId !== undefined) validateAccountId(input.accountId);
-          return await services.tenants.updateTenant(tenant.id, {
+          return await getServices().tenants.updateTenant(tenant.id, {
             name: input.name,
             subdomain: input.subdomain,
             accountId: input.accountId,
@@ -430,7 +475,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .use(requireOrgRole("owner"))
         .handler(async ({ input, context }) => {
           await authorizedTenant(input, context);
-          const result = await services.tenants.softDeleteTenant(input.tenantId);
+          const result = await getServices().tenants.softDeleteTenant(input.tenantId);
           if (!result) {
             throw new ORPCError("NOT_FOUND", {
               message: "Tenant not found",
@@ -445,7 +490,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .use(requireOrgRole("admin"))
         .handler(async ({ input, context }) => {
           await authorizedTenant(input, context);
-          const result = await services.tenants.suspendTenant(input.tenantId);
+          const result = await getServices().tenants.suspendTenant(input.tenantId);
           if (!result) {
             throw new ORPCError("NOT_FOUND", {
               message: "Tenant not found",
@@ -460,7 +505,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .use(requireOrgRole("admin"))
         .handler(async ({ input, context }) => {
           await authorizedTenant(input, context);
-          const result = await services.tenants.reactivateTenant(input.tenantId);
+          const result = await getServices().tenants.reactivateTenant(input.tenantId);
           if (!result) {
             throw new ORPCError("NOT_FOUND", {
               message: "Tenant not found",
@@ -471,12 +516,12 @@ export default createPlugin.withPlugins<PluginsClient>()({
         }),
 
       resolveTenant: builder.resolveTenant.handler(async ({ input }) => {
-        const tenant = await services.tenants.resolveTenantByAccountId(input.accountId);
+        const tenant = await getServices().tenants.resolveTenantByAccountId(input.accountId);
         return tenant ?? null;
       }),
 
       resolveTenantByOrgId: builder.resolveTenantByOrgId.handler(async ({ input, errors }) => {
-        const tenant = await services.tenants.resolveTenantByOrgId(input.orgId);
+        const tenant = await getServices().tenants.resolveTenantByOrgId(input.orgId);
         if (!tenant) {
           throw errors.NOT_FOUND({
             message: "Tenant not found",
@@ -495,10 +540,10 @@ export default createPlugin.withPlugins<PluginsClient>()({
 
         const reserved = RESERVED_SUBDOMAINS.has(input.subdomain);
         const existingSubdomain = subdomainValid
-          ? await services.tenants.resolveTenantBySubdomain(input.subdomain)
+          ? await getServices().tenants.resolveTenantBySubdomain(input.subdomain)
           : null;
         const existingAccount = subdomainValid
-          ? await services.tenants.resolveTenantByAccountId(accountId)
+          ? await getServices().tenants.resolveTenantByAccountId(accountId)
           : null;
         const accountAvailable = accountFormat === "valid" && !existingAccount;
 
@@ -515,13 +560,13 @@ export default createPlugin.withPlugins<PluginsClient>()({
           validateAccountId(input.nearAccountId);
           if (input.nearbuildersProjectId) {
             await requireProjectOwnerAccount(
-              services.nearbuildersProjects,
+              getServices().nearbuildersProjects,
               input.nearbuildersProjectId,
               input.nearAccountId,
               mainnetNearAccountIds(context.near.linkedAccounts),
             );
           }
-          return await services.activitySources.createSource({
+          return await getServices().activitySources.createSource({
             ...input,
             organizationId: context.organization.activeOrganizationId,
           });
@@ -530,7 +575,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       listActivitySources: builder.listActivitySources
         .use(requireOrgRole("owner", "admin", "member"))
         .handler(async ({ context }) =>
-          services.activitySources.listSourcesByOrganization(
+          getServices().activitySources.listSourcesByOrganization(
             context.organization.activeOrganizationId,
           ),
         ),
@@ -549,20 +594,20 @@ export default createPlugin.withPlugins<PluginsClient>()({
           }
           if (input.nearAccountId !== undefined) {
             validateAccountId(input.nearAccountId);
-            const existing = await services.activitySources.getSourceAccount(
+            const existing = await getServices().activitySources.getSourceAccount(
               context.organization.activeOrganizationId,
               input.sourceId,
             );
             if (existing?.nearbuildersProjectId && existing.nearAccountId !== input.nearAccountId) {
               await requireProjectOwnerAccount(
-                services.nearbuildersProjects,
+                getServices().nearbuildersProjects,
                 existing.nearbuildersProjectId,
                 input.nearAccountId,
                 mainnetNearAccountIds(context.near?.linkedAccounts ?? []),
               );
             }
           }
-          return await services.activitySources.updateSource(
+          return await getServices().activitySources.updateSource(
             context.organization.activeOrganizationId,
             input.sourceId,
             {
@@ -576,13 +621,13 @@ export default createPlugin.withPlugins<PluginsClient>()({
       listActivitySourcesForReview: builder.listActivitySourcesForReview
         .use(requireAdmin)
         .handler(async ({ input }) =>
-          services.activitySources.listSourcesForReview(input.approvalStatus),
+          getServices().activitySources.listSourcesForReview(input.approvalStatus),
         ),
 
       reviewActivitySource: builder.reviewActivitySource
         .use(requireAdmin)
         .handler(async ({ input, context }) =>
-          services.activitySources.reviewSource({
+          getServices().activitySources.reviewSource({
             ...input,
             administratorId: context.userId,
           }),
@@ -591,7 +636,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       updateActivitySourceTrust: builder.updateActivitySourceTrust
         .use(requireAdmin)
         .handler(async ({ input, context }) =>
-          services.activitySources.updateSourceTrust({
+          getServices().activitySources.updateSourceTrust({
             ...input,
             administratorId: context.userId,
           }),
@@ -600,7 +645,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       createActivitySigningIdentity: builder.createActivitySigningIdentity
         .use(requireOrgRole("owner"))
         .handler(async ({ input, context }) =>
-          services.activityCredentials.createSigningIdentity(
+          getServices().activityCredentials.createSigningIdentity(
             context.organization.activeOrganizationId,
             input.sourceId,
             context.userId,
@@ -610,7 +655,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       getActivitySigningIdentity: builder.getActivitySigningIdentity
         .use(requireOrgRole("owner"))
         .handler(async ({ input, context }) =>
-          services.activityCredentials.getSigningIdentity(
+          getServices().activityCredentials.getSigningIdentity(
             context.organization.activeOrganizationId,
             input.sourceId,
           ),
@@ -619,7 +664,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       listActivitySigningIdentities: builder.listActivitySigningIdentities
         .use(requireOrgRole("owner"))
         .handler(async ({ input, context }) =>
-          services.activityCredentials.listSigningIdentities(
+          getServices().activityCredentials.listSigningIdentities(
             context.organization.activeOrganizationId,
             input.sourceId,
           ),
@@ -628,7 +673,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       rotateActivitySigningIdentity: builder.rotateActivitySigningIdentity
         .use(requireOrgRole("owner"))
         .handler(async ({ input, context }) =>
-          services.activityCredentials.rotateSigningIdentity(
+          getServices().activityCredentials.rotateSigningIdentity(
             context.organization.activeOrganizationId,
             input.sourceId,
             context.userId,
@@ -640,7 +685,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .use(requireOrgRole("owner"))
         .use(requireNearAuthentication)
         .handler(async ({ input, context }) => {
-          return services.activityCredentials.prepareSigningIdentityBinding(
+          return getServices().activityCredentials.prepareSigningIdentityBinding(
             context.organization.activeOrganizationId,
             input.sourceId,
             mainnetNearAccountIds(context.near.linkedAccounts),
@@ -651,7 +696,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .use(requireOrgRole("owner"))
         .use(requireNearAuthentication)
         .handler(async ({ input, context }) => {
-          return services.activityCredentials.confirmSigningIdentityBinding(
+          return getServices().activityCredentials.confirmSigningIdentityBinding(
             context.organization.activeOrganizationId,
             input.sourceId,
             mainnetNearAccountIds(context.near.linkedAccounts),
@@ -661,7 +706,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       createActivitySourceApiKey: builder.createActivitySourceApiKey
         .use(requireOrgRole("owner"))
         .handler(async ({ input, context }) =>
-          services.activityCredentials.createApiKey(
+          getServices().activityCredentials.createApiKey(
             context.organization.activeOrganizationId,
             input.sourceId,
             input.name,
@@ -671,7 +716,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       listActivitySourceApiKeys: builder.listActivitySourceApiKeys
         .use(requireOrgRole("owner"))
         .handler(async ({ input, context }) =>
-          services.activityCredentials.listApiKeys(
+          getServices().activityCredentials.listApiKeys(
             context.organization.activeOrganizationId,
             input.sourceId,
           ),
@@ -680,7 +725,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       revokeActivitySourceApiKey: builder.revokeActivitySourceApiKey
         .use(requireOrgRole("owner"))
         .handler(async ({ input, context }) =>
-          services.activityCredentials.revokeApiKey(
+          getServices().activityCredentials.revokeApiKey(
             context.organization.activeOrganizationId,
             input.sourceId,
             input.apiKeyId,
@@ -690,7 +735,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       getActivityGithubIntegration: builder.getActivityGithubIntegration
         .use(requireOrgRole("owner"))
         .handler(async ({ input, context }) =>
-          services.activityGithub.getConfiguration(
+          getServices().activityGithub.getConfiguration(
             context.organization.activeOrganizationId,
             input.sourceId,
           ),
@@ -699,7 +744,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       configureActivityGithubIntegration: builder.configureActivityGithubIntegration
         .use(requireOrgRole("owner"))
         .handler(async ({ input, context }) =>
-          services.activityGithub.configure(
+          getServices().activityGithub.configure(
             context.organization.activeOrganizationId,
             input.sourceId,
             input,
@@ -709,7 +754,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       pollActivityGithubIntegration: builder.pollActivityGithubIntegration
         .use(requireOrgRole("owner"))
         .handler(async ({ input, context }) =>
-          services.activityGithub.pollSource(
+          getServices().activityGithub.pollSource(
             context.organization.activeOrganizationId,
             input.sourceId,
           ),
@@ -718,7 +763,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       listActivityGithubQuarantine: builder.listActivityGithubQuarantine
         .use(requireOrgRole("owner"))
         .handler(async ({ input, context }) =>
-          services.activityGithub.listQuarantine(
+          getServices().activityGithub.listQuarantine(
             context.organization.activeOrganizationId,
             input.sourceId,
           ),
@@ -732,8 +777,8 @@ export default createPlugin.withPlugins<PluginsClient>()({
           let issuer: { sourceId: string } | null = null;
           if (partnerKey) {
             const credential =
-              await services.activityCredentials.authenticateEventWriteKey(partnerKey);
-            const trust = await services.activitySources.getSourceTrust(credential.sourceId);
+              await getServices().activityCredentials.authenticateEventWriteKey(partnerKey);
+            const trust = await getServices().activitySources.getSourceTrust(credential.sourceId);
             if (trust?.trustStatus !== "trusted" || trust.approvalStatus !== "approved") {
               throw new ORPCError("FORBIDDEN", {
                 message:
@@ -742,7 +787,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
             }
             issuer = { sourceId: credential.sourceId };
           }
-          return services.activityBindingSessions.create(
+          return getServices().activityBindingSessions.create(
             input,
             requestOrigin(context.reqHeaders),
             requestClientKey(context.reqHeaders),
@@ -754,7 +799,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       revealActivityBindingSessionKey: builder.revealActivityBindingSessionKey
         .use(requireOrgRole("owner"))
         .handler(async ({ input, context }) =>
-          services.activityBindingSessions.reveal({
+          getServices().activityBindingSessions.reveal({
             sessionToken: input.sessionToken,
             organizationId: context.organization.activeOrganizationId,
           }),
@@ -763,14 +808,14 @@ export default createPlugin.withPlugins<PluginsClient>()({
       getActivitySourceTestStatus: builder.getActivitySourceTestStatus
         .use(requireOrgRole("owner", "admin", "member"))
         .handler(async ({ input, context }) =>
-          services.activitySources.getTestStatus(
+          getServices().activitySources.getTestStatus(
             context.organization.activeOrganizationId,
             input.sourceId,
           ),
         ),
 
       getNearbuildersProjectActivity: builder.getNearbuildersProjectActivity.handler(
-        async ({ input }) => services.activityBindingSessions.projectActivity(input.projectId),
+        async ({ input }) => getServices().activityBindingSessions.projectActivity(input.projectId),
       ),
 
       claimActivityBindingSession: builder.claimActivityBindingSession.handler(
@@ -780,26 +825,28 @@ export default createPlugin.withPlugins<PluginsClient>()({
           if (!pollToken) {
             throw new ORPCError("UNAUTHORIZED", { message: "Binding session poll token required" });
           }
-          return services.activityBindingSessions.claim(input.sessionId, pollToken);
+          return getServices().activityBindingSessions.claim(input.sessionId, pollToken);
         },
       ),
 
       searchNearbuildersProjects: builder.searchNearbuildersProjects
         .use(requireAuth)
-        .handler(async ({ input }) => services.nearbuildersProjects.search(input.query)),
+        .handler(async ({ input }) => getServices().nearbuildersProjects.search(input.query)),
 
       lookupNearbuildersProject: builder.lookupNearbuildersProject
         .use(requireAuth)
-        .handler(async ({ input }) => services.nearbuildersProjects.resolve(input.reference)),
+        .handler(async ({ input }) => getServices().nearbuildersProjects.resolve(input.reference)),
 
       getActivityBindingSession: builder.getActivityBindingSession
         .use(requireAuth)
-        .handler(async ({ input }) => services.activityBindingSessions.lookup(input.sessionToken)),
+        .handler(async ({ input }) =>
+          getServices().activityBindingSessions.lookup(input.sessionToken),
+        ),
 
       completeActivityBindingSession: builder.completeActivityBindingSession
         .use(requireOrgRole("owner"))
         .handler(async ({ input, context }) =>
-          services.activityBindingSessions.complete({
+          getServices().activityBindingSessions.complete({
             sessionToken: input.sessionToken,
             organizationId: context.organization.activeOrganizationId,
             sourceId: input.sourceId,
@@ -815,12 +862,12 @@ export default createPlugin.withPlugins<PluginsClient>()({
             message: "Source API Key required",
           });
         }
-        return services.activityIngestion.submit(apiKey, input);
+        return getServices().activityIngestion.submit(apiKey, input);
       }),
 
       listActivityEvents: builder.listActivityEvents.handler(async ({ input }) => {
         try {
-          return await services.activityFeed.list({
+          return await getServices().activityFeed.list({
             source: input.source,
             eventType: input.type,
             actor: input.actor,
@@ -846,23 +893,23 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .use(requireAuth)
         .handler(async ({ input, context }) => {
           await requireVisibleActivityEvent(input.eventId);
-          return services.activityEndorsements.endorse(input.eventId, context.userId);
+          return getServices().activityEndorsements.endorse(input.eventId, context.userId);
         }),
 
       unendorseActivityEvent: builder.unendorseActivityEvent
         .use(requireAuth)
         .handler(async ({ input, context }) =>
-          services.activityEndorsements.unendorse(input.eventId, context.userId),
+          getServices().activityEndorsements.unendorse(input.eventId, context.userId),
         ),
 
       getActivityEventEndorsements: builder.getActivityEventEndorsements.handler(
         async ({ input, context }) =>
-          services.activityEndorsements.getStates(input.eventIds, context.userId ?? undefined),
+          getServices().activityEndorsements.getStates(input.eventIds, context.userId ?? undefined),
       ),
 
       streamActivityEventEndorsements: builder.streamActivityEventEndorsements.handler(
         async function* ({ context, signal, lastEventId }) {
-          const iterator = services.activityEndorsements.publisher.subscribe("endorsement", {
+          const iterator = getServices().activityEndorsements.publisher.subscribe("endorsement", {
             signal,
             lastEventId,
           });
@@ -884,7 +931,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         lastEventId,
       }) {
         try {
-          for await (const event of services.activityFeed.stream(
+          for await (const event of getServices().activityFeed.stream(
             {
               source: input.source,
               eventType: input.type,
@@ -916,7 +963,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
           const ready = new Promise<void>((resolve) => {
             markReady = resolve;
           });
-          const events = services.activityFeed.stream(
+          const events = getServices().activityFeed.stream(
             {
               source: input.source,
               eventType: input.type,
@@ -940,7 +987,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .use(requireAdmin)
         .handler(async ({ input, context }) => {
           try {
-            return await services.activityModeration.hide({
+            return await getServices().activityModeration.hide({
               ...input,
               administratorId: context.userId,
             });
@@ -962,9 +1009,10 @@ export default createPlugin.withPlugins<PluginsClient>()({
         if (!apiKey) {
           throw new ORPCError("UNAUTHORIZED", { message: "Source API Key required" });
         }
-        const credential = await services.activityCredentials.authenticateEventWriteKey(apiKey);
+        const credential =
+          await getServices().activityCredentials.authenticateEventWriteKey(apiKey);
         try {
-          return await services.activityModeration.retract({
+          return await getServices().activityModeration.retract({
             ...input,
             sourceId: credential.sourceId,
           });
@@ -982,11 +1030,11 @@ export default createPlugin.withPlugins<PluginsClient>()({
 
       listHiddenActivityEvents: builder.listHiddenActivityEvents
         .use(requireAdmin)
-        .handler(async () => services.activityModeration.listHidden()),
+        .handler(async () => getServices().activityModeration.listHidden()),
 
       getActivityLeaderboard: builder.getActivityLeaderboard.handler(async ({ input }) => {
         try {
-          return await services.activityLeaderboard.getLeaderboard(input);
+          return await getServices().activityLeaderboard.getLeaderboard(input);
         } catch {
           throw new ORPCError("SERVICE_UNAVAILABLE", {
             message: "Activity leaderboard projection is unavailable",
@@ -996,7 +1044,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
 
       getActivityLeaderboardStatus: builder.getActivityLeaderboardStatus.handler(async () => {
         try {
-          return await services.activityLeaderboard.getStatus();
+          return await getServices().activityLeaderboard.getStatus();
         } catch {
           throw new ORPCError("SERVICE_UNAVAILABLE", {
             message: "Activity leaderboard projection status is unavailable",
@@ -1005,7 +1053,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
       }),
 
       getActivityHealth: builder.getActivityHealth.handler(async ({ errors }) => {
-        const health = await services.activityHealth.check();
+        const health = await getServices().activityHealth.check();
         if (health.status !== "ok") {
           throw errors.SERVICE_UNAVAILABLE({
             message: "One or more Activity dependencies are unavailable",

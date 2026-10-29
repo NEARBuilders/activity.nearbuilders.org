@@ -134,3 +134,17 @@ export interface RenderOptions extends Omit<BaseRenderOptions<SessionData>, "run
   apiClient: ApiClient;
   authClient?: AuthClientType;
 }
+
+import type { ApiConnectionErrorCopy } from "everything-dev/ui/api";
+import type { LocaleOptions } from "everything-dev/ui/i18n";
+
+export const appLocale: LocaleOptions<string> = {
+  locales: ["en"],
+  defaultLocale: "en",
+  cookieName: "app_locale",
+};
+
+export const apiConnectionError: ApiConnectionErrorCopy = () => ({
+  title: "Connection problem",
+  description: "We couldn't reach the API. Check your connection and try again.",
+});
