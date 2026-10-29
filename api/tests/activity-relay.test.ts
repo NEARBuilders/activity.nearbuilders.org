@@ -1,5 +1,6 @@
 import type { Event, Filter } from "nostr-tools";
-import { describe, expect, it } from "vitest";
+import type { SimplePool } from "nostr-tools/pool";
+import { describe, expect, it, vi } from "vitest";
 import {
   ActivityCursorError,
   ActivityRelay,
@@ -61,6 +62,49 @@ async function readAll(relay: ActivityRelay, limit: number): Promise<string[]> {
 }
 
 describe("ActivityRelay", () => {
+  it("suppresses duplicates across reconnects until an ID is evicted", async () => {
+    const subscriptions: Array<{
+      callbacks: { onevent: (event: Event) => void; onclose: (reason: string) => void };
+      close: ReturnType<typeof vi.fn>;
+    }> = [];
+    const pool = {
+      ensureRelay: async () => ({
+        subscribe: (_filters: Filter[], callbacks: (typeof subscriptions)[number]["callbacks"]) => {
+          const subscription = { callbacks, close: vi.fn() };
+          subscriptions.push(subscription);
+          return { close: subscription.close };
+        },
+      }),
+      destroy: vi.fn(),
+    } as unknown as SimplePool;
+    const adapter = new NostrRelayAdapter("ws://relay.test", {
+      maxDeduplicationIds: 2,
+      pool,
+    });
+    const first = eventWithId("a".repeat(64), 1_788_307_200);
+    const second = eventWithId("b".repeat(64), 1_788_307_201);
+    const third = eventWithId("c".repeat(64), 1_788_307_202);
+    const received: string[] = [];
+    const subscription = await adapter.subscribe({ kinds: [1701] }, (event) => {
+      received.push(event.id);
+    });
+
+    subscriptions[0]?.callbacks.onevent(first);
+    subscriptions[0]?.callbacks.onevent(first);
+    subscriptions[0]?.callbacks.onclose("connection lost");
+    await vi.waitFor(() => expect(subscriptions).toHaveLength(2));
+    subscriptions[1]?.callbacks.onevent(first);
+    subscriptions[1]?.callbacks.onevent(second);
+    subscriptions[1]?.callbacks.onevent(third);
+    subscriptions[1]?.callbacks.onevent(first);
+
+    expect(received).toEqual([first.id, second.id, third.id, first.id]);
+
+    subscription.close();
+    expect(subscriptions[1]?.close).toHaveBeenCalledOnce();
+    expect(pool.destroy).not.toHaveBeenCalled();
+  });
+
   it("rejects when the relay connection cannot be established", async () => {
     const adapter = new NostrRelayAdapter("ws://127.0.0.1:1");
 
