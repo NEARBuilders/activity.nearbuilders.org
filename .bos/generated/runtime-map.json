@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-10-29T04:16:59.742Z",
+  "generatedAt": "2026-10-29T04:19:39.445Z",
   "env": "development",
-  "platform": "2.0.0-rc.24",
+  "platform": "2.0.0-rc.27",
   "extends": "/Users/elliot.braem/workspace/product/activity.nearbuilders.org/bos.app.ts → bos://dev.everything.near/everything.dev",
   "sources": [
     {

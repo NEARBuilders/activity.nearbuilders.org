@@ -4,9 +4,9 @@
 // below. Nav labels are runtime-only (route options, not manifests).
 // See docs/agents/runtime-map.md for the investigation workflows.
 
-export const RUNTIME_MAP_GENERATED_AT = "2026-10-29T04:16:59.742Z";
+export const RUNTIME_MAP_GENERATED_AT = "2026-10-29T04:19:39.445Z";
 export const RUNTIME_MAP_ENV = "development";
-export const RUNTIME_PLATFORM = "2.0.0-rc.24";
+export const RUNTIME_PLATFORM = "2.0.0-rc.27";
 
 export const RUNTIME_SOURCES = [
   {
