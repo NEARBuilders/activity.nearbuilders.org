@@ -33,7 +33,8 @@
     "pg": "catalog:",
     "redis": "6.2.1",
     "ws": "8.21.3",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "aws4fetch": "catalog:"
   },
   "devDependencies": {
     "@effect/language-service": "^0.85.1",
@@ -47,13 +48,14 @@
     "dotenv": "^17.2.3",
     "everything-dev": "catalog:",
     "vitest": "catalog:",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "@module-federation/runtime-tools": "catalog:"
   },
   "scripts": {
-    "build": "pnpm run build:types && rspack build",
+    "build": "every-plugin build",
     "build:types": "tsc -p tsconfig.contract.json",
     "deploy": "pnpm run build:types && DEPLOY=true rspack build",
-    "dev": "pnpm run build:types && every-plugin dev",
+    "dev": "every-plugin dev",
     "test": "vitest run --root . --pool=forks",
     "test:watch": "vitest --root .",
     "coverage": "vitest run --root . --coverage",

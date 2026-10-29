@@ -56,7 +56,10 @@
       "!!**/plugins/**/types/**/*.d.ts",
       "!!**/env.d.ts",
       "!!**/virtual-modules.d.ts",
-      "!!bos.config.json"
+      "!!bos.config.json",
+      "!!docs/plans",
+      "!!**/scaffold/upgrade-audit/fixtures",
+      "!!.agents"
     ],
     "ignoreUnknown": true
   },

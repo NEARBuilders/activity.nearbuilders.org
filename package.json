@@ -20,7 +20,7 @@
     "publish": "bos publish",
     "bos": "bos",
     "types:gen": "bos types gen",
-    "typecheck": "pnpm run types:gen && if [ -d ui ]; then pnpm --dir ui run typecheck; fi && if [ -d api ]; then pnpm --dir api run typecheck; fi && for dir in packages/*; do if [ -f \"$dir/package.json\" ]; then pnpm --dir \"$dir\" --if-present run typecheck || exit 1; fi; done",
+    "typecheck": "pnpm run types:gen && if [ -d ui ]; then pnpm --dir ui run typecheck; fi && if [ -d api ]; then pnpm --dir api run typecheck; fi && if [ -d plugins ]; then for dir in plugins/*; do if [ -f \"$dir/package.json\" ]; then pnpm --dir \"$dir\" --if-present run typecheck && pnpm --dir \"$dir\" --if-present run typecheck:ui; fi; done; fi",
     "typecheck:examples": "tsc --noEmit -p examples/tsconfig.json",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
@@ -35,7 +35,7 @@
     "db:studio": "bos db:studio",
     "db:generate": "pnpm --dir api exec drizzle-kit generate",
     "db:migrate": "pnpm --dir api exec drizzle-kit migrate",
-    "test": "pnpm --dir api --if-present run test && pnpm --dir ui --if-present run test && for dir in packages/*; do if [ -f \"$dir/package.json\" ]; then pnpm --dir \"$dir\" --if-present run test || exit 1; fi; done",
+    "test": "pnpm --dir api --if-present run test && pnpm --dir ui --if-present run test && for d in plugins/*; do [ -f \"$d/package.json\" ] && pnpm --dir \"$d\" --if-present run test; done",
     "test:api": "pnpm --dir api --if-present run test",
     "test:integration": "pnpm --dir api --if-present run test tests/integration/",
     "test:integration-guide": "pnpm --dir api test tests/integration/activity-client-example.test.ts",
@@ -48,7 +48,7 @@
     "db:repair": "bos db:repair",
     "test:scripts": "vitest run scripts"
   },
-  "packageManager": "pnpm@12.10.1",
+  "packageManager": "pnpm@12.10.1+sha512.ba40a37eb1a370d60fea8c4cf1d364c13bcccef518e98ad2bcee954f539d38da37458e58261a3fa55e06523450ea0ffff9f497b135be41f2c15c1642bacace6c",
   "type": "module",
   "engines": {
     "node": ">=20.11"
@@ -62,7 +62,12 @@
     "tsx": "^4.21.0",
     "vite-tsconfig-paths": "^6.1.1",
     "vitest": "catalog:",
-    "yaml": "catalog:"
+    "yaml": "catalog:",
+    "@effect/tsgo": "^0.45.0",
+    "@playwright/test": "^1.58.1",
+    "@shadcn/lint": "^0.2.0",
+    "oxlint": "1.82.0",
+    "oxlint-tsgolint": "7.0.2001"
   },
   "dependencies": {
     "@better-auth/api-key": "catalog:",
@@ -80,9 +85,13 @@
     "zod": "catalog:",
     "@opentelemetry/api": "catalog:",
     "every-plugin": "catalog:",
-    "everything-dev": "catalog:"
+    "everything-dev": "catalog:",
+    "@effect/oxc": "link:repos/effect/packages/tools/oxc"
   },
   "patchedDependencies": {
     "everything-dev@1.53.2": "patches/everything-dev@1.53.2.patch"
+  },
+  "peerDependencies": {
+    "typescript": "catalog:"
   }
 }

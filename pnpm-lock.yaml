@@ -288,8 +288,8 @@ catalogs:
       specifier: ^3.0.0-rc.14
       version: 3.0.0-rc.14
     everything-dev:
-      specifier: ^2.0.0-rc.24
-      version: 2.0.0-rc.24
+      specifier: ^2.0.0-rc.27
+      version: 2.0.0-rc.27
     near-kit:
       specifier: ^0.20.2
       version: 0.20.2
@@ -306,7 +306,7 @@ catalogs:
       specifier: 2.0.8
       version: 2.0.8
     typescript:
-      specifier: ^7.0.2
+      specifier: 7.0.2
       version: 7.0.2
     vitest:
       specifier: ^4.1.8
@@ -367,7 +367,7 @@ importers:
         version: 3.0.0-rc.14(@orpc/contract@2.0.0-beta.35)(@orpc/server@2.0.0-beta.35)(@orpc/tanstack-query@2.0.0-beta.35(@tanstack/query-core@5.104.5))(@orpc/zod@2.0.0-beta.35(zod@4.6.5))(@proj-airi/unplugin-drizzle-orm-migrations@0.1.6(vite@8.3.5(@types/node@25.9.9)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0)))(@rspack/core@2.2.8(@module-federation/runtime-tools@2.9.2)(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.45(react-dom@19.2.9(react@19.2.9))(react@19.2.9))(@tanstack/router-generator@1.167.33)(@types/react@19.3.0)(effect@4.0.0-rc.117)(esbuild@0.28.2)(react-dom@19.2.9(react@19.2.9))(react@19.2.9)(redis@6.2.1(@opentelemetry/api@1.10.0))(rolldown@1.2.15)(typescript@7.0.2)(vite@8.3.5(@types/node@25.9.9)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))(zod@4.6.5)
       everything-dev:
         specifier: 'catalog:'
-        version: 2.0.0-rc.24(246411829a7feed01d558b7e2bad3aa2)
+        version: 2.0.0-rc.27(246411829a7feed01d558b7e2bad3aa2)
       pg:
         specifier: 'catalog:'
         version: 8.23.1
@@ -483,7 +483,7 @@ importers:
         version: 17.4.2
       everything-dev:
         specifier: 'catalog:'
-        version: 2.0.0-rc.24(246411829a7feed01d558b7e2bad3aa2)
+        version: 2.0.0-rc.27(246411829a7feed01d558b7e2bad3aa2)
       vite-tsconfig-paths:
         specifier: ^5.1.4
         version: 5.1.4(typescript@7.0.2)(vite@8.3.5(@types/node@25.9.9)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))
@@ -728,7 +728,7 @@ importers:
         version: 3.0.0-rc.14(@orpc/contract@2.0.0-beta.35)(@orpc/server@2.0.0-beta.35)(@orpc/tanstack-query@2.0.0-beta.35(@tanstack/query-core@5.104.5))(@orpc/zod@2.0.0-beta.35(zod@4.6.5))(@proj-airi/unplugin-drizzle-orm-migrations@0.1.6(vite@8.3.5(@types/node@25.9.9)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0)))(@rspack/core@2.2.8(@module-federation/runtime-tools@2.9.2)(@swc/helpers@0.5.23))(@tanstack/react-router@1.170.45(react-dom@19.2.9(react@19.2.9))(react@19.2.9))(@tanstack/router-generator@1.167.33)(@types/react@19.3.0)(effect@4.0.0-rc.117)(esbuild@0.28.2)(react-dom@19.2.9(react@19.2.9))(react@19.2.9)(redis@6.2.1(@opentelemetry/api@1.10.0))(rolldown@1.2.15)(typescript@7.0.2)(vite@8.3.5(@types/node@25.9.9)(esbuild@0.28.2)(jiti@2.7.0)(tsx@4.23.15)(yaml@2.9.0))(zod@4.6.5)
       everything-dev:
         specifier: 'catalog:'
-        version: 2.0.0-rc.24(246411829a7feed01d558b7e2bad3aa2)
+        version: 2.0.0-rc.27(246411829a7feed01d558b7e2bad3aa2)
       happy-dom:
         specifier: ^20.13.2
         version: 20.14.6
@@ -4444,8 +4444,8 @@ packages:
       typescript: ^7.0.2
       zod: 4.6.5
 
-  everything-dev@2.0.0-rc.24:
-    resolution: {integrity: sha512-w61SAM6d/nQRMf2cp8fxeam5tT5IlON867j/RZg72FUp+Y3JpzSH18Ydna7Bdz670B7SLeW5l4MuCVesfK7ozQ==}
+  everything-dev@2.0.0-rc.27:
+    resolution: {integrity: sha512-awzwzlyTAplkVbqFCbEA6i42BfIKPFiuVOuMfRp2VH73x7LhgIZMqqPu2EA8sJVH4E7aMYAh3DpNVK/hT1XlyQ==}
     engines: {node: '>=20.11'}
     hasBin: true
     peerDependencies:
@@ -9613,7 +9613,7 @@ snapshots:
       - vue-tsc
       - webpack
 
-  everything-dev@2.0.0-rc.24(246411829a7feed01d558b7e2bad3aa2):
+  everything-dev@2.0.0-rc.27(246411829a7feed01d558b7e2bad3aa2):
     dependencies:
       '@clack/prompts': 0.10.1
       '@effect/platform-node': 4.0.0-rc.117(effect@4.0.0-rc.117)(redis@6.2.1(@opentelemetry/api@1.10.0))
