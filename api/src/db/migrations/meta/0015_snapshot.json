@@ -175,12 +175,8 @@
           "name": "activity_binding_sessions_source_record_id_activity_sources_id_fk",
           "tableFrom": "activity_binding_sessions",
           "tableTo": "activity_sources",
-          "columnsFrom": [
-            "source_record_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -372,12 +368,8 @@
           "name": "activity_event_moderation_requests_event_id_activity_hidden_events_event_id_fk",
           "tableFrom": "activity_event_moderation_requests",
           "tableTo": "activity_hidden_events",
-          "columnsFrom": [
-            "event_id"
-          ],
-          "columnsTo": [
-            "event_id"
-          ],
+          "columnsFrom": ["event_id"],
+          "columnsTo": ["event_id"],
           "onDelete": "no action",
           "onUpdate": "no action"
         }
@@ -492,12 +484,8 @@
           "name": "activity_event_submissions_source_record_id_activity_sources_id_fk",
           "tableFrom": "activity_event_submissions",
           "tableTo": "activity_sources",
-          "columnsFrom": [
-            "source_record_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -594,12 +582,8 @@
           "name": "activity_event_types_source_record_id_activity_sources_id_fk",
           "tableFrom": "activity_event_types",
           "tableTo": "activity_sources",
-          "columnsFrom": [
-            "source_record_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -682,12 +666,8 @@
           "name": "activity_github_actor_mappings_integration_id_activity_github_integrations_id_fk",
           "tableFrom": "activity_github_actor_mappings",
           "tableTo": "activity_github_integrations",
-          "columnsFrom": [
-            "integration_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["integration_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -773,12 +753,8 @@
           "name": "activity_github_integrations_source_record_id_activity_sources_id_fk",
           "tableFrom": "activity_github_integrations",
           "tableTo": "activity_sources",
-          "columnsFrom": [
-            "source_record_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -878,12 +854,8 @@
           "name": "activity_github_quarantine_integration_id_activity_github_integrations_id_fk",
           "tableFrom": "activity_github_quarantine",
           "tableTo": "activity_github_integrations",
-          "columnsFrom": [
-            "integration_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["integration_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1018,12 +990,8 @@
           "name": "activity_github_repositories_integration_id_activity_github_integrations_id_fk",
           "tableFrom": "activity_github_repositories",
           "tableTo": "activity_github_integrations",
-          "columnsFrom": [
-            "integration_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["integration_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1282,12 +1250,8 @@
           "name": "activity_signing_identities_source_record_id_activity_sources_id_fk",
           "tableFrom": "activity_signing_identities",
           "tableTo": "activity_sources",
-          "columnsFrom": [
-            "source_record_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1297,9 +1261,7 @@
         "activity_signing_identities_public_key_unique": {
           "name": "activity_signing_identities_public_key_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "public_key"
-          ]
+          "columns": ["public_key"]
         }
       },
       "policies": {},
@@ -1390,12 +1352,8 @@
           "name": "activity_source_api_keys_source_record_id_activity_sources_id_fk",
           "tableFrom": "activity_source_api_keys",
           "tableTo": "activity_sources",
-          "columnsFrom": [
-            "source_record_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1405,9 +1363,7 @@
         "activity_source_api_keys_secret_hash_unique": {
           "name": "activity_source_api_keys_secret_hash_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "secret_hash"
-          ]
+          "columns": ["secret_hash"]
         }
       },
       "policies": {},
@@ -1486,12 +1442,8 @@
           "name": "activity_source_reviews_source_record_id_activity_sources_id_fk",
           "tableFrom": "activity_source_reviews",
           "tableTo": "activity_sources",
-          "columnsFrom": [
-            "source_record_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1580,12 +1532,8 @@
           "name": "activity_source_trust_changes_source_record_id_activity_sources_id_fk",
           "tableFrom": "activity_source_trust_changes",
           "tableTo": "activity_sources",
-          "columnsFrom": [
-            "source_record_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["source_record_id"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1752,16 +1700,12 @@
         "activity_sources_source_id_unique": {
           "name": "activity_sources_source_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "source_id"
-          ]
+          "columns": ["source_id"]
         },
         "activity_sources_nearbuilders_project_id_unique": {
           "name": "activity_sources_nearbuilders_project_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "nearbuilders_project_id"
-          ]
+          "columns": ["nearbuilders_project_id"]
         }
       },
       "policies": {},
@@ -1870,23 +1814,17 @@
         "tenants_subdomain_unique": {
           "name": "tenants_subdomain_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "subdomain"
-          ]
+          "columns": ["subdomain"]
         },
         "tenants_account_id_unique": {
           "name": "tenants_account_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "account_id"
-          ]
+          "columns": ["account_id"]
         },
         "tenants_org_id_unique": {
           "name": "tenants_org_id_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "org_id"
-          ]
+          "columns": ["org_id"]
         }
       },
       "policies": {},
@@ -1898,45 +1836,27 @@
     "public.activity_signing_identity_binding_status": {
       "name": "activity_signing_identity_binding_status",
       "schema": "public",
-      "values": [
-        "pending",
-        "bound"
-      ]
+      "values": ["pending", "bound"]
     },
     "public.activity_source_approval_status": {
       "name": "activity_source_approval_status",
       "schema": "public",
-      "values": [
-        "pending",
-        "approved",
-        "rejected"
-      ]
+      "values": ["pending", "approved", "rejected"]
     },
     "public.activity_source_review_decision": {
       "name": "activity_source_review_decision",
       "schema": "public",
-      "values": [
-        "approved",
-        "rejected"
-      ]
+      "values": ["approved", "rejected"]
     },
     "public.activity_source_trust_status": {
       "name": "activity_source_trust_status",
       "schema": "public",
-      "values": [
-        "standard",
-        "trusted"
-      ]
+      "values": ["standard", "trusted"]
     },
     "public.tenant_status": {
       "name": "tenant_status",
       "schema": "public",
-      "values": [
-        "active",
-        "pending",
-        "suspended",
-        "pending_deletion"
-      ]
+      "values": ["active", "pending", "suspended", "pending_deletion"]
     }
   },
   "schemas": {},
