@@ -175,8 +175,8 @@ type change is reverted (for example by `bos sync`) or if source outside the aut
 
 | Ticket | Covers | Migration |
 | --- | --- | --- |
-| Key endorsements on the canonical NEAR owner id | Finding 1 | Add column; backfill from the auth `near_account` table before C3; merge duplicates |
-| Preserve or remap organization ids in the C3 join | Finding 2 | Id map applied to sources, tenants, and members (add to #80) |
-| Verify source NEAR account ownership on create and update | Finding 3 | None |
-| Verify tenant account ownership | Finding 4 | None |
-| Store the canonical owner id in audit columns | Finding 5 | Optional backfill, ideally in the C3 window |
+| #103 Key endorsements on the canonical NEAR owner id | Finding 1 | Add column; backfill from the auth `near_account` table before C3; merge duplicates |
+| #104 Preserve or remap organization ids in the C3 join | Finding 2 | Id map applied to sources, tenants, and members (blocks #80) |
+| #105 Verify source NEAR account ownership on create and update | Finding 3 | None |
+| #106 Verify tenant account ownership | Finding 4 | None |
+| #107 Store the canonical owner id in audit columns | Finding 5 | Optional backfill, ideally in the C3 window |
