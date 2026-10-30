@@ -1,0 +1,1 @@
+CREATE INDEX "activity_event_submissions_history_cursor_idx" ON "activity_event_submissions" USING btree ("created_at","id");
