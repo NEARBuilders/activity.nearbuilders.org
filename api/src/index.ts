@@ -50,6 +50,7 @@ import {
   DatabaseActivityPointValueProvider,
 } from "./services/activity-leaderboard";
 import { DatabaseActivityLeaderboardHistory } from "./services/activity-leaderboard-history";
+import { ActivityMcpServer } from "./services/activity-mcp";
 import {
   ActivityModerationService,
   DatabaseActivityModerationStore,
@@ -169,6 +170,7 @@ export type ApiServices = {
   activityLeaderboard: ActivityLeaderboard;
   activityRelay: ActivityRelay;
   activityHealth: ActivityHealthService;
+  activityMcp: ActivityMcpServer;
 };
 
 export class ApiServicesTag extends Context.Service<ApiServicesTag, ApiServices>()(
@@ -352,6 +354,10 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityLeaderboard,
         activityRelay,
         activityHealth: activityHealthService,
+        activityMcp: new ActivityMcpServer(
+          activityBindingSessionsService,
+          activityIngestionService,
+        ),
       };
 
       yield* Effect.addFinalizer(() =>
@@ -1050,6 +1056,20 @@ export default createPlugin.withPlugins<PluginsClient>()({
             message: "Activity leaderboard projection status is unavailable",
           });
         }
+      }),
+
+      handleActivityMcpRequest: builder.handleActivityMcpRequest.handler(
+        async ({ input, context }) =>
+          getServices().activityMcp.handle(input, {
+            origin: requestOrigin(context.reqHeaders),
+            clientKey: requestClientKey(context.reqHeaders),
+          }),
+      ),
+
+      openActivityMcpStream: builder.openActivityMcpStream.handler(async ({ errors }) => {
+        throw errors.METHOD_NOT_SUPPORTED({
+          message: "The Activity MCP server does not stream; send JSON-RPC requests with POST",
+        });
       }),
 
       getActivityHealth: builder.getActivityHealth.handler(async ({ errors }) => {

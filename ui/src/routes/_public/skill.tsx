@@ -3,6 +3,7 @@ import {
   CopyIcon as Copy,
   ArrowSquareOutIcon as ExternalLink,
   FileTextIcon as FileText,
+  PlugsConnectedIcon as PlugsConnected,
 } from "@phosphor-icons/react/ssr";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -11,6 +12,7 @@ import { getAccount, getActiveRuntime, getAppName } from "@/app";
 import { PageContainer } from "@/components/layout/page-container";
 import { Button } from "@/components/ui/button";
 import { Markdown } from "@/components/ui/markdown";
+import { buildActivityMcpPrompt } from "@/lib/activity-mcp-prompt";
 
 export const Route = createFileRoute("/_public/skill")({
   loader: async ({ context }) => {
@@ -49,6 +51,7 @@ function SkillPage() {
   const account = getAccount(runtimeConfig);
   const appName = getAppName(runtimeConfig);
   const [copied, setCopied] = useState(false);
+  const [mcpCopied, setMcpCopied] = useState(false);
 
   const accountId = runtime?.accountId ?? account;
 
@@ -62,6 +65,13 @@ function SkillPage() {
     setCopied(true);
     toast.success("Skill prompt copied");
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleCopyMcp = async () => {
+    await navigator.clipboard.writeText(buildActivityMcpPrompt(window.location.origin));
+    setMcpCopied(true);
+    toast.success("MCP prompt copied");
+    setTimeout(() => setMcpCopied(false), 2000);
   };
 
   return (
@@ -90,6 +100,10 @@ function SkillPage() {
                 {copied ? <Check size={14} /> : <Copy size={14} />}
                 {copied ? "Copied" : "Copy prompt"}
               </Button>
+              <Button variant="outline" onClick={handleCopyMcp}>
+                {mcpCopied ? <Check size={14} /> : <PlugsConnected size={14} />}
+                {mcpCopied ? "Copied" : "Copy MCP prompt"}
+              </Button>
               <Button variant="outline" asChild>
                 <a href="/skill.md" target="_blank" rel="noopener noreferrer">
                   <ExternalLink size={14} />
@@ -101,7 +115,9 @@ function SkillPage() {
 
           <div className="border-t border-border py-4 text-sm text-muted-foreground">
             Ask your coding agent to "integrate activity.nearbuilders.org" and point it at
-            `/skill.md`, or copy the prompt above.
+            `/skill.md`, or copy the prompt above. If your agent supports MCP, copy the MCP prompt
+            instead: it connects the agent to `/api/v1/mcp`, which registers the project and hands
+            over its key after you approve in the browser.
           </div>
         </div>
 
