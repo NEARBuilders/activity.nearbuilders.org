@@ -70,7 +70,7 @@ function write(kind, pubkey) {
 
 const waitPastMissInterval = () => sleep(MISS_REFRESH_SECONDS * 1000 * 2);
 
-test("a restore republishes history from listed keys and drops keys that left the list", async () => {
+test("a restore republishes history from listed keys and rejects unlisted keys", async () => {
   const replies = await Promise.all([
     write(1701, KEY_A),
     write(1701, KEY_B),
