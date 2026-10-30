@@ -1,3 +1,4 @@
+import { ORPCError } from "@orpc/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -69,7 +70,13 @@ export function useActivitySourceCredentials(
       try {
         await apiClient.confirmActivitySigningIdentityBinding({ sourceId });
         return;
-      } catch {}
+      } catch (error) {
+        if (error instanceof ORPCError && error.code === "SERVICE_UNAVAILABLE") {
+          throw new Error(
+            `${error.message}. The transaction was sent; use Check again once this is resolved.`,
+          );
+        }
+      }
     }
     throw new Error(
       "The transaction was sent but is not indexed yet. Use Check again in a moment.",

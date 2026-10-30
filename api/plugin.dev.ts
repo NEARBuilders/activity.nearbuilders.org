@@ -35,6 +35,7 @@ export default {
       ACTIVITY_SIGNING_ACTIVE_KEY_VERSION: process.env.ACTIVITY_SIGNING_ACTIVE_KEY_VERSION || "v1",
       ACTIVITY_REDIS_URL: process.env.ACTIVITY_REDIS_URL || "memory:",
       ACTIVITY_GITHUB_TOKEN: process.env.ACTIVITY_GITHUB_TOKEN || undefined,
+      FASTNEAR_API_KEY: process.env.FASTNEAR_API_KEY || undefined,
     },
   } satisfies PluginConfigInput<typeof Plugin>,
 };

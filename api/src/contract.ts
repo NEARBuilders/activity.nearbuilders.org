@@ -686,7 +686,7 @@ export const contract = oc.router({
     })
     .input(z.object({ sourceId: z.string() }))
     .output(ActivitySigningIdentitySchema)
-    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST }),
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST, SERVICE_UNAVAILABLE }),
 
   createActivitySourceApiKey: oc
     .route({ method: "POST", path: "/activity/sources/{sourceId}/api-keys" })
