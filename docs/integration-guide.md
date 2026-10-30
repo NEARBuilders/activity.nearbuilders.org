@@ -289,6 +289,125 @@ The gateway returns only events whose Nostr signature and source identity are va
 `provenance.payloadClaimsVerified` field remains `false`; a valid signature proves who submitted the
 payload, not that every payload claim is true.
 
+### Read a relay directly
+
+Activity events are portable Nostr events, so you can read kind `1701` from any relay with a `#s`,
+`#t`, `#n`, or `#i` filter. **A relay read is untrusted until your own checks pass.** Relays store
+events from anyone. relay.nearbuilders.org refuses new kind-1701 writes from keys missing from
+Activity's key list, but it still holds history written before that check, it does not check that a
+key belongs to the source in the event's `s` tag, and other relays filter nothing. No relay checks
+tags, payloads, or signing windows. Only Activity's own reads (`GET /v1/events`, the SSE stream, and
+the leaderboard) apply every check below. If you only need verified events, use those instead.
+
+Accept a relay event only when all of these hold:
+
+1. **Envelope and signature.** It is a valid NIP-01 event of kind `1701` whose `id`, `pubkey`, and
+   `sig` are lowercase hex, its `id` is the hash of its serialized fields, and its `sig` is a valid
+   Schnorr signature by `pubkey`. `created_at` is a non-negative integer that is a valid date in
+   seconds.
+2. **Exactly one of each tag.** It has exactly one `s`, `t`, `n`, and `i` tag, each with exactly one
+   value. The source (`s`) is 2–100 characters and the event type (`t`) at most 100, both matching
+   `^[a-z0-9]+(?:[._-][a-z0-9]+)*$`; the actor (`n`) is a valid NEAR account ID; the idempotency key
+   (`i`) is 1–200 characters.
+3. **Payload.** `content` is valid JSON of at most 16 KiB.
+4. **Key bound to that source.** The pair (`s` tag, `pubkey`) appears in
+   [`GET /v1/signing-keys`](activity-protocol.md#signing-keys). Match the pair, not the key alone: a
+   key registered for one source must not vouch for another. The list holds the current and retired
+   keys of every source that is not rejected, so rejected sources drop out. Cache it, and refresh it
+   periodically and when you see an unknown key.
+
+These checks prove that Activity's registered Signing Identity for that source signed the event.
+Two guarantees remain that a relay reader cannot check:
+
+- **Signing window.** The key list does not say when each key was active. Activity accepts a retired
+  key's event only if it was created before that key was retired.
+- **Backdated events.** An event dated before its key was bound, such as history imported with
+  `occurredAt`, is trusted only because Activity's own submission ledger shows it published that
+  event. A relay record claiming an earlier date proves nothing by itself.
+
+Hidden and retracted events also stay on relays; only Activity's reads remove them. Before an event
+counts toward anything someone could gain from, such as scores, rewards, or access, confirm it
+through Activity: it appears in `GET /v1/events` only after passing every check, including the two
+above, and only while it is not hidden. The feed has no lookup by event ID, so filter by the event's
+`source`, `type`, and `actor` and page newest first until you pass its `created_at`; if it has not
+appeared by then, treat it as unverified or hidden. For old or backdated events this can take many
+pages, so confirm in the background and cache the result per event ID.
+
+The relay checks with [`nostr-tools`](https://github.com/nbd-wtf/nostr-tools):
+
+```ts
+import { type Event, validateEvent, verifyEvent } from "nostr-tools/pure";
+
+const ACTIVITY_API = "https://activity.nearbuilders.org/api";
+const SLUG = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
+const NEAR_ACCOUNT =
+  /^(?=.{2,64}$)([a-z0-9]+(?:[-_][a-z0-9]+)*)(\.([a-z0-9]+(?:[-_][a-z0-9]+)*))*$/;
+const HEX_64 = /^[a-f0-9]{64}$/;
+const HEX_128 = /^[a-f0-9]{128}$/;
+
+export async function loadSigningKeys(): Promise<Map<string, Set<string>>> {
+  const response = await fetch(`${ACTIVITY_API}/v1/signing-keys`);
+  if (!response.ok) throw new Error(`Activity signing keys: HTTP ${response.status}`);
+  const { data } = (await response.json()) as { data: { sourceId: string; publicKey: string }[] };
+  const keys = new Map<string, Set<string>>();
+  for (const { sourceId, publicKey } of data) {
+    keys.set(sourceId, (keys.get(sourceId) ?? new Set()).add(publicKey));
+  }
+  return keys;
+}
+
+function singleTag(event: Event, name: string): string | null {
+  const matches = event.tags.filter((tag) => tag[0] === name);
+  return matches.length === 1 && matches[0]?.length === 2 ? (matches[0][1] ?? null) : null;
+}
+
+function isJson(content: string): boolean {
+  try {
+    JSON.parse(content);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Copy the signed fields so nostr-tools cannot reuse a verification cached on another object.
+function hasValidSignature({ id, pubkey, created_at, kind, tags, content, sig }: Event): boolean {
+  return verifyEvent({ id, pubkey, created_at, kind, tags, content, sig });
+}
+
+export function passesRelayChecks(event: Event, keys: Map<string, Set<string>>): boolean {
+  if (!validateEvent(event) || !HEX_64.test(event.id) || !HEX_128.test(String(event.sig))) {
+    return false;
+  }
+  const source = singleTag(event, "s");
+  const type = singleTag(event, "t");
+  const actor = singleTag(event, "n");
+  const idempotencyKey = singleTag(event, "i");
+  return (
+    event.kind === 1701 &&
+    Number.isSafeInteger(event.created_at) &&
+    event.created_at >= 0 &&
+    !Number.isNaN(new Date(event.created_at * 1_000).getTime()) &&
+    source !== null &&
+    source.length >= 2 &&
+    source.length <= 100 &&
+    SLUG.test(source) &&
+    type !== null &&
+    type.length <= 100 &&
+    SLUG.test(type) &&
+    actor !== null &&
+    NEAR_ACCOUNT.test(actor) &&
+    idempotencyKey !== null &&
+    idempotencyKey.length >= 1 &&
+    idempotencyKey.length <= 200 &&
+    new TextEncoder().encode(event.content).length <= 16 * 1024 &&
+    isJson(event.content) &&
+    keys.get(source)?.has(event.pubkey) === true &&
+    hasValidSignature(event)
+  );
+}
+```
+
 ## 4. Subscribe and reconnect
 
 Connect to `GET /v1/events/stream` with the same optional `source`, `type`, and `actor` filters. The

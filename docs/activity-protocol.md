@@ -15,10 +15,12 @@ The JSON payload is stored in `content`. Fields that relays must index are dupli
 | NEAR actor | `n` | `["n", "alice.near"]` |
 | source-scoped idempotency key | `i` | `["i", "github:pr:42"]` |
 
-Consumers query these fields with NIP-01 tag filters (`#s`, `#t`, `#n`, and `#i`). Redis projection
-uses the `[source, idempotency key]` pair as its atomic deduplication identity, so separately signed
-events carrying the same source-scoped idempotency key count once. Projected counters are also
-source-scoped and cannot merge event types declared by different Activity Sources.
+Consumers query these fields with NIP-01 tag filters (`#s`, `#t`, `#n`, and `#i`). A relay serves
+any kind-1701 event it stores, whoever signed it, so a relay read is untrusted until the consumer
+verifies it; the [integration guide](integration-guide.md#read-a-relay-directly) lists the checks.
+Redis projection uses the `[source, idempotency key]` pair as its atomic deduplication identity, so
+separately signed events carrying the same source-scoped idempotency key count once. Projected
+counters are also source-scoped and cannot merge event types declared by different Activity Sources.
 
 `POST /api/v1/events` accepts JSON payloads up to 16 KiB after serialization. The gateway rejects
 larger payloads before reserving an idempotency key, signing an event, or contacting the relay.
@@ -124,6 +126,21 @@ makes those omissions observable to clients. The provenance object states exactl
 implies that payload claims were independently checked. A malformed cursor returns `400 Bad Request`;
 a relay timeout or unsafe scan-limit result returns `503 Service Unavailable` rather than leaving the
 request open or returning an incomplete page.
+
+### Signing keys
+
+`GET /api/v1/signing-keys` is public. It lists the source ID and public key of every bound Signing
+Identity, current and retired, for each Activity Source that is not rejected, and nothing else:
+
+```json
+{ "data": [{ "sourceId": "feedback-rounds", "publicKey": "<64-character Nostr public key>" }] }
+```
+
+relay.nearbuilders.org uses it to refuse new kind-1701 writes from any other key, and consumers
+reading a relay directly use it to check that an event's key is bound to the source in its `s` tag.
+It does not include signing windows, so it cannot show that an event falls inside its key's active
+window or that a backdated event came from Activity's submission ledger; only the feed above checks
+both.
 
 ## Event endorsements
 
