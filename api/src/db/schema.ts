@@ -214,6 +214,10 @@ export const activityEventSubmissions = pgTable(
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
+    historyCursorIdx: index("activity_event_submissions_history_cursor_idx").on(
+      table.createdAt,
+      table.id,
+    ),
     sourceIdempotencyIdx: uniqueIndex("activity_event_submissions_source_idempotency_idx").on(
       table.sourceRecordId,
       table.idempotencyKey,
