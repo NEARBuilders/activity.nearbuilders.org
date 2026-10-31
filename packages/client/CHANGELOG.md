@@ -1,5 +1,17 @@
 # @nearbuilders/activity-client
 
+## 0.3.0
+
+### Minor Changes
+
+- 97a2dbf: Build the client on oRPC 2 and everything-dev v2. `createActivityClient(baseUrl, options)` and the contract import path are unchanged. The package now declares `@orpc/openapi` and `zod`, which the bundled contract imports directly instead of through the removed `every-plugin/orpc` and `every-plugin/zod` facades.
+- 57d293c: Add a stateless MCP server at `POST /api/v1/mcp` whose tools let a coding agent register a project through a binding session (`start_activity_registration`, `check_activity_registration`) and submit events (`submit_activity_event`, including `activity.test` and history with `occurredAt`). The `/skill` page gains a **Copy MCP prompt** button, and `skill.md` and the integration guide describe the MCP flow.
+- 3549d8d: Add the public `GET /v1/signing-keys` endpoint (`listActivitySigningKeys`), listing the source ID and public key of every bound Signing Identity, current and retired, for Activity Sources that are not rejected. relay.nearbuilders.org's write policy uses it to reject kind-1701 events from unregistered pubkeys.
+
+### Patch Changes
+
+- 99fc647: Send the `FASTNEAR_API_KEY` secret as a bearer token on FastKV binding reads. A 401, 403, or 429 from FastKV now fails binding confirmation with a distinct `SERVICE_UNAVAILABLE` error and log line instead of reporting that the binding is not available yet, and the dashboard stops polling and shows that error.
+
 ## 0.2.0
 
 ### Minor Changes
