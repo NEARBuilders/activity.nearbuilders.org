@@ -293,9 +293,10 @@ payload, not that every payload claim is true.
 
 Activity events are portable Nostr events, so you can read kind `1701` from any relay with a `#s`,
 `#t`, `#n`, or `#i` filter. **A relay read is untrusted until your own checks pass.** Relays store
-events from anyone. relay.nearbuilders.org refuses new kind-1701 writes from keys missing from
-Activity's key list, but it still holds history written before that check, it does not check that a
-key belongs to the source in the event's `s` tag, and other relays filter nothing. No relay checks
+events from anyone. Once its signing key check is enabled, relay.nearbuilders.org refuses new
+kind-1701 writes from keys missing from Activity's key list, but it still holds history written
+before that check, it does not check that a key belongs to the source in the event's `s` tag, and
+other relays filter nothing. No relay checks
 tags, payloads, or signing windows. Only Activity's own reads (`GET /v1/events`, the SSE stream, and
 the leaderboard) apply every check below. If you only need verified events, use those instead.
 
@@ -342,8 +343,8 @@ const ACTIVITY_API = "https://activity.nearbuilders.org/api";
 const SLUG = /^[a-z0-9]+(?:[._-][a-z0-9]+)*$/;
 const NEAR_ACCOUNT =
   /^(?=.{2,64}$)([a-z0-9]+(?:[-_][a-z0-9]+)*)(\.([a-z0-9]+(?:[-_][a-z0-9]+)*))*$/;
-const HEX_64 = /^[a-f0-9]{64}$/;
-const HEX_128 = /^[a-f0-9]{128}$/;
+const EVENT_ID_HEX = /^[a-f0-9]{64}$/;
+const SIGNATURE_HEX = /^[a-f0-9]{128}$/;
 
 export async function loadSigningKeys(): Promise<Map<string, Set<string>>> {
   const response = await fetch(`${ACTIVITY_API}/v1/signing-keys`);
@@ -370,13 +371,18 @@ function isJson(content: string): boolean {
   }
 }
 
-// Copy the signed fields so nostr-tools cannot reuse a verification cached on another object.
+// KEEP: copy the signed fields so nostr-tools cannot reuse a verification cached on
+// another object.
 function hasValidSignature({ id, pubkey, created_at, kind, tags, content, sig }: Event): boolean {
   return verifyEvent({ id, pubkey, created_at, kind, tags, content, sig });
 }
 
 export function passesRelayChecks(event: Event, keys: Map<string, Set<string>>): boolean {
-  if (!validateEvent(event) || !HEX_64.test(event.id) || !HEX_128.test(String(event.sig))) {
+  if (
+    !validateEvent(event) ||
+    !EVENT_ID_HEX.test(event.id) ||
+    !SIGNATURE_HEX.test(String(event.sig))
+  ) {
     return false;
   }
   const source = singleTag(event, "s");

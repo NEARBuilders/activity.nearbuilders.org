@@ -134,11 +134,11 @@ Identity, current and retired, for each Activity Source that is not rejected, an
 { "data": [{ "sourceId": "feedback-rounds", "publicKey": "<64-character Nostr public key>" }] }
 ```
 
-relay.nearbuilders.org uses it to refuse new kind-1701 writes from any other key, and consumers
-reading a relay directly use it to check that an event's key is bound to the source in its `s` tag.
-It does not include signing windows, so it cannot show that an event falls inside its key's active
-window or that a backdated event came from Activity's submission ledger; only the feed above checks
-both.
+With its signing key check enabled, relay.nearbuilders.org uses it to refuse new kind-1701 writes
+from any other key, and consumers reading a relay directly use it to check that an event's key is
+bound to the source in its `s` tag. It does not include signing windows, so it cannot show that an
+event falls inside its key's active window or that a backdated event came from Activity's submission
+ledger; only the feed above checks both.
 
 ## Event endorsements
 
