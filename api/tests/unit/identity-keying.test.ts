@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
-import { describe, expect, it } from "vitest";
+import { describe, expect, expectTypeOf, it } from "vitest";
+import type { ActivityRequestContext } from "@/lib/activity-context";
 
 const SOURCE_ROOT = join(import.meta.dirname, "../../src");
 const AUTH_LIBRARY_FILES = new Set(["lib/auth.ts", "lib/auth-types.gen.ts"]);
@@ -24,8 +25,8 @@ function withoutComments(source: string): string {
 
 describe("identity keying", () => {
   it("removes the auth session from the handler context type", () => {
-    const context = readFileSync(join(SOURCE_ROOT, "lib/context.ts"), "utf8");
-    expect(context).toContain('z.custom<Omit<AuthContext, "session">>()');
+    expectTypeOf<ActivityRequestContext>().not.toHaveProperty("session");
+    expectTypeOf<ActivityRequestContext>().toHaveProperty("userId");
   });
 
   it("never reads the auth session outside the auth library", () => {

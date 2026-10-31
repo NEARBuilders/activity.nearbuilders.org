@@ -42,12 +42,15 @@ holding this app's user id or organization id points at nothing after the join.
 | 5 | Admin and actor audit columns store bare user ids | Low | Optional backfill |
 | 6 | Signing, event, and scoring identity already key on NEAR accounts | Conforms | None |
 
-No code path keys data on an auth session id, and two guards keep it that way:
-[`api/src/lib/context.ts`](../../api/src/lib/context.ts) removes `session` from the handler context
-type, so any read, destructure, or alias of it fails typecheck; and
-[`api/tests/unit/identity-keying.test.ts`](../../api/tests/unit/identity-keying.test.ts) fails if that
-type change is reverted (for example by `bos sync`) or if source outside the auth library reads
-`context.session`, uses the `AuthSession` types, or calls `getSession`.
+No code path keys data on an auth session id, and two guards keep it that way. The handler context
+type comes from [`api/src/lib/activity-context.ts`](../../api/src/lib/activity-context.ts), an
+app-owned file that removes `session` from the auth context, so any read, destructure, or alias of
+it in a route fails typecheck; the framework-owned `lib/context.ts` is untouched, so `bos upgrade`
+cannot undo this.
+[`api/tests/unit/identity-keying.test.ts`](../../api/tests/unit/identity-keying.test.ts) pins that
+type and fails if source outside the auth library uses the `AuthSession` types, calls `getSession`,
+or reads `context.session` in a way typecheck would not see. The session object still exists at
+runtime inside the auth middleware; the guard is that route code cannot reach it.
 
 ## Findings
 
@@ -76,7 +79,8 @@ type change is reverted (for example by `bos sync`) or if source outside the aut
   - Backfill `owner_account_id` with a one-off migration that maps each `user_id` to its primary NEAR
     account. The auth plugin exposes no admin-level user-to-account lookup (`nearListAccounts` returns
     only the caller's accounts), so this script reads the auth database's `near_account` table
-    directly: a documented, migration-only exception to the "never read the auth schema" rule. Rows
+    directly. That breaks the parent convention's "no direct reads of the auth DB schema", so it
+    needs an explicit sign-off on #103, or an admin lookup added to the auth plugin first. Rows
     for users without a NEAR account keep their user id as the owner. Merge rows that collapse onto
     one owner.
   - Run the backfill **before** the C3 flip, while this app's user ids still resolve. In the C3
@@ -172,6 +176,9 @@ type change is reverted (for example by `bos sync`) or if source outside the aut
   For users whose id changes, it falls back to the `isPersonal` metadata.
 
 ## Fix tickets
+
+All five tickets carry `needs-triage`; the severities above are this audit's proposal for that
+triage.
 
 | Ticket | Covers | Migration |
 | --- | --- | --- |
