@@ -1071,6 +1071,36 @@ export const contract = oc.router({
     .output(ActivityLeaderboardProjectionStatusSchema)
     .errors({ SERVICE_UNAVAILABLE }),
 
+  handleActivityMcpRequest: oc
+    .route({
+      method: "POST",
+      path: "/v1/mcp",
+      summary: "Activity MCP server",
+      description:
+        "Stateless Model Context Protocol endpoint (Streamable HTTP, JSON responses) with tools to register a project as an Activity Source through a binding session and to submit events. Starting a registration needs no credential; the person approves it in the browser.",
+      tags: ["Activity"],
+      outputStructure: "detailed",
+    })
+    .input(z.unknown())
+    .output(
+      z.object({
+        status: z.union([z.literal(200), z.literal(202)]),
+        body: z.unknown().optional(),
+      }),
+    ),
+
+  openActivityMcpStream: oc
+    .route({
+      method: "GET",
+      path: "/v1/mcp",
+      summary: "Activity MCP server-sent events",
+      description:
+        "The Activity MCP server sends no server-initiated messages, so this returns 405.",
+      tags: ["Activity"],
+    })
+    .output(z.object({}))
+    .errors({ METHOD_NOT_SUPPORTED: {} }),
+
   listActivitySigningKeys: oc
     .route({
       method: "GET",

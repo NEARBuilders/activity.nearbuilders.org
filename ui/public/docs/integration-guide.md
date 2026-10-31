@@ -158,6 +158,32 @@ A wrong or missing poll token returns `404` or `401`. The source starts **Under 
 are accepted and appear in the feed straight away, and count on leaderboards once a Platform
 Administrator approves it.
 
+### MCP server
+
+Agents that speak the Model Context Protocol can run the same flow as tools. Connect
+`https://activity.nearbuilders.org/api/v1/mcp` (stateless Streamable HTTP with JSON responses; no
+credentials):
+
+```bash
+claude mcp add --transport http activity https://activity.nearbuilders.org/api/v1/mcp
+```
+
+| Tool | Does | Returns |
+| --- | --- | --- |
+| `start_activity_registration` | Starts a binding session; takes the same fields as `POST /v1/binding-sessions` | `url`, `matchCode`, `sessionId`, `pollToken`, `expiresAt`, `draft` |
+| `check_activity_registration` | Claims the key; takes `sessionId` and `pollToken` | The same `status` values as the claim endpoint, with `secret` once when `ready`, and the `eventTypes` the person approved when `ready` or `claimed` |
+| `submit_activity_event` | Submits one event; takes `apiKey` plus the `POST /v1/events` body (`payload` optional, `occurredAt` for history) | `eventId`, and `test: true` for `activity.test` |
+
+The person still opens the link, checks the match code, and approves the wallet transaction; the
+agent never needs a key to start. Tool failures, such as a wrong poll token or a rejected event,
+come back as tool results with `isError` and the API's error code, for example
+`NOT_FOUND: Binding session not found`. Use the MCP tools for setup and testing; production code
+should send events with `POST /v1/events` directly. `submit_activity_event` takes the Source API Key
+as a tool argument, so the key appears in the agent's tool-call history; send only the test event
+through it. The `/skill` page has a **Copy MCP prompt**
+button with a ready-made prompt for this flow. This endpoint is separate from the generic
+`/api/mcp`, which requires a user API key.
+
 ## 1. Register a source
 
 Everything in this section happens in the browser, and it is the only part that needs a NEAR

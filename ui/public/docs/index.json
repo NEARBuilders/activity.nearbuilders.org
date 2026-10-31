@@ -41,6 +41,11 @@
         "slug": "binding-session-api"
       },
       {
+        "depth": 3,
+        "text": "MCP server",
+        "slug": "mcp-server"
+      },
+      {
         "depth": 2,
         "text": "1. Register a source",
         "slug": "1-register-a-source"

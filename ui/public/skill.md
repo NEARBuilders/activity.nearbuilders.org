@@ -14,6 +14,15 @@ proves they own the project's NEAR account. You never handle their wallet or key
 Base URL: `https://activity.nearbuilders.org`. If the person runs Activity locally, use their URL
 instead, such as `http://localhost:3000`.
 
+**MCP (optional).** If you can connect MCP servers, connect `https://activity.nearbuilders.org/api/v1/mcp`
+(Streamable HTTP, no credentials). Its tools replace the HTTP calls below and take the same fields:
+`start_activity_registration` for step 3, `check_activity_registration` (with `sessionId` and
+`pollToken`) for step 5, and `submit_activity_event` (with the key as `apiKey`) for the test event in
+step 8. When the registration is ready, `check_activity_registration` also returns the Event Types
+the person approved; integrate those, since the person may have changed your proposal. Every other step is unchanged. Passing the key to `submit_activity_event` puts it in your
+tool-call history, so use that tool only for the one test event and never show the key to the
+person. This is not the generic `/api/mcp` endpoint, which needs a user API key.
+
 ## 1. Identify the project
 
 Look for the project's nearbuilders.org page: a link in the README, website, or package metadata, of
