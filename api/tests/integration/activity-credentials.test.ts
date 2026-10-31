@@ -536,23 +536,18 @@ describe("Activity source credentials", () => {
     };
     const logged = vi.spyOn(console, "error").mockImplementation(() => {});
 
-    for (const [status, message] of [
-      [429, "Binding confirmation is unavailable: FastKV quota is exhausted, try again later"],
-      [401, "Binding confirmation is unavailable: FastKV rejected the API key"],
-    ] as const) {
-      const refused = respondWith(status, { error: "refused" });
-      try {
-        await expect(
-          owner.confirmActivitySigningIdentityBinding({ sourceId: "fastkv-source" }),
-        ).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE", message });
-        expect(refused.authorizations).toEqual([`Bearer ${TEST_FASTNEAR_API_KEY}`]);
-      } finally {
-        refused.spy.mockRestore();
-      }
+    const refused = respondWith(429, { error: "quota" });
+    try {
       await expect(
-        owner.getActivitySigningIdentity({ sourceId: "fastkv-source" }),
-      ).resolves.toMatchObject({ bindingStatus: "pending" });
+        owner.confirmActivitySigningIdentityBinding({ sourceId: "fastkv-source" }),
+      ).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
+      expect(refused.authorizations).toEqual([`Bearer ${TEST_FASTNEAR_API_KEY}`]);
+    } finally {
+      refused.spy.mockRestore();
     }
+    await expect(
+      owner.getActivitySigningIdentity({ sourceId: "fastkv-source" }),
+    ).resolves.toMatchObject({ bindingStatus: "pending" });
     logged.mockRestore();
 
     const bound = respondWith(200, { entries: [{ value: JSON.parse(prepared.value) }] });

@@ -223,23 +223,33 @@ function legacyNostrBindingKey(nearAccountId: string): string {
 
 type OnChainBinding = { npub?: unknown; bound_at?: unknown; sourceId?: unknown };
 
-const FASTKV_QUOTA_EXHAUSTED = {
-  reason: "quota exhausted",
-  message: "Binding confirmation is unavailable: FastKV quota is exhausted, try again later",
-};
+const FASTKV_REFUSALS = {
+  quotaExhausted: {
+    reason: "quota exhausted",
+    message: "Binding confirmation is unavailable: FastKV quota is exhausted, try again later",
+  },
+  apiKeyRejected: {
+    reason: "API key rejected",
+    message: "Binding confirmation is unavailable: FastKV rejected the API key",
+  },
+  apiKeyMissing: {
+    reason: "API key required, none configured",
+    message: "Binding confirmation is unavailable: FastKV requires an API key",
+  },
+} as const;
 
 function fastKvRefusal(status: number, apiKeySent: boolean) {
-  if (status === 429) return FASTKV_QUOTA_EXHAUSTED;
+  if (status === 429) return FASTKV_REFUSALS.quotaExhausted;
   if (status !== 401 && status !== 403) return null;
-  return apiKeySent
-    ? {
-        reason: "API key rejected",
-        message: "Binding confirmation is unavailable: FastKV rejected the API key",
-      }
-    : {
-        reason: "API key required, none configured",
-        message: "Binding confirmation is unavailable: FastKV requires an API key",
-      };
+  return apiKeySent ? FASTKV_REFUSALS.apiKeyRejected : FASTKV_REFUSALS.apiKeyMissing;
+}
+
+function logBindingRead(
+  outcome: "refused the binding read" | "binding read failed",
+  slot: string,
+  detail: string,
+) {
+  console.error(`[ActivityBinding] FastKV ${outcome} for ${slot}: ${detail}`);
 }
 
 export async function readOnChainBinding(
@@ -257,22 +267,24 @@ export async function readOnChainBinding(
       signal: AbortSignal.timeout(5_000),
     });
   } catch (error) {
-    console.error(
-      `[ActivityBinding] FastKV binding read failed for ${nearAccountId}/${key}: ${error instanceof Error ? error.name : "unknown error"}`,
+    logBindingRead(
+      "binding read failed",
+      `${nearAccountId}/${key}`,
+      error instanceof Error ? error.name : "unknown error",
     );
     return null;
   }
   const refusal = fastKvRefusal(response.status, Boolean(apiKey));
   if (refusal) {
-    console.error(
-      `[ActivityBinding] FastKV refused the binding read for ${nearAccountId}/${key}: HTTP ${response.status} (${refusal.reason})`,
+    logBindingRead(
+      "refused the binding read",
+      `${nearAccountId}/${key}`,
+      `HTTP ${response.status} (${refusal.reason})`,
     );
     throw new ORPCError("SERVICE_UNAVAILABLE", { message: refusal.message });
   }
   if (response.status >= 500) {
-    console.error(
-      `[ActivityBinding] FastKV binding read failed for ${nearAccountId}/${key}: HTTP ${response.status}`,
-    );
+    logBindingRead("binding read failed", `${nearAccountId}/${key}`, `HTTP ${response.status}`);
   }
   if (!response.ok) return null;
   const data = (await response.json().catch(() => null)) as {

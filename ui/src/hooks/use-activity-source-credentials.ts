@@ -73,7 +73,7 @@ export function useActivitySourceCredentials(
       } catch (error) {
         if (error instanceof ORPCError && error.code === "SERVICE_UNAVAILABLE") {
           throw new Error(
-            `${error.message}. The transaction was sent; use Check again once this is resolved.`,
+            `${error.message.replace(/\.$/, "")}. The transaction was sent; use Check again once this is resolved.`,
           );
         }
       }
