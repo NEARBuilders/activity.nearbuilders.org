@@ -45,7 +45,7 @@ jobs:
         run: pnpm run postinstall
 
       - name: Test relay write policy
-        run: node --test infra/relay/write-policy.test.mjs
+        run: node --test infra/relay/write-policy.test.mjs infra/relay/write-policy.integration.test.mjs
 
       - name: Test repository scripts
         run: pnpm run test:scripts
