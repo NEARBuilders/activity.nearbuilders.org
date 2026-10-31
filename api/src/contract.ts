@@ -219,11 +219,17 @@ export const ActivityGithubQuarantineSchema = z.object({
   createdAt: z.string(),
 });
 
+const ActivityEventPayloadSchema = z
+  .custom<z.core.util.JSONType>((value) => z.json().safeParse(value).success, {
+    message: "Expected a JSON value",
+  })
+  .describe("Any JSON value");
+
 export const ActivityEventSubmissionSchema = z.object({
   eventType: ActivityEventTypeNameSchema,
   actor: NearAccountIdSchema,
   idempotencyKey: z.string().trim().min(1).max(200),
-  payload: z.json(),
+  payload: ActivityEventPayloadSchema,
   /**
    * When the activity actually happened, for importing history. Must be in the past and within the
    * relay's accepted age. Omitted means "now", which is what live producers should send.
