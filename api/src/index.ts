@@ -19,9 +19,9 @@ import { SharedNostrRelayAdapter } from "./activity/shared-nostr-relay";
 import { type ActivityFeedEvent, contract, NEAR_ACCOUNT_ID_REGEX } from "./contract";
 import type { Database } from "./db";
 import { DatabaseLive, DatabaseTag } from "./db/layer";
+import { ActivityContextSchema } from "./lib/activity-context";
 import { createActivitySseStream } from "./lib/activity-sse";
 import { createAuthMiddleware } from "./lib/auth";
-import { ContextSchema } from "./lib/context";
 import type { PluginsClient } from "./lib/plugins-types.gen";
 import { ActivityBindingSessionsService } from "./services/activity-binding-sessions";
 import {
@@ -214,7 +214,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
     FASTNEAR_API_KEY: z.string().optional(),
   }),
 
-  context: ContextSchema,
+  context: ActivityContextSchema,
 
   contract,
 
