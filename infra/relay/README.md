@@ -9,7 +9,7 @@ and issue #12.
 | --- | --- |
 | `Dockerfile` | Upstream strfry image pinned by digest, plus Node for the write policy |
 | `strfry.conf` | Static relay settings: query cap 1,000, 4 tag filters, NIP-11 info, database on `/data` |
-| `write-policy.mjs` | strfry plugin: allowed kinds and per-address write rate limits |
+| `write-policy.mjs` | strfry plugin: allowed kinds, per-address write rate limits, and the kind 1701 signing key check |
 | `entrypoint.sh` | Fixes volume ownership, applies environment settings with `--set`, drops root |
 | `export-relay.mjs` | Copies a relay's events of the accepted kinds as JSONL (migration and backups) |
 | `publish-events.mjs` | Replays JSONL into a relay over a normal client connection (restore), paced under the rate limit |
@@ -28,11 +28,52 @@ All are optional environment variables on the Railway service.
 | `RELAY_WRITE_RATE` | `20` | Sustained writes per second per client address |
 | `RELAY_WRITE_BURST` | `300` | Burst size per client address |
 | `RELAY_REAL_IP_HEADER` | `x-real-ip` | Header carrying the client address behind the proxy |
+| `RELAY_SIGNING_KEYS_URL` | empty | Activity's signing key list. Empty disables the kind 1701 pubkey check |
+| `RELAY_SIGNING_KEYS_REFRESH_SECONDS` | `60` | How often the key list is refreshed |
+| `RELAY_SIGNING_KEYS_MISS_REFRESH_SECONDS` | `5` | Minimum time between refreshes caused by an unknown pubkey |
 
 The Activity gateway publishes every source's events from one server address, so the burst has
 to absorb a GitHub backfill. Imports, syncs, and streams are operator actions and are not
 rate-limited, but they are also **not** filtered by the write policy: `strfry import` accepts any
 kind, which is why `export-relay.mjs` filters kinds itself.
+
+## Signing key check
+
+Production sets `RELAY_SIGNING_KEYS_URL=https://activity.nearbuilders.org/api/v1/signing-keys` on
+the Railway service. With it set, the write policy accepts kind 1701 only when `event.pubkey` is in
+that list; kinds 0, 1, and 1111 are never checked. The check applies to client writes and to
+`strfry stream` and `strfry sync`, and runs after the rate limit so floods are throttled before
+they can cause refreshes. `strfry import` bypasses the write policy entirely, so it skips this check
+too. Without the variable the check is off and the plugin logs that once at startup.
+
+The list holds the bound signing identities of every source that is not rejected, **including
+retired ones**: an event signed before a rotation can still be published afterwards, and a restore
+republishes history signed by old keys. The cost is that a key retired because it was compromised
+stays writable on this relay until its source is rejected; Activity's feed still rejects its events
+dated after retirement. Signing keys are held only by Activity, so this matters only if Activity's
+key store itself is compromised. Narrowing it (for example, a time limit on retired keys) is part of
+the publish-auth decision in #32.
+
+- **Propagation.** An unknown pubkey triggers a refresh, at most one fetch per
+  `RELAY_SIGNING_KEYS_MISS_REFRESH_SECONDS`. A newly bound or rotated identity is therefore writable
+  on its first write made at least that long after the previous refresh, and in any case within
+  `RELAY_SIGNING_KEYS_REFRESH_SECONDS`. An earlier write is rejected; Activity answers it with 503
+  and the client's retry replays the same stored event. A source that becomes rejected loses write
+  access at the next successful refresh: within `RELAY_SIGNING_KEYS_REFRESH_SECONDS` while the API
+  answers, and only after it recovers during an outage, because the last good list stays in use.
+- **Failures.** An error status, an unreadable body, a timeout, and an empty key list all count as a
+  failed refresh. Once a list has loaded, failed fetches keep the last good list in use, misses are
+  rejected without waiting on another fetch, and the periodic refresh keeps retrying. Before the
+  first successful load, kind 1701 is rejected with
+  `error: Activity signing keys are unavailable, retry later` and each miss retries the fetch
+  (throttled as above); Activity is the only legitimate writer of kind 1701, so nothing legitimate
+  is lost. Writes are answered in order, so a miss that waits on a refresh delays the writes behind
+  it by up to the 2-second fetch timeout, at most once per miss interval.
+- **Restores.** Restore with `publish-events.mjs`, which goes through the write policy. Events
+  signed by keys of deleted or rejected sources are rejected and counted as rejections, so it exits
+  non-zero; check that the rejections are all `blocked: pubkey is not a registered Activity signing
+  identity`. `strfry import` would store them, forged events included. The daily backup
+  restore-test runs without `RELAY_SIGNING_KEYS_URL`, so it still proves the full export loads.
 
 Activity's adapters declare a per-query cap (`maxQueryLimit`, currently 500). It must never exceed
 this relay's `maxFilterLimit` (1,000), or Activity could miss truncated history.
@@ -43,7 +84,7 @@ this relay's `maxFilterLimit` (1,000), or Activity could miss truncated history.
 docker build -t nearbuilders-relay infra/relay
 docker run --rm -p 7777:7777 -v relay-data:/data nearbuilders-relay
 curl -H 'Accept: application/nostr+json' http://localhost:7777   # NIP-11 document
-node --test infra/relay/write-policy.test.mjs
+node --test infra/relay/write-policy.test.mjs infra/relay/write-policy.integration.test.mjs
 ```
 
 ## Deploying on Railway

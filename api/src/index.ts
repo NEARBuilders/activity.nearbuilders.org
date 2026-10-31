@@ -1054,6 +1054,16 @@ export default createPlugin.withPlugins<PluginsClient>()({
         }
       }),
 
+      listActivitySigningKeys: builder.listActivitySigningKeys.handler(async () => {
+        try {
+          return { data: await getServices().activityFeed.listSigningKeys() };
+        } catch {
+          throw new ORPCError("SERVICE_UNAVAILABLE", {
+            message: "Activity signing keys are unavailable",
+          });
+        }
+      }),
+
       getActivityHealth: builder.getActivityHealth.handler(async ({ errors }) => {
         const health = await getServices().activityHealth.check();
         if (health.status !== "ok") {

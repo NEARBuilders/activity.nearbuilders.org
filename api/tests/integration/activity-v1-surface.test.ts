@@ -21,6 +21,7 @@ const PUBLIC_ROUTES = [
   "GET /v1/leaderboard",
   "GET /v1/leaderboard/status",
   "GET /v1/health",
+  "GET /v1/signing-keys",
   "POST /internal/activity/events/stream",
   "GET /internal/activity/events/endorsements/stream",
 ];
