@@ -78,22 +78,32 @@ export class ActivityEventStream {
 
   async nextEvent(): Promise<ActivityEvent> {
     while (true) {
+      const data = (await this.#nextBlock())
+        .split("\n")
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
+        .join("\n");
+      if (data) return JSON.parse(data) as ActivityEvent;
+    }
+  }
+
+  async waitUntilReady(): Promise<void> {
+    let block = await this.#nextBlock();
+    while (!block.split("\n").includes(": ready")) block = await this.#nextBlock();
+  }
+
+  async #nextBlock(): Promise<string> {
+    while (true) {
+      const boundary = this.#buffered.indexOf("\n\n");
+      if (boundary >= 0) {
+        const block = this.#buffered.slice(0, boundary);
+        this.#buffered = this.#buffered.slice(boundary + 2);
+        return block;
+      }
       const { done, value } = await this.#reader.read();
       if (done) throw new Error("Activity event stream ended before an event arrived");
       this.#buffered += this.#decoder.decode(value, { stream: true });
       this.#buffered = this.#buffered.replaceAll("\r\n", "\n");
-      let boundary = this.#buffered.indexOf("\n\n");
-      while (boundary >= 0) {
-        const block = this.#buffered.slice(0, boundary);
-        this.#buffered = this.#buffered.slice(boundary + 2);
-        const data = block
-          .split("\n")
-          .filter((line) => line.startsWith("data:"))
-          .map((line) => line.slice(5).trimStart())
-          .join("\n");
-        if (data) return JSON.parse(data) as ActivityEvent;
-        boundary = this.#buffered.indexOf("\n\n");
-      }
     }
   }
 
@@ -172,7 +182,12 @@ export class ActivityClient {
         clearTimeout(timeout);
         throw await activityError(response);
       }
-      return new ActivityEventStream(response.body.getReader(), controller, timeout);
+      const stream = new ActivityEventStream(response.body.getReader(), controller, timeout);
+      await stream.waitUntilReady().catch(async (error: unknown) => {
+        await stream.close();
+        throw error;
+      });
+      return stream;
     } catch (error) {
       clearTimeout(timeout);
       throw error;

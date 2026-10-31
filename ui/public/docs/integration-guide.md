@@ -442,7 +442,9 @@ export function passesRelayChecks(event: Event, keys: Map<string, Set<string>>):
 
 Connect to `GET /v1/events/stream` with the same optional `source`, `type`, and `actor` filters. The
 response is `text/event-stream`; each Activity event arrives in an SSE `data:` field and has its
-Nostr event ID as the SSE `id`.
+Nostr event ID as the SSE `id`. The stream first sends a `: ready` comment once it is listening for
+new events. Wait for it before relying on live delivery: an event published between the response
+headers and `: ready` is not streamed, unless you reconnect with `Last-Event-ID` to replay it.
 
 If the connection drops, reconnect with the last processed ID in the `Last-Event-ID` request header.
 The server replays later matching events before continuing live. Persist the ID only after your
