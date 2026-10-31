@@ -388,6 +388,17 @@ export const ActivityHealthSchema = z.object({
   }),
 });
 
+export const ActivitySigningKeySchema = z.object({
+  sourceId: z.string(),
+  publicKey: z.string().regex(/^[a-f0-9]{64}$/),
+});
+
+export const ActivitySigningKeysSchema = z.object({
+  data: z.array(ActivitySigningKeySchema),
+});
+
+export type ActivitySigningKey = z.infer<typeof ActivitySigningKeySchema>;
+
 export type ActivityHealthCheck = z.infer<typeof ActivityHealthCheckSchema>;
 export type ActivityHealth = z.infer<typeof ActivityHealthSchema>;
 
@@ -686,7 +697,7 @@ export const contract = oc.router({
     })
     .input(z.object({ sourceId: z.string() }))
     .output(ActivitySigningIdentitySchema)
-    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST }),
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST, SERVICE_UNAVAILABLE }),
 
   createActivitySourceApiKey: oc
     .route({ method: "POST", path: "/activity/sources/{sourceId}/api-keys" })
@@ -1058,6 +1069,18 @@ export const contract = oc.router({
       tags: ["Activity"],
     })
     .output(ActivityLeaderboardProjectionStatusSchema)
+    .errors({ SERVICE_UNAVAILABLE }),
+
+  listActivitySigningKeys: oc
+    .route({
+      method: "GET",
+      path: "/v1/signing-keys",
+      summary: "List Activity signing keys",
+      description:
+        "Lists the public keys of bound Signing Identities, current and retired, for every Activity Source that is not rejected. Relays use it to accept kind-1701 writes only from these keys; consumers still verify each event's source tag and signing window.",
+      tags: ["Activity"],
+    })
+    .output(ActivitySigningKeysSchema)
     .errors({ SERVICE_UNAVAILABLE }),
 
   getActivityHealth: oc
