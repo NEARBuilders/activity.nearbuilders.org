@@ -48,15 +48,21 @@ too. Without the variable the check is off and the plugin logs that once at star
 
 The list holds the bound signing identities of every source that is not rejected, **including
 retired ones**: an event signed before a rotation can still be published afterwards, and a restore
-republishes history signed by old keys.
+republishes history signed by old keys. The cost is that a key retired because it was compromised
+stays writable on this relay until its source is rejected; Activity's feed still rejects its events
+dated after retirement. Signing keys are held only by Activity, so this matters only if Activity's
+key store itself is compromised. Narrowing it (for example, a time limit on retired keys) is part of
+the publish-auth decision in #32.
 
 - **Propagation.** An unknown pubkey triggers a refresh, at most one fetch per
   `RELAY_SIGNING_KEYS_MISS_REFRESH_SECONDS`. A newly bound or rotated identity is therefore writable
   on its first write made at least that long after the previous refresh, and in any case within
   `RELAY_SIGNING_KEYS_REFRESH_SECONDS`. An earlier write is rejected; Activity answers it with 503
   and the client's retry replays the same stored event. A source that becomes rejected loses write
-  access within `RELAY_SIGNING_KEYS_REFRESH_SECONDS`.
-- **Failures.** Once a list has loaded, failed fetches keep the last good list in use, misses are
+  access at the next successful refresh: within `RELAY_SIGNING_KEYS_REFRESH_SECONDS` while the API
+  answers, and only after it recovers during an outage, because the last good list stays in use.
+- **Failures.** An error status, an unreadable body, a timeout, and an empty key list all count as a
+  failed refresh. Once a list has loaded, failed fetches keep the last good list in use, misses are
   rejected without waiting on another fetch, and the periodic refresh keeps retrying. Before the
   first successful load, kind 1701 is rejected with
   `error: Activity signing keys are unavailable, retry later` and each miss retries the fetch

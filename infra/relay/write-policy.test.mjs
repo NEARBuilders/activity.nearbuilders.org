@@ -212,11 +212,22 @@ test("treats malformed bodies and non-2xx responses as failures", async () => {
     serving({ data: "x" }),
     serving({}),
     serving(keyList(KEY_A), 500),
+    serving(keyList()),
     () => new Response("not json"),
   ]) {
     const { signingKeys } = setup(respond);
     assert.equal(await signingKeys.allows(KEY_A), "unavailable");
   }
+});
+
+test("keeps the last good list when the API returns an empty list", async () => {
+  const { api, clock, signingKeys } = setup(serving(keyList(KEY_A)));
+  assert.equal(await signingKeys.allows(KEY_A), "allowed");
+
+  api.respond = serving(keyList());
+  clock.now += 5_000;
+  assert.equal(await signingKeys.allows(KEY_B), "unknown");
+  assert.equal(await signingKeys.allows(KEY_A), "allowed");
 });
 
 test("ignores invalid entries in the key list", async () => {

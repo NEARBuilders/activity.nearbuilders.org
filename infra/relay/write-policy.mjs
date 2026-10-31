@@ -34,11 +34,13 @@ async function fetchSigningKeys(url, fetch, timeoutMs) {
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
   const body = await response.json();
   if (!Array.isArray(body?.data)) throw new Error("response has no data array");
-  return new Set(
+  const keys = new Set(
     body.data
       .map((entry) => entry?.publicKey)
       .filter((key) => typeof key === "string" && PUBLIC_KEY.test(key)),
   );
+  if (keys.size === 0) throw new Error("key list is empty");
+  return keys;
 }
 
 export function createSigningKeyCache({
@@ -75,9 +77,9 @@ export function createSigningKeyCache({
     return inFlight;
   }
 
-  // Once a list is loaded, a miss while fetches fail must not stall the relay on another fetch;
-  // the periodic refresh keeps retrying. Before the first load, misses keep retrying (throttled),
-  // since waiting for a list is the only way to answer.
+  // KEEP: once a list is loaded, a miss while fetches fail must not stall the relay on another
+  // fetch; the periodic refresh keeps retrying. Before the first load, misses keep retrying
+  // (throttled), since waiting for a list is the only way to answer.
   function shouldRefreshOnMiss() {
     const servingStaleList = keys !== null && lastRefreshFailed;
     if (inFlight) return !servingStaleList;
@@ -230,7 +232,7 @@ if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
     process.stdout.write(`${JSON.stringify(decision)}\n`);
   }
 
-  // decide is async; chaining keeps replies in request order.
+  // KEEP: decide is async; chaining keeps replies in request order.
   let queue = Promise.resolve();
   const lines = createInterface({ input: process.stdin, terminal: false });
   lines.on("line", (line) => {
