@@ -1,11 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { activityMcpUrl, buildActivityMcpPrompt } from "@/lib/activity-mcp-prompt";
+import { buildActivityMcpPrompt } from "@/lib/activity-mcp-prompt";
 
 describe("Activity MCP prompt", () => {
   it("points the agent at this site's MCP endpoint and tools", () => {
     const prompt = buildActivityMcpPrompt("https://activity.example/");
 
-    expect(activityMcpUrl("https://activity.example/")).toBe("https://activity.example/api/v1/mcp");
     expect(prompt).toContain(
       "claude mcp add --transport http activity https://activity.example/api/v1/mcp",
     );

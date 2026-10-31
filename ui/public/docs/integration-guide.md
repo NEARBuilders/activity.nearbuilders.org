@@ -171,7 +171,7 @@ claude mcp add --transport http activity https://activity.nearbuilders.org/api/v
 | Tool | Does | Returns |
 | --- | --- | --- |
 | `start_activity_registration` | Starts a binding session; takes the same fields as `POST /v1/binding-sessions` | `url`, `matchCode`, `sessionId`, `pollToken`, `expiresAt`, `draft` |
-| `check_activity_registration` | Claims the key; takes `sessionId` and `pollToken` | The same `status` values as the claim endpoint, with `secret` once when `ready` |
+| `check_activity_registration` | Claims the key; takes `sessionId` and `pollToken` | The same `status` values as the claim endpoint, with `secret` once when `ready`, and the `eventTypes` the person approved when `ready` or `claimed` |
 | `submit_activity_event` | Submits one event; takes `apiKey` plus the `POST /v1/events` body (`payload` optional, `occurredAt` for history) | `eventId`, and `test: true` for `activity.test` |
 
 The person still opens the link, checks the match code, and approves the wallet transaction; the

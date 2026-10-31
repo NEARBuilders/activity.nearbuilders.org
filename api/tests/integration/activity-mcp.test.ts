@@ -124,6 +124,7 @@ describe("Activity MCP server", () => {
       status: "ready",
       sourceId: "mcp-project",
       secret: expect.stringMatching(/^act_/),
+      eventTypes: [expect.objectContaining({ name: "mcp.task.completed", pointValue: 4 })],
     });
     await expect(callTool("check_activity_registration", check)).resolves.toMatchObject({
       structuredContent: { status: "claimed", sourceId: "mcp-project" },

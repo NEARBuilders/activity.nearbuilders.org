@@ -356,6 +356,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityHealth: activityHealthService,
         activityMcp: new ActivityMcpServer(
           activityBindingSessionsService,
+          activitySourcesService,
           activityIngestionService,
         ),
       };

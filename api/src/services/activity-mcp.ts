@@ -1,8 +1,10 @@
 import { ORPCError } from "@orpc/server";
+import { Predicate } from "effect";
 import { z } from "zod";
 import { ActivityBindingDraftSchema, ActivityEventSubmissionSchema } from "../contract";
 import type { ActivityBindingSessionsService } from "./activity-binding-sessions";
 import type { ActivityIngestionService } from "./activity-ingestion";
+import type { ActivitySourcesService } from "./activity-sources";
 
 const ACTIVITY_MCP_PROTOCOL_VERSIONS = ["2025-06-18", "2025-03-26", "2024-11-05"] as const;
 const ACTIVITY_MCP_SERVER_VERSION = "1.0.0";
@@ -35,8 +37,31 @@ type ActivityMcpTool = {
   name: string;
   description: string;
   schema: z.ZodType;
-  call: (input: never, request: ActivityMcpRequestContext) => Promise<unknown>;
+  run: (args: unknown, request: ActivityMcpRequestContext) => Promise<unknown>;
 };
+
+function defineTool<Schema extends z.ZodType>(tool: {
+  name: string;
+  description: string;
+  schema: Schema;
+  call: (input: z.output<Schema>, request: ActivityMcpRequestContext) => Promise<unknown>;
+}): ActivityMcpTool {
+  return {
+    name: tool.name,
+    description: tool.description,
+    schema: tool.schema,
+    run: (args, request) => {
+      const parsed = tool.schema.safeParse(args);
+      if (!parsed.success) {
+        throw new JsonRpcError(
+          JSON_RPC_INVALID_PARAMS,
+          `Invalid arguments for ${tool.name}: ${z.prettifyError(parsed.error)}`,
+        );
+      }
+      return tool.call(parsed.data, request);
+    },
+  };
+}
 
 class JsonRpcError extends Error {
   readonly code: number;
@@ -52,39 +77,46 @@ export class ActivityMcpServer {
 
   constructor(
     bindingSessions: Pick<ActivityBindingSessionsService, "create" | "claim">,
+    sources: Pick<ActivitySourcesService, "getSourceForIngestion">,
     ingestion: Pick<ActivityIngestionService, "submit">,
   ) {
-    const tools: ActivityMcpTool[] = [
-      {
+    const tools = [
+      defineTool({
         name: "start_activity_registration",
         description:
           "Start registering this project as an Activity Source. Send the nearbuilders.org project reference and the proposed Event Types. Show the returned url and matchCode to the person: they open the link, sign in with their NEAR wallet, check the match code, and approve one transaction. Keep sessionId and pollToken private, then call check_activity_registration every 5 seconds.",
         schema: ActivityBindingDraftSchema,
-        call: (draft: z.infer<typeof ActivityBindingDraftSchema>, request) =>
-          bindingSessions.create(draft, request.origin, request.clientKey),
-      },
-      {
+        call: (draft, request) => bindingSessions.create(draft, request.origin, request.clientKey),
+      }),
+      defineTool({
         name: "check_activity_registration",
         description:
-          "Check a registration started with start_activity_registration. Status waiting: call again in 5 seconds. Status ready: the response holds the Source API Key (secret) and sourceId exactly once; store the key as the ACTIVITY_API_KEY server-side secret and never print it. Status claimed: the key was already returned. Status expired: start again.",
+          "Check a registration started with start_activity_registration. Status waiting: call again in 5 seconds. Status ready: the response holds the Source API Key (secret) and sourceId exactly once; store the key as the ACTIVITY_API_KEY server-side secret and never print it. Ready and claimed also list the Event Types the person approved, which may differ from the proposal; report only those. Status expired: start again.",
         schema: CheckRegistrationSchema,
-        call: ({ sessionId, pollToken }: z.infer<typeof CheckRegistrationSchema>) =>
-          bindingSessions.claim(sessionId, pollToken),
-      },
-      {
+        call: async ({ sessionId, pollToken }) => {
+          const claim = await bindingSessions.claim(sessionId, pollToken);
+          if (claim.status !== "ready" && claim.status !== "claimed") return claim;
+          const eventTypes = await sources
+            .getSourceForIngestion(claim.sourceId)
+            .then((source) => source.eventTypes)
+            .catch(() => undefined);
+          return eventTypes ? { ...claim, eventTypes } : claim;
+        },
+      }),
+      defineTool({
         name: "submit_activity_event",
         description:
           "Submit one Activity event with the source's API key and return its eventId. Use eventType activity.test to check the connection: it is accepted for every source and never published or scored. Set occurredAt to import a past event. Production code should call POST /api/v1/events directly instead.",
         schema: SubmitEventSchema,
-        call: ({ apiKey, payload, ...event }: z.infer<typeof SubmitEventSchema>) =>
+        call: ({ apiKey, payload, ...event }) =>
           ingestion.submit(apiKey, { ...event, payload: payload ?? {} }),
-      },
+      }),
     ];
     this.#tools = new Map(tools.map((tool) => [tool.name, tool]));
   }
 
   async handle(message: unknown, request: ActivityMcpRequestContext): Promise<ActivityMcpResponse> {
-    if (!isRecord(message) || message.jsonrpc !== "2.0") {
+    if (!Predicate.isObject(message) || message.jsonrpc !== "2.0") {
       return errorResponse(null, JSON_RPC_INVALID_REQUEST, "Expected one JSON-RPC 2.0 message");
     }
     if (typeof message.method !== "string") {
@@ -132,7 +164,7 @@ export class ActivityMcpServer {
   }
 
   #initialize(params: unknown) {
-    const requested = isRecord(params) ? params.protocolVersion : undefined;
+    const requested = Predicate.isObject(params) ? params.protocolVersion : undefined;
     const protocolVersion = ACTIVITY_MCP_PROTOCOL_VERSIONS.find((version) => version === requested);
     return {
       protocolVersion: protocolVersion ?? ACTIVITY_MCP_PROTOCOL_VERSIONS[0],
@@ -144,25 +176,22 @@ export class ActivityMcpServer {
   }
 
   async #callTool(params: unknown, request: ActivityMcpRequestContext) {
-    const name = isRecord(params) ? params.name : undefined;
+    const name = Predicate.isObject(params) ? params.name : undefined;
     const tool = typeof name === "string" ? this.#tools.get(name) : undefined;
     if (!tool) {
       throw new JsonRpcError(JSON_RPC_INVALID_PARAMS, `Unknown tool: ${String(name)}`);
     }
-    const parsed = tool.schema.safeParse(isRecord(params) ? (params.arguments ?? {}) : {});
-    if (!parsed.success) {
-      throw new JsonRpcError(
-        JSON_RPC_INVALID_PARAMS,
-        `Invalid arguments for ${tool.name}: ${z.prettifyError(parsed.error)}`,
-      );
-    }
     try {
-      const result = await tool.call(parsed.data as never, request);
+      const result = await tool.run(
+        Predicate.isObject(params) ? (params.arguments ?? {}) : {},
+        request,
+      );
       return {
         content: [{ type: "text", text: JSON.stringify(result, null, 2) }],
         structuredContent: result,
       };
     } catch (error) {
+      if (error instanceof JsonRpcError) throw error;
       if (error instanceof ORPCError) return toolError(`${error.code}: ${error.message}`);
       console.error(`[ActivityMcp] ${tool.name} failed`, error);
       return toolError("Activity could not complete the request; try again later");
@@ -181,10 +210,6 @@ function toolError(text: string) {
 
 function errorResponse(id: JsonRpcId, code: number, message: string): ActivityMcpResponse {
   return { status: 200, body: { jsonrpc: "2.0", id, error: { code, message } } };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function toJsonRpcId(value: unknown): JsonRpcId | undefined {

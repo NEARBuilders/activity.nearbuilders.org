@@ -18,7 +18,8 @@ instead, such as `http://localhost:3000`.
 (Streamable HTTP, no credentials). Its tools replace the HTTP calls below and take the same fields:
 `start_activity_registration` for step 3, `check_activity_registration` (with `sessionId` and
 `pollToken`) for step 5, and `submit_activity_event` (with the key as `apiKey`) for the test event in
-step 8. Every other step is unchanged. Passing the key to `submit_activity_event` puts it in your
+step 8. When the registration is ready, `check_activity_registration` also returns the Event Types
+the person approved; integrate those, since the person may have changed your proposal. Every other step is unchanged. Passing the key to `submit_activity_event` puts it in your
 tool-call history, so use that tool only for the one test event and never show the key to the
 person. This is not the generic `/api/mcp` endpoint, which needs a user API key.
 

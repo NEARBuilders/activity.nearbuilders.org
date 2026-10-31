@@ -45,13 +45,24 @@ export const Route = createFileRoute("/_public/skill")({
   component: SkillPage,
 });
 
+function useCopyAction(successMessage: string) {
+  const [copied, setCopied] = useState(false);
+  const copy = async (text: string) => {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    toast.success(successMessage);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return { copied, copy };
+}
+
 function SkillPage() {
   const { skill, runtimeConfig } = Route.useLoaderData();
   const runtime = getActiveRuntime(runtimeConfig);
   const account = getAccount(runtimeConfig);
   const appName = getAppName(runtimeConfig);
-  const [copied, setCopied] = useState(false);
-  const [mcpCopied, setMcpCopied] = useState(false);
+  const skillCopy = useCopyAction("Skill prompt copied");
+  const mcpCopy = useCopyAction("MCP prompt copied");
 
   const accountId = runtime?.accountId ?? account;
 
@@ -60,18 +71,7 @@ function SkillPage() {
       toast.error("Skill prompt unavailable");
       return;
     }
-
-    await navigator.clipboard.writeText(skill);
-    setCopied(true);
-    toast.success("Skill prompt copied");
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleCopyMcp = async () => {
-    await navigator.clipboard.writeText(buildActivityMcpPrompt(window.location.origin));
-    setMcpCopied(true);
-    toast.success("MCP prompt copied");
-    setTimeout(() => setMcpCopied(false), 2000);
+    await skillCopy.copy(skill);
   };
 
   return (
@@ -97,12 +97,15 @@ function SkillPage() {
 
             <div className="flex flex-wrap items-center gap-2">
               <Button variant="outline" onClick={handleCopy} disabled={!skill}>
-                {copied ? <Check size={14} /> : <Copy size={14} />}
-                {copied ? "Copied" : "Copy prompt"}
+                {skillCopy.copied ? <Check size={14} /> : <Copy size={14} />}
+                {skillCopy.copied ? "Copied" : "Copy prompt"}
               </Button>
-              <Button variant="outline" onClick={handleCopyMcp}>
-                {mcpCopied ? <Check size={14} /> : <PlugsConnected size={14} />}
-                {mcpCopied ? "Copied" : "Copy MCP prompt"}
+              <Button
+                variant="outline"
+                onClick={() => mcpCopy.copy(buildActivityMcpPrompt(window.location.origin))}
+              >
+                {mcpCopy.copied ? <Check size={14} /> : <PlugsConnected size={14} />}
+                {mcpCopy.copied ? "Copied" : "Copy MCP prompt"}
               </Button>
               <Button variant="outline" asChild>
                 <a href="/skill.md" target="_blank" rel="noopener noreferrer">
