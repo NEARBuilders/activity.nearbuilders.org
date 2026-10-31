@@ -66,6 +66,11 @@
         "slug": "3-query-history-and-cursors"
       },
       {
+        "depth": 3,
+        "text": "Read a relay directly",
+        "slug": "read-a-relay-directly"
+      },
+      {
         "depth": 2,
         "text": "4. Subscribe and reconnect",
         "slug": "4-subscribe-and-reconnect"
@@ -190,6 +195,11 @@
         "depth": 2,
         "text": "Public feed",
         "slug": "public-feed"
+      },
+      {
+        "depth": 3,
+        "text": "Signing keys",
+        "slug": "signing-keys"
       },
       {
         "depth": 2,

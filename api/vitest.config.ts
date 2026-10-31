@@ -24,6 +24,7 @@ export default defineConfig({
       API_DATABASE_URL: "",
       ACTIVITY_REDIS_URL: "",
       ACTIVITY_GITHUB_TOKEN: "",
+      FASTNEAR_API_KEY: "",
       ACTIVITY_SIGNING_MASTER_KEYS: "",
       ACTIVITY_SIGNING_ACTIVE_KEY_VERSION: "",
     },

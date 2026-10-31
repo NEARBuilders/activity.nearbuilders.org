@@ -9,6 +9,7 @@ import {
   ACTIVITY_EVENT_TYPE_NAME_REGEX,
   ACTIVITY_SOURCE_ID_REGEX,
   type ActivityFeedEvent,
+  type ActivitySigningKey,
   NEAR_ACCOUNT_ID_REGEX,
 } from "../contract";
 import type { Database } from "../db";
@@ -181,6 +182,17 @@ export class ActivityFeedService {
     this.#identities = identities;
     this.#suppression = suppression;
     this.#published = published;
+  }
+
+  async listSigningKeys(): Promise<ActivitySigningKey[]> {
+    const identities = await this.#identities.listBound();
+    return identities
+      .map(({ sourceId, publicKey }) => ({ sourceId, publicKey }))
+      .sort(
+        (left, right) =>
+          left.sourceId.localeCompare(right.sourceId) ||
+          left.publicKey.localeCompare(right.publicKey),
+      );
   }
 
   async list(input: ActivityQuery): Promise<ActivityFeedResult> {

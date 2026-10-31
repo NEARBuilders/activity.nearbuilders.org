@@ -19,9 +19,9 @@ import { SharedNostrRelayAdapter } from "./activity/shared-nostr-relay";
 import { type ActivityFeedEvent, contract, NEAR_ACCOUNT_ID_REGEX } from "./contract";
 import type { Database } from "./db";
 import { DatabaseLive, DatabaseTag } from "./db/layer";
+import { ActivityContextSchema } from "./lib/activity-context";
 import { createActivitySseStream } from "./lib/activity-sse";
 import { createAuthMiddleware } from "./lib/auth";
-import { ContextSchema } from "./lib/context";
 import type { PluginsClient } from "./lib/plugins-types.gen";
 import { ActivityBindingSessionsService } from "./services/activity-binding-sessions";
 import {
@@ -213,9 +213,10 @@ export default createPlugin.withPlugins<PluginsClient>()({
     ACTIVITY_SIGNING_ACTIVE_KEY_VERSION: z.string().default("v1"),
     ACTIVITY_REDIS_URL: z.string(),
     ACTIVITY_GITHUB_TOKEN: z.string().optional(),
+    FASTNEAR_API_KEY: z.string().optional(),
   }),
 
-  context: ContextSchema,
+  context: ActivityContextSchema,
 
   contract,
 
@@ -246,6 +247,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
           contractId: config.variables.activityNostrBindingContract,
           relay: config.variables.activityNostrBindingRelay,
           kvApiUrl: config.variables.activityNostrKvApiUrl,
+          kvApiKey: config.secrets.FASTNEAR_API_KEY,
         }).pipe(Layer.provide(databaseLayer)),
       );
       const relayUrl = resolveActivityRelayUrl(config.variables.activityRelayUrl);
@@ -1071,6 +1073,16 @@ export default createPlugin.withPlugins<PluginsClient>()({
         throw errors.METHOD_NOT_SUPPORTED({
           message: "The Activity MCP server does not stream; send JSON-RPC requests with POST",
         });
+      }),
+
+      listActivitySigningKeys: builder.listActivitySigningKeys.handler(async () => {
+        try {
+          return { data: await getServices().activityFeed.listSigningKeys() };
+        } catch {
+          throw new ORPCError("SERVICE_UNAVAILABLE", {
+            message: "Activity signing keys are unavailable",
+          });
+        }
       }),
 
       getActivityHealth: builder.getActivityHealth.handler(async ({ errors }) => {
