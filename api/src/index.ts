@@ -211,6 +211,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
     ACTIVITY_SIGNING_ACTIVE_KEY_VERSION: z.string().default("v1"),
     ACTIVITY_REDIS_URL: z.string(),
     ACTIVITY_GITHUB_TOKEN: z.string().optional(),
+    FASTNEAR_API_KEY: z.string().optional(),
   }),
 
   context: ContextSchema,
@@ -244,6 +245,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
           contractId: config.variables.activityNostrBindingContract,
           relay: config.variables.activityNostrBindingRelay,
           kvApiUrl: config.variables.activityNostrKvApiUrl,
+          kvApiKey: config.secrets.FASTNEAR_API_KEY,
         }).pipe(Layer.provide(databaseLayer)),
       );
       const relayUrl = resolveActivityRelayUrl(config.variables.activityRelayUrl);

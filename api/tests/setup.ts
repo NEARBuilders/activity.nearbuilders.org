@@ -18,6 +18,7 @@ import pluginDevConfig from "../plugin.dev";
 
 const TEST_PLUGIN_ID = pluginDevConfig.pluginId;
 const TEST_CONFIG = pluginDevConfig.config;
+export const TEST_FASTNEAR_API_KEY = "test-fastnear-api-key";
 
 // The runtime keys plugin instances by config, so every helper must use this one config or it
 // silently starts a second instance. The dev config's relay and Nostr RPC default to production.
@@ -33,6 +34,10 @@ async function getTestConfig(): Promise<typeof TEST_CONFIG> {
         activityNostrRpcUrl: "",
         activityPendingSourceDailyEventLimit: 3,
         activityApprovedSourceDailyEventLimit: 10,
+      },
+      secrets: {
+        ...TEST_CONFIG.secrets,
+        FASTNEAR_API_KEY: TEST_FASTNEAR_API_KEY,
       },
     } as typeof TEST_CONFIG;
   }

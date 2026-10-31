@@ -256,6 +256,18 @@ own namespace. The wallet submits the transaction directly; no relayer is requir
 the identity bound only after FastNear mainnet returns the same public key, and the same source ID,
 from `activity/<source-id>` under the source's account.
 
+The gateway reads FastKV with the deployment's `FASTNEAR_API_KEY` secret as a bearer token, so binding
+reads are not limited to FastNear's free tier; without the key (local development) it reads
+unauthenticated. Confirmation always fails closed. A binding FastKV does not return yet fails with
+`BAD_REQUEST` "The NEAR-to-Nostr binding is not available yet". When FastKV refuses the read itself,
+confirmation fails with `SERVICE_UNAVAILABLE` and the gateway logs
+`[ActivityBinding] FastKV refused the binding read for <account>/<key>: HTTP <status> (<reason>)`:
+HTTP 429 means the key's quota is exhausted ("FastKV quota is exhausted, try again later"), and HTTP
+401 or 403 means FastKV rejected the key ("FastKV rejected the API key"), or, when the deployment has
+no key configured, that FastKV requires one ("FastKV requires an API key"). None of these is a binding
+mismatch, and the identity stays pending until a later confirmation succeeds. A FastKV 5xx, timeout,
+or network error is logged as `FastKV binding read failed` and still reads as not available yet.
+
 Because each source has its own slot, one NEAR account can own up to 10 Activity Sources, each with
 its own signing key, and binding never touches the account's personal `nostr/<account>` identity
 record. Earlier sources were bound under `nostr/<source-account>`; the gateway still accepts that
