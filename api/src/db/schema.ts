@@ -230,7 +230,10 @@ export const activityEventEndorsements = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     eventId: text("event_id").notNull(),
-    userId: text("user_id").notNull(),
+    // Canonical owner id: the endorser's primary NEAR account, or their user id if they have
+    // none (#103). Null only on rows written before this column, until they are backfilled.
+    ownerAccountId: text("owner_account_id"),
+    userId: text("user_id"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
@@ -238,7 +241,13 @@ export const activityEventEndorsements = pgTable(
       table.eventId,
       table.userId,
     ),
+    eventOwnerIdx: uniqueIndex("activity_event_endorsements_event_owner_idx").on(
+      table.eventId,
+      table.ownerAccountId,
+    ),
     eventIdx: index("activity_event_endorsements_event_idx").on(table.eventId),
+    ownerIdx: index("activity_event_endorsements_owner_idx").on(table.ownerAccountId),
+    userIdx: index("activity_event_endorsements_user_idx").on(table.userId),
   }),
 );
 

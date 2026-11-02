@@ -97,3 +97,85 @@ describe("Activity event endorsements", () => {
     });
   });
 });
+
+function nearCaller(userId: string, accounts: string[]) {
+  return {
+    ...authedContext(userId),
+    near: {
+      primaryAccountId: accounts[0] ?? null,
+      linkedAccounts: accounts.map((accountId, index) => ({
+        accountId,
+        network: "mainnet",
+        publicKey: "",
+        isPrimary: index === 0,
+      })),
+      hasNearAccount: accounts.length > 0,
+    },
+  };
+}
+
+describe("Activity endorsements keyed on the canonical owner id (#103)", () => {
+  it("follows the endorser across a primary switch, a NEAR link and a reissued user id", async () => {
+    const { secret } = await provisionIngestionSource({
+      sourceId: "endorsement-identity-source",
+      ownerId: "endorsement-identity-owner",
+      organizationId: "org-endorsement-identity",
+      eventType: "feedback.submitted",
+    });
+    const gateway = await getPluginClient(undefined, { authorization: `Bearer ${secret}` });
+    const submit = async (key: string) =>
+      (
+        await gateway.submitActivityEvent({
+          eventType: "feedback.submitted",
+          actor: "carol.near",
+          idempotencyKey: `endorsement-identity:${key}`,
+          payload: { rating: 4 },
+        })
+      ).eventId;
+    const switchEvent = await submit("switch");
+    const linkEvent = await submit("link");
+
+    // Endorsed as carol.near, then the primary moves to a linked account.
+    const carol = await getPluginClient(nearCaller("carol-user", ["carol.near", "carol-alt.near"]));
+    await carol.endorseActivityEvent({ eventId: switchEvent });
+    const switched = await getPluginClient(
+      nearCaller("carol-user", ["carol-alt.near", "carol.near"]),
+    );
+    await expect(switched.endorseActivityEvent({ eventId: switchEvent })).resolves.toEqual({
+      eventId: switchEvent,
+      totalCount: 1,
+      endorsedByCurrentUser: true,
+    });
+
+    // The shared auth DB reissues the user id; the account still owns the endorsement.
+    const reissued = await getPluginClient(nearCaller("carol-user-new", ["carol.near"]));
+    await expect(
+      reissued.getActivityEventEndorsements({ eventIds: [switchEvent] }),
+    ).resolves.toMatchObject({ [switchEvent]: { totalCount: 1, endorsedByCurrentUser: true } });
+    await expect(reissued.unendorseActivityEvent({ eventId: switchEvent })).resolves.toMatchObject({
+      totalCount: 0,
+      endorsedByCurrentUser: false,
+    });
+
+    // Endorsed before linking NEAR (keyed on the user id), then a NEAR account is linked.
+    const dave = await getPluginClient(authedContext("dave-user"));
+    await dave.endorseActivityEvent({ eventId: linkEvent });
+    const daveLinked = await getPluginClient(nearCaller("dave-user", ["dave.near"]));
+    await expect(daveLinked.endorseActivityEvent({ eventId: linkEvent })).resolves.toEqual({
+      eventId: linkEvent,
+      totalCount: 1,
+      endorsedByCurrentUser: true,
+    });
+    // Once claimed onto the account, it survives a reissued user id too.
+    const daveReissued = await getPluginClient(nearCaller("dave-user-new", ["dave.near"]));
+    await expect(
+      daveReissued.getActivityEventEndorsements({ eventIds: [linkEvent] }),
+    ).resolves.toMatchObject({ [linkEvent]: { totalCount: 1, endorsedByCurrentUser: true } });
+
+    // Someone else holding none of these ids is unaffected.
+    const erin = await getPluginClient(nearCaller("erin-user", ["erin.near"]));
+    await expect(
+      erin.getActivityEventEndorsements({ eventIds: [linkEvent] }),
+    ).resolves.toMatchObject({ [linkEvent]: { totalCount: 1, endorsedByCurrentUser: false } });
+  });
+});
