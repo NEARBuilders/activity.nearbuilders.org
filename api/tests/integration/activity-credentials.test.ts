@@ -41,7 +41,8 @@ describe("Activity source credentials", () => {
       boundNearAccountId: null,
       boundAt: null,
       keyVersion: "v1",
-      createdBy: "credential-owner",
+      // Recorded by the owner's primary NEAR account, not their user id (#107).
+      createdBy: "credential-owner.near",
       createdAt: expect.any(String),
       retiredBy: null,
       retirementReason: null,
@@ -79,7 +80,7 @@ describe("Activity source credentials", () => {
       expect.arrayContaining([
         expect.objectContaining({
           publicKey: identity.publicKey,
-          retiredBy: "credential-owner",
+          retiredBy: "credential-owner.near",
           retirementReason: "Routine credential rotation",
           retiredAt: expect.any(String),
         }),

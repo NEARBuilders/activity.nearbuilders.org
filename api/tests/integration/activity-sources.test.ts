@@ -335,6 +335,37 @@ describe("Activity sources", () => {
     });
   });
 
+  it("records an administrator with NEAR by their primary account (#107)", async () => {
+    const owner = await getPluginClient(orgOwnerContext("owner-107", "org-owner-107"));
+    await owner.createActivitySource({
+      sourceId: "audit-actor-source",
+      displayName: "Audit Actor Source",
+      nearAccountId: "audit-actor.near",
+      eventTypes: [
+        { name: "audit.action", description: "An audited action", enabled: true, pointValue: 1 },
+      ],
+    });
+    const administrator = await getPluginClient({
+      ...adminContext("platform-admin-107"),
+      near: {
+        primaryAccountId: "Reviewer.near",
+        linkedAccounts: [
+          { accountId: "Reviewer.near", network: "mainnet", publicKey: "", isPrimary: true },
+        ],
+        hasNearAccount: true,
+      },
+    });
+    const reviewed = await administrator.reviewActivitySource({
+      sourceId: "audit-actor-source",
+      decision: "approved",
+      reason: "Verified",
+    });
+    expect(reviewed).toMatchObject({
+      reviewedBy: "reviewer.near",
+      reviewHistory: [{ decision: "approved", administratorId: "reviewer.near" }],
+    });
+  });
+
   it("lets only a platform administrator designate source trust without changing approval", async () => {
     const owner = await getPluginClient(orgOwnerContext("trust-owner", "org-trust"));
     await owner.createActivitySource({

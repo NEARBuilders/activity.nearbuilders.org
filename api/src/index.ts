@@ -123,6 +123,18 @@ function requestClientKey(headers: Headers | undefined): string | null {
   return forwarded?.at(-1) || headers?.get("x-real-ip") || null;
 }
 
+/**
+ * The canonical owner id recorded in admin and actor audit columns (#107): the caller's
+ * primary NEAR account, or their auth user id if they have none. NEAR ids can't contain
+ * ":", so they never collide with the "source:<id>" requester ids in moderation rows.
+ */
+function canonicalOwnerId(context: {
+  userId: string;
+  near?: { primaryAccountId?: string | null } | null;
+}): string {
+  return context.near?.primaryAccountId?.trim().toLowerCase() || context.userId;
+}
+
 function mainnetNearAccountIds(
   linkedAccounts: Array<{ accountId: string; network: string }>,
 ): string[] {
@@ -638,7 +650,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .handler(async ({ input, context }) =>
           getServices().activitySources.reviewSource({
             ...input,
-            administratorId: context.userId,
+            administratorId: canonicalOwnerId(context),
           }),
         ),
 
@@ -647,7 +659,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .handler(async ({ input, context }) =>
           getServices().activitySources.updateSourceTrust({
             ...input,
-            administratorId: context.userId,
+            administratorId: canonicalOwnerId(context),
           }),
         ),
 
@@ -657,7 +669,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
           getServices().activityCredentials.createSigningIdentity(
             context.organization.activeOrganizationId,
             input.sourceId,
-            context.userId,
+            canonicalOwnerId(context),
           ),
         ),
 
@@ -685,7 +697,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
           getServices().activityCredentials.rotateSigningIdentity(
             context.organization.activeOrganizationId,
             input.sourceId,
-            context.userId,
+            canonicalOwnerId(context),
             input.reason ?? "Signing Identity rotated by Source Owner",
           ),
         ),
@@ -859,7 +871,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
             sessionToken: input.sessionToken,
             organizationId: context.organization.activeOrganizationId,
             sourceId: input.sourceId,
-            actorId: context.userId,
+            actorId: canonicalOwnerId(context),
           }),
         ),
 
@@ -998,7 +1010,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
           try {
             return await getServices().activityModeration.hide({
               ...input,
-              administratorId: context.userId,
+              administratorId: canonicalOwnerId(context),
             });
           } catch (error) {
             if (
