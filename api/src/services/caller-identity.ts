@@ -4,6 +4,9 @@
  * every identifier the caller may have written rows under before (primary account, each
  * linked account, user id), so reads and deletes still find rows written before a primary
  * switch, a NEAR link, or a reissued user id.
+ *
+ * `ownerId` is also what admin and actor audit columns record (#107). NEAR ids can't contain
+ * ":", so it never collides with the "source:<id>" requester ids in moderation rows.
  */
 export type CallerIdentity = {
   ownerId: string;
