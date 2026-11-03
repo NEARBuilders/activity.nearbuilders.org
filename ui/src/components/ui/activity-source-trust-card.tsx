@@ -126,9 +126,9 @@ export function ActivitySourceTrustCard({
             <div className="space-y-1 border-t border-border pt-3 text-xs text-muted-foreground">
               <p className="font-medium text-foreground">Trust history</p>
               {source.trustHistory.map((change) => (
-                <p key={`${change.changedAt}-${change.administratorId}`}>
-                  {change.trustStatus} · {change.scoreMultiplier}× · {change.reason} ·{" "}
-                  {change.administratorId}
+                <p key={`${change.changedAt}-${change.administratorId ?? ""}`}>
+                  {change.trustStatus} · {change.scoreMultiplier}× · {change.reason}
+                  {change.administratorId && <> · {change.administratorId}</>}
                 </p>
               ))}
             </div>

@@ -310,18 +310,20 @@ describe("Activity sources", () => {
       sourceId: "governance-hub",
       displayName: "Governance Hub Updated",
     });
+    // The owner sees the decision but not which administrator made it (#117).
     expect(resubmitted).toMatchObject({
       approvalStatus: "pending",
       canIngest: true,
       reviewHistory: [
         {
           decision: "approved",
-          administratorId: "platform-admin-1",
           reason: "Ownership and event types verified",
           reviewedAt: expect.any(String),
         },
       ],
     });
+    expect(resubmitted.reviewHistory[0]).not.toHaveProperty("administratorId");
+    expect(resubmitted).not.toHaveProperty("reviewedBy");
 
     await expect(
       owner.updateActivitySource({
@@ -363,6 +365,66 @@ describe("Activity sources", () => {
     expect(reviewed).toMatchObject({
       reviewedBy: "reviewer.near",
       reviewHistory: [{ decision: "approved", administratorId: "reviewer.near" }],
+    });
+  });
+
+  it("shows which administrator acted only to platform administrators (#117)", async () => {
+    const owner = await getPluginClient(orgOwnerContext("owner-117", "org-117"));
+    await owner.createActivitySource({
+      sourceId: "audit-visibility-source",
+      displayName: "Audit Visibility Source",
+      nearAccountId: "audit-visibility.near",
+      eventTypes: [
+        { name: "audit.action", description: "An audited action", enabled: true, pointValue: 1 },
+      ],
+    });
+    const administrator = await getPluginClient({
+      ...adminContext("platform-admin-117"),
+      near: {
+        primaryAccountId: "moderator.near",
+        linkedAccounts: [
+          { accountId: "moderator.near", network: "mainnet", publicKey: "", isPrimary: true },
+        ],
+        hasNearAccount: true,
+      },
+    });
+    await administrator.reviewActivitySource({
+      sourceId: "audit-visibility-source",
+      decision: "approved",
+      reason: "Verified",
+    });
+    await administrator.updateActivitySourceTrust({
+      sourceId: "audit-visibility-source",
+      trustStatus: "trusted",
+      scoreMultiplier: 2,
+      reason: "Operating history reviewed",
+    });
+
+    for (const context of [
+      orgMemberContext("member-117", "org-117"),
+      orgOwnerContext("owner-117", "org-117"),
+    ]) {
+      const client = await getPluginClient(context);
+      const [source] = (await client.listActivitySources()).filter(
+        ({ sourceId }) => sourceId === "audit-visibility-source",
+      );
+      expect(source).toMatchObject({
+        reviewHistory: [{ decision: "approved", reason: "Verified" }],
+        trustHistory: [{ trustStatus: "trusted", reason: "Operating history reviewed" }],
+        reviewReason: "Verified",
+        reviewedAt: expect.any(String),
+      });
+      expect(JSON.stringify(source)).not.toContain("moderator.near");
+      expect(source).not.toHaveProperty("reviewedBy");
+    }
+
+    const reviewQueue = await administrator.listActivitySourcesForReview({});
+    expect(
+      reviewQueue.find(({ sourceId }) => sourceId === "audit-visibility-source"),
+    ).toMatchObject({
+      reviewedBy: "moderator.near",
+      reviewHistory: [{ administratorId: "moderator.near" }],
+      trustHistory: [{ administratorId: "moderator.near" }],
     });
   });
 

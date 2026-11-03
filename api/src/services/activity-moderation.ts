@@ -97,16 +97,22 @@ export class DatabaseActivityModerationStore implements ActivitySuppressionStore
     return hidden.map((row) => toHiddenRecord(row, historyByEvent.get(row.eventId) ?? []));
   }
 
-  async findRequest(administratorId: string, idempotencyKey: string): Promise<RequestRow | null> {
+  /** Finds a request by its idempotency key under any of the requester's ids. */
+  async findRequest(
+    requesterIds: readonly string[],
+    idempotencyKey: string,
+  ): Promise<RequestRow | null> {
+    if (requesterIds.length === 0) return null;
     const [request] = await this.#db
       .select()
       .from(requestsTable)
       .where(
         and(
-          eq(requestsTable.administratorId, administratorId),
+          inArray(requestsTable.administratorId, [...requesterIds]),
           eq(requestsTable.idempotencyKey, idempotencyKey),
         ),
       )
+      .orderBy(asc(requestsTable.requestedAt), asc(requestsTable.id))
       .limit(1);
     return request ?? null;
   }
@@ -200,13 +206,20 @@ export class ActivityModerationService {
 
   async hide(input: {
     eventId: string;
+    /** Requester id recorded on a new request. */
     administratorId: string;
+    /**
+     * Every id the requester may have recorded an earlier request under (primary and linked NEAR
+     * accounts, user id), so a retry after a primary-account switch is still idempotent.
+     */
+    requesterIds?: readonly string[];
     idempotencyKey: string;
     reason: string;
   }): Promise<HideActivityEventResult> {
+    const { requesterIds, ...request } = input;
     const hash = requestHash(input.eventId, input.reason);
     const existingRequest = await this.#store.findRequest(
-      input.administratorId,
+      [input.administratorId, ...(requesterIds ?? [])],
       input.idempotencyKey,
     );
     if (existingRequest) {
@@ -224,7 +237,7 @@ export class ActivityModerationService {
       throw new ORPCError("NOT_FOUND", { message: "Activity event not found" });
     }
 
-    const recorded = await this.#store.recordHide({ ...input, event, requestHash: hash });
+    const recorded = await this.#store.recordHide({ ...request, event, requestHash: hash });
     return this.#resultWithProjection(recorded.request, recorded.requestReplayed);
   }
 
