@@ -1,4 +1,5 @@
-import type { HideActivityEventResult } from "../contract";
+import type { z } from "zod";
+import type { ActivitySourceSchema, HideActivityEventResult } from "../contract";
 import type { ActivitySourceRecord } from "./activity-sources";
 
 /**
@@ -10,14 +11,7 @@ export function isPlatformAdministrator(context: { user?: { role?: string | null
   return context.user?.role === "admin";
 }
 
-export type ActivitySourceView = Omit<
-  ActivitySourceRecord,
-  "reviewHistory" | "trustHistory" | "reviewedBy"
-> & {
-  reviewHistory: Array<Omit<ActivitySourceRecord["reviewHistory"][number], "administratorId">>;
-  trustHistory: Array<Omit<ActivitySourceRecord["trustHistory"][number], "administratorId">>;
-  reviewedBy?: string | null;
-};
+export type ActivitySourceView = z.infer<typeof ActivitySourceSchema>;
 
 /** Strips administrator ids from a source for a caller who is not a platform administrator. */
 export function withoutAdministratorIds(source: ActivitySourceRecord): ActivitySourceView {
@@ -37,8 +31,9 @@ export function sourceForCaller(
 }
 
 /**
- * Keeps only the requests a source made itself in a retraction result: a source sees its own
- * "source:<id>" requester id, never an administrator who also hid the event.
+ * Strips requester ids other than the source's own from a retraction result: a source sees its
+ * own "source:<id>" requester id, never the id of an administrator who also hid the event. The
+ * requests themselves (reason, time, applied) stay visible, as before.
  */
 export function retractionForSource(
   result: HideActivityEventResult,

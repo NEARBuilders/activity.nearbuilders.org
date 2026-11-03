@@ -97,13 +97,16 @@ export class DatabaseActivityModerationStore implements ActivitySuppressionStore
     return hidden.map((row) => toHiddenRecord(row, historyByEvent.get(row.eventId) ?? []));
   }
 
-  /** Finds a request by its idempotency key under any of the requester's ids. */
+  /**
+   * Finds a request by its idempotency key under any of the requester's ids, preferring the
+   * first id (the one new requests are recorded under), then the earliest request.
+   */
   async findRequest(
     requesterIds: readonly string[],
     idempotencyKey: string,
   ): Promise<RequestRow | null> {
     if (requesterIds.length === 0) return null;
-    const [request] = await this.#db
+    const requests = await this.#db
       .select()
       .from(requestsTable)
       .where(
@@ -112,9 +115,12 @@ export class DatabaseActivityModerationStore implements ActivitySuppressionStore
           eq(requestsTable.idempotencyKey, idempotencyKey),
         ),
       )
-      .orderBy(asc(requestsTable.requestedAt), asc(requestsTable.id))
-      .limit(1);
-    return request ?? null;
+      .orderBy(asc(requestsTable.requestedAt), asc(requestsTable.id));
+    return (
+      requests.find(({ administratorId }) => administratorId === requesterIds[0]) ??
+      requests[0] ??
+      null
+    );
   }
 
   async recordHide(input: {
