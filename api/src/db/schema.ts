@@ -237,10 +237,11 @@ export const activityEventEndorsements = pgTable(
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
-    eventUserIdx: uniqueIndex("activity_event_endorsements_event_user_idx").on(
-      table.eventId,
-      table.userId,
-    ),
+    // Only legacy rows (no owner id yet) are unique per user. Once keyed on the owner id, a user
+    // who unlinks the account they endorsed with must be able to endorse again under a new one.
+    eventUserIdx: uniqueIndex("activity_event_endorsements_event_user_idx")
+      .on(table.eventId, table.userId)
+      .where(sql`${table.ownerAccountId} IS NULL`),
     eventOwnerIdx: uniqueIndex("activity_event_endorsements_event_owner_idx").on(
       table.eventId,
       table.ownerAccountId,

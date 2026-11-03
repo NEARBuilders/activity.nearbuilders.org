@@ -242,6 +242,7 @@
             }
           ],
           "isUnique": true,
+          "where": "\"activity_event_endorsements\".\"owner_account_id\" IS NULL",
           "concurrently": false,
           "method": "btree",
           "with": {}

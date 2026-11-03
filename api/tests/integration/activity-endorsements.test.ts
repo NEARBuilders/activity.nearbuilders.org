@@ -179,3 +179,44 @@ describe("Activity endorsements keyed on the canonical owner id (#103)", () => {
     ).resolves.toMatchObject({ [linkEvent]: { totalCount: 1, endorsedByCurrentUser: false } });
   });
 });
+
+describe("Activity endorsements after unlinking the endorsing account (#103)", () => {
+  it("lets the user endorse again under a new primary account", async () => {
+    const { secret } = await provisionIngestionSource({
+      sourceId: "endorsement-unlink-source",
+      ownerId: "endorsement-unlink-owner",
+      organizationId: "org-endorsement-unlink",
+      eventType: "feedback.submitted",
+    });
+    const gateway = await getPluginClient(undefined, { authorization: `Bearer ${secret}` });
+    const { eventId } = await gateway.submitActivityEvent({
+      eventType: "feedback.submitted",
+      actor: "frank.near",
+      idempotencyKey: "endorsement-unlink:event",
+      payload: { rating: 3 },
+    });
+
+    const before = await getPluginClient(nearCaller("frank-user", ["frank-old.near"]));
+    await before.endorseActivityEvent({ eventId });
+
+    // frank-old.near is unlinked and frank-new.near becomes primary for the same user. The
+    // old endorsement stays with frank-old.near; the user can endorse again as frank-new.near.
+    const after = await getPluginClient(nearCaller("frank-user", ["frank-new.near"]));
+    await expect(after.getActivityEventEndorsements({ eventIds: [eventId] })).resolves.toEqual({
+      [eventId]: { eventId, totalCount: 1, endorsedByCurrentUser: false },
+    });
+    await expect(after.endorseActivityEvent({ eventId })).resolves.toEqual({
+      eventId,
+      totalCount: 2,
+      endorsedByCurrentUser: true,
+    });
+    await expect(after.unendorseActivityEvent({ eventId })).resolves.toEqual({
+      eventId,
+      totalCount: 1,
+      endorsedByCurrentUser: false,
+    });
+    await expect(
+      before.getActivityEventEndorsements({ eventIds: [eventId] }),
+    ).resolves.toMatchObject({ [eventId]: { totalCount: 1, endorsedByCurrentUser: true } });
+  });
+});

@@ -41,7 +41,9 @@ export class ActivityEndorsementsService {
           await this.#db
             .insert(endorsementsTable)
             .values({ eventId, ownerAccountId: caller.ownerId, userId: caller.userId })
-            .onConflictDoNothing()
+            .onConflictDoNothing({
+              target: [endorsementsTable.eventId, endorsementsTable.ownerAccountId],
+            })
             .returning({ id: endorsementsTable.id })
         )[0];
     const result = await this.#state(eventId, caller);
