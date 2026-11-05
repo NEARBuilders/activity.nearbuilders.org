@@ -77,7 +77,8 @@ export const ActivityEventTypeSchema = z.object({
 export const ActivitySourceReviewSchema = z.object({
   decision: z.enum(["approved", "rejected"]),
   reason: z.string(),
-  administratorId: z.string(),
+  /** Platform administrator who decided. Only platform administrators receive it. */
+  administratorId: z.string().optional(),
   reviewedAt: z.string(),
 });
 
@@ -85,7 +86,8 @@ export const ActivitySourceTrustChangeSchema = z.object({
   trustStatus: ActivitySourceTrustStatusSchema,
   scoreMultiplier: ActivityScoreMultiplierSchema,
   reason: z.string(),
-  administratorId: z.string(),
+  /** Platform administrator who changed trust. Only platform administrators receive it. */
+  administratorId: z.string().optional(),
   changedAt: z.string(),
 });
 
@@ -102,7 +104,8 @@ export const ActivitySourceSchema = z.object({
   eventTypes: z.array(ActivityEventTypeSchema),
   reviewHistory: z.array(ActivitySourceReviewSchema),
   trustHistory: z.array(ActivitySourceTrustChangeSchema),
-  reviewedBy: z.string().nullable(),
+  /** Only platform administrators receive it. */
+  reviewedBy: z.string().nullable().optional(),
   reviewReason: z.string().nullable(),
   reviewedAt: z.string().nullable(),
   createdAt: z.string(),
@@ -300,7 +303,8 @@ export const ActivityEndorsementUpdateSchema = z.object({
 
 export const ActivityModerationHistorySchema = z.object({
   id: z.string().uuid(),
-  administratorId: z.string(),
+  /** Requester: an administrator's owner id, or "source:<id>". Omitted when the caller may not see it. */
+  administratorId: z.string().optional(),
   idempotencyKey: z.string(),
   reason: z.string(),
   applied: z.boolean(),
@@ -310,7 +314,8 @@ export type ActivityModerationHistory = z.infer<typeof ActivityModerationHistory
 
 export const HiddenActivityEventSchema = z.object({
   event: ActivityFeedEventSchema,
-  hiddenBy: z.string(),
+  /** Omitted when the caller may not see who hid the event. */
+  hiddenBy: z.string().optional(),
   reason: z.string(),
   hiddenAt: z.iso.datetime(),
   moderationHistory: z.array(ActivityModerationHistorySchema),

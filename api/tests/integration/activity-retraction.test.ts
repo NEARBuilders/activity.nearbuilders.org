@@ -100,6 +100,55 @@ describe("Activity event retraction by source", () => {
     });
   });
 
+  it("does not show a source which administrator also hid its event (#117)", async () => {
+    const { secret } = await provisionIngestionSource({
+      sourceId: "retraction-admin-source",
+      ownerId: "retraction-admin-owner",
+      organizationId: "org-retraction-admin",
+      eventType: "claim.approved",
+    });
+    const gateway = await getPluginClient(undefined, { authorization: `Bearer ${secret}` });
+    const event = await gateway.submitActivityEvent({
+      eventType: "claim.approved",
+      actor: "alice.near",
+      idempotencyKey: "claim:admin-hidden",
+      payload: { claim: 1 },
+    });
+    const administrator = await getPluginClient({
+      ...adminContext("retraction-moderator"),
+      near: {
+        primaryAccountId: "moderator.near",
+        linkedAccounts: [
+          { accountId: "moderator.near", network: "mainnet", publicKey: "", isPrimary: true },
+        ],
+        hasNearAccount: true,
+      },
+    });
+    await administrator.hideActivityEvent({
+      eventId: event.eventId,
+      reason: "Hidden by moderation",
+      idempotencyKey: "admin-hide:1",
+    });
+
+    const retraction = await gateway.retractActivityEvent({
+      eventId: event.eventId,
+      reason: "Claim compensation",
+      idempotencyKey: "retract:admin-hidden",
+    });
+
+    expect(retraction.hiddenEvent.hiddenBy).toBeUndefined();
+    expect(retraction.hiddenEvent.moderationHistory).toEqual([
+      expect.not.objectContaining({ administratorId: expect.anything() }),
+      expect.objectContaining({ administratorId: "source:retraction-admin-source" }),
+    ]);
+    expect(JSON.stringify(retraction)).not.toContain("moderator.near");
+
+    const hidden = await administrator.listHiddenActivityEvents();
+    expect(hidden.find((entry) => entry.event.id === event.eventId)).toMatchObject({
+      hiddenBy: "moderator.near",
+    });
+  });
+
   it("rejects an unknown or revoked key over public HTTP", async () => {
     const response = await fetch(
       `${await getPluginBaseUrl()}/v1/events/${"a".repeat(64)}/retract`,

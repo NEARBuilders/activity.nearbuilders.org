@@ -54,12 +54,14 @@ import { ActivityMcpServer } from "./services/activity-mcp";
 import {
   ActivityModerationService,
   DatabaseActivityModerationStore,
+  sourceRequesterId,
 } from "./services/activity-moderation";
 import {
   ActivitySourcesLive,
   type ActivitySourcesService,
   ActivitySourcesTag,
 } from "./services/activity-sources";
+import { retractionForSource, sourceForCaller } from "./services/actor-visibility";
 import { callerIdentity } from "./services/caller-identity";
 import { NearbuildersProjectsClient } from "./services/nearbuilders-projects";
 import { TenantsLive, type TenantsService, TenantsTag } from "./services/tenants";
@@ -582,19 +584,21 @@ export default createPlugin.withPlugins<PluginsClient>()({
               mainnetNearAccountIds(context.near.linkedAccounts),
             );
           }
-          return await getServices().activitySources.createSource({
+          const source = await getServices().activitySources.createSource({
             ...input,
             organizationId: context.organization.activeOrganizationId,
           });
+          return sourceForCaller(source, context);
         }),
 
       listActivitySources: builder.listActivitySources
         .use(requireOrgRole("owner", "admin", "member"))
-        .handler(async ({ context }) =>
-          getServices().activitySources.listSourcesByOrganization(
+        .handler(async ({ context }) => {
+          const sources = await getServices().activitySources.listSourcesByOrganization(
             context.organization.activeOrganizationId,
-          ),
-        ),
+          );
+          return sources.map((source) => sourceForCaller(source, context));
+        }),
 
       updateActivitySource: builder.updateActivitySource
         .use(requireOrgRole("owner"))
@@ -623,7 +627,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
               );
             }
           }
-          return await getServices().activitySources.updateSource(
+          const source = await getServices().activitySources.updateSource(
             context.organization.activeOrganizationId,
             input.sourceId,
             {
@@ -632,6 +636,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
               eventTypes: input.eventTypes,
             },
           );
+          return sourceForCaller(source, context);
         }),
 
       listActivitySourcesForReview: builder.listActivitySourcesForReview
@@ -645,7 +650,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .handler(async ({ input, context }) =>
           getServices().activitySources.reviewSource({
             ...input,
-            administratorId: context.userId,
+            administratorId: requireCallerIdentity(context).ownerId,
           }),
         ),
 
@@ -654,7 +659,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .handler(async ({ input, context }) =>
           getServices().activitySources.updateSourceTrust({
             ...input,
-            administratorId: context.userId,
+            administratorId: requireCallerIdentity(context).ownerId,
           }),
         ),
 
@@ -664,7 +669,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
           getServices().activityCredentials.createSigningIdentity(
             context.organization.activeOrganizationId,
             input.sourceId,
-            context.userId,
+            requireCallerIdentity(context).ownerId,
           ),
         ),
 
@@ -692,7 +697,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
           getServices().activityCredentials.rotateSigningIdentity(
             context.organization.activeOrganizationId,
             input.sourceId,
-            context.userId,
+            requireCallerIdentity(context).ownerId,
             input.reason ?? "Signing Identity rotated by Source Owner",
           ),
         ),
@@ -866,7 +871,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
             sessionToken: input.sessionToken,
             organizationId: context.organization.activeOrganizationId,
             sourceId: input.sourceId,
-            actorId: context.userId,
+            actorId: requireCallerIdentity(context).ownerId,
           }),
         ),
 
@@ -1009,10 +1014,13 @@ export default createPlugin.withPlugins<PluginsClient>()({
       hideActivityEvent: builder.hideActivityEvent
         .use(requireAdmin)
         .handler(async ({ input, context }) => {
+          const caller = requireCallerIdentity(context);
           try {
             return await getServices().activityModeration.hide({
               ...input,
-              administratorId: context.userId,
+              administratorId: caller.ownerId,
+              // A retry after a primary-account switch still finds the first request (#117).
+              requesterIds: caller.ids,
             });
           } catch (error) {
             if (
@@ -1035,10 +1043,11 @@ export default createPlugin.withPlugins<PluginsClient>()({
         const credential =
           await getServices().activityCredentials.authenticateEventWriteKey(apiKey);
         try {
-          return await getServices().activityModeration.retract({
+          const result = await getServices().activityModeration.retract({
             ...input,
             sourceId: credential.sourceId,
           });
+          return retractionForSource(result, sourceRequesterId(credential.sourceId));
         } catch (error) {
           if (
             error instanceof ActivityRelayQueryTimeoutError ||
