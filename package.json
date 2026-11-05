@@ -14,6 +14,8 @@
     "compose:doctor": "tsx scripts/compose-doctor.ts",
     "seed:demo": "tsx scripts/seed-demo-data.ts",
     "backfill:endorsement-owners": "tsx scripts/backfill-endorsement-owners.ts",
+    "auth:cutover": "tsx api/scripts/shared-auth/cutover.ts",
+    "auth:check-schema": "tsx api/scripts/shared-auth/check-schema.ts",
     "docs:sync": "tsx scripts/sync-docs.ts",
     "keys:gen": "tsx scripts/keys-gen.ts",
     "build": "bos build",
