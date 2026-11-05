@@ -1,6 +1,6 @@
+import { ORPCError } from "@orpc/server";
 import { and, asc, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import { Context, Effect, Layer } from "every-plugin/effect";
-import { ORPCError } from "every-plugin/orpc";
+import { Context, Effect, Layer } from "effect";
 import { MAX_ACTIVITY_SOURCES_PER_NEAR_ACCOUNT } from "../contract";
 import type { Database } from "../db";
 import { DatabaseTag } from "../db/layer";
@@ -110,10 +110,10 @@ export interface ActivitySourcesService {
   }): Promise<ActivitySourceRecord>;
 }
 
-export class ActivitySourcesTag extends Context.Tag("api/ActivitySources")<
-  ActivitySourcesService,
+export class ActivitySourcesTag extends Context.Service<
+  ActivitySourcesTag,
   ActivitySourcesService
->() {}
+>()("api/ActivitySources") {}
 
 type SourceRow = typeof sourcesTable.$inferSelect;
 type EventTypeRow = typeof eventTypesTable.$inferSelect;

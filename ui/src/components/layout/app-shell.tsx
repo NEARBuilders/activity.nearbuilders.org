@@ -1,0 +1,151 @@
+import {
+  BookOpenIcon,
+  BroadcastIcon,
+  HouseIcon,
+  ListIcon,
+  PlusIcon,
+  PulseIcon,
+  ShieldIcon,
+} from "@phosphor-icons/react/ssr";
+import { useQuery } from "@tanstack/react-query";
+import { ClientOnly, Link, useRouteContext, useRouterState } from "@tanstack/react-router";
+import type { ReactNode } from "react";
+import { getAccount, sessionQueryOptions, useApiClient, useAuthClient } from "@/app";
+import { BrandElement } from "@/components/brand-element";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { NetworkToggle } from "@/components/ui/network-toggle";
+import { UserNav } from "@/components/user-nav";
+import { currentTenantOptions } from "@/lib/activity-queries";
+import { cn } from "@/lib/utils";
+
+export function AppShell({ children }: { children: ReactNode }) {
+  const isNavigating = useRouterState({ select: (s) => s.status === "pending" });
+  return (
+    <div className="min-h-dvh bg-background">
+      <AppHeader />
+      <ClientOnly>
+        {isNavigating && (
+          <div
+            role="progressbar"
+            aria-label="Loading page"
+            className="fixed inset-x-0 top-0 z-50 h-0.5 animate-pulse bg-primary"
+          />
+        )}
+      </ClientOnly>
+      <main className="min-w-0">{children}</main>
+    </div>
+  );
+}
+
+function AppHeader() {
+  const runtimeConfig = useRouteContext({ from: "__root__", select: (c) => c.runtimeConfig });
+  const auth = useAuthClient();
+  const apiClient = useApiClient();
+  const { data: liveSession } = useQuery(sessionQueryOptions(auth));
+  const { data: tenant } = useQuery(currentTenantOptions(apiClient, getAccount(runtimeConfig)));
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isLogin = pathname === "/login";
+  const activeOrgId = liveSession?.session?.activeOrganizationId;
+  const isTenantMember = !!tenant && !!activeOrgId && activeOrgId === tenant.orgId;
+  const isSignedIn = Boolean(liveSession?.user);
+  const items = [
+    ...(isSignedIn ? [{ icon: HouseIcon, label: "Overview", to: "/home" }] : []),
+    { icon: PulseIcon, label: "Activity", to: "/activity" },
+    ...(isSignedIn ? [{ icon: BroadcastIcon, label: "Sources", to: "/activity-sources" }] : []),
+    { icon: BookOpenIcon, label: "Docs", to: "/docs" },
+    ...(isSignedIn && isTenantMember ? [{ icon: ShieldIcon, label: "Admin", to: "/admin" }] : []),
+  ];
+  return (
+    <header className="sticky top-0 z-20 border-b bg-background/95 shadow-elevation-sm backdrop-blur">
+      <div className="mx-auto flex h-16 max-w-screen-2xl items-center gap-x-4 px-4 sm:px-6">
+        <Link
+          to="/"
+          aria-label="NEAR Builders Activity home"
+          className="flex shrink-0 items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <BrandElement appName="NEAR Builders" size="sm" />
+          <span className="hidden text-sm font-semibold sm:inline">NEAR Builders</span>
+        </Link>
+        <nav aria-label="Main navigation" className="hidden gap-1 lg:flex">
+          {items.map(({ icon: Icon, label, to }) => {
+            const active = pathname === to || pathname.startsWith(`${to}/`);
+            return (
+              <Link
+                key={to}
+                to={to}
+                aria-current={active ? "page" : undefined}
+                className={cn(
+                  "relative flex shrink-0 items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  active
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                )}
+              >
+                <Icon className="size-4" />
+                <span>{label}</span>
+                {active && (
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-x-2 -bottom-[9px] h-0.5 rounded-full bg-brand-accent"
+                  />
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="ml-auto flex min-w-0 items-center gap-2">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden"
+                aria-label="Open navigation menu"
+              >
+                <ListIcon className="size-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-48">
+              {items.map(({ icon: Icon, label, to }) => {
+                const active = pathname === to || pathname.startsWith(`${to}/`);
+                return (
+                  <DropdownMenuItem key={to} asChild>
+                    <Link
+                      to={to}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "flex items-center gap-2",
+                        active && "font-medium text-foreground",
+                      )}
+                    >
+                      <Icon className="size-4" />
+                      <span>{label}</span>
+                    </Link>
+                  </DropdownMenuItem>
+                );
+              })}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {isLogin && <NetworkToggle />}
+          {!isLogin && !pathname.startsWith("/activity-sources") && (
+            <Button asChild size="sm" className="shrink-0">
+              <Link to="/activity-sources" search={{ setup: "new" }} aria-label="Submit new source">
+                <PlusIcon />
+                <span className="hidden sm:inline">Submit new source</span>
+              </Link>
+            </Button>
+          )}
+          <ThemeToggle />
+          {!isLogin && <UserNav />}
+        </div>
+      </div>
+    </header>
+  );
+}

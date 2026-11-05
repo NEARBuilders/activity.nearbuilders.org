@@ -5,81 +5,30 @@
  * Prefer upstream changes at https://github.com/nearbuilders/everything-dev
  */
 
-import fs from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import DrizzleORMMigrations from "@proj-airi/unplugin-drizzle-orm-migrations/rspack";
 import { rspack } from "@rspack/core";
-import {
-  EmitPluginManifest,
-  EveryPluginDevServer,
-  FixMfDataUriPlugin,
-} from "every-plugin/build/rspack";
-import { computeSriHashForUrl, reportDeployResult } from "everything-dev/integrity";
-import { withZephyr } from "zephyr-rspack-plugin";
+import { createPluginBaseConfig } from "every-plugin/build/rspack";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const shouldDeploy = process.env.DEPLOY === "true";
-
-const resolvedConfigPath = path.resolve(__dirname, "../.bos/bos.resolved-config.json");
-const bosConfigPath = path.resolve(__dirname, "../bos.config.json");
-
-function readBosConfig() {
-  const configPath = fs.existsSync(resolvedConfigPath) ? resolvedConfigPath : bosConfigPath;
-  const raw = JSON.parse(fs.readFileSync(configPath, "utf8"));
-  if (raw._resolved) {
-    const { _resolved, ...data } = raw;
-    return data;
-  }
-  return raw;
-}
-
-const _bosConfig = readBosConfig();
-
-const baseConfig = {
-  externals: ["pg", "@electric-sql/pglite"],
-  module: {
-    rules: [
-      // The drizzle migrations unplugin has no loadInclude, so it forces every module to
-      // "javascript/auto" — including JSON. Keep JSON as JSON so bundled deps that
-      // require their package.json (e.g. redis) build. The production host doesn't ship
-      // redis, so it has to be bundled rather than external.
-      { test: /\.json$/i, type: "json" },
-    ],
+const baseConfig = createPluginBaseConfig({
+  rspack: {
+    module: {
+      rules: [
+        // The drizzle migrations unplugin has no loadInclude, so it forces every module to
+        // "javascript/auto" — including JSON. Keep JSON as JSON so bundled deps that
+        // require their package.json (e.g. redis) build. The production host doesn't ship
+        // redis, so it has to be bundled rather than external.
+        { test: /\.json$/i, type: "json" },
+      ],
+    },
   },
-  devtool: shouldDeploy ? false : "source-map",
+});
+
+export default {
+  ...baseConfig,
   plugins: [
-    new EmitPluginManifest(),
+    ...baseConfig.plugins,
     new rspack.DefinePlugin({
       "process.env.WS_NO_BUFFER_UTIL": JSON.stringify("1"),
       "process.env.WS_NO_UTF_8_VALIDATE": JSON.stringify("1"),
     }),
-    new EveryPluginDevServer({ dts: false }),
-    new FixMfDataUriPlugin(),
-    DrizzleORMMigrations(),
   ],
-  infrastructureLogging: {
-    level: "error",
-  },
-  stats: "errors-warnings",
 };
-
-export default shouldDeploy
-  ? withZephyr({
-      hooks: {
-        onDeployComplete: async (info) => {
-          console.log("🚀 API Deployed:", info.url);
-          const integrity = await computeSriHashForUrl(info.url);
-          reportDeployResult({
-            url: info.url,
-            integrity,
-            bosConfigPath: bosConfigPath,
-            urlField: "app.api.production",
-            integrityField: "app.api.integrity",
-          });
-        },
-      },
-    })(baseConfig)
-  : baseConfig;

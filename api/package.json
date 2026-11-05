@@ -22,6 +22,8 @@
     "@orpc/client": "catalog:",
     "@electric-sql/pglite": "catalog:",
     "@orpc/contract": "catalog:",
+    "@orpc/openapi": "catalog:",
+    "@orpc/publisher": "catalog:",
     "@orpc/server": "catalog:",
     "drizzle-kit": "catalog:",
     "drizzle-orm": "catalog:",
@@ -31,12 +33,12 @@
     "pg": "catalog:",
     "redis": "6.2.1",
     "ws": "8.21.3",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "aws4fetch": "catalog:"
   },
   "devDependencies": {
     "@effect/language-service": "^0.85.1",
     "@module-federation/node": "catalog:",
-    "@orpc/openapi": "catalog:",
     "@proj-airi/unplugin-drizzle-orm-migrations": "^0.1.4",
     "@rspack/cli": "catalog:",
     "@rspack/core": "catalog:",
@@ -46,14 +48,14 @@
     "dotenv": "^17.2.3",
     "everything-dev": "catalog:",
     "vitest": "catalog:",
-    "zephyr-rspack-plugin": "catalog:",
-    "vite-tsconfig-paths": "^5.1.4"
+    "vite-tsconfig-paths": "^5.1.4",
+    "@module-federation/runtime-tools": "catalog:"
   },
   "scripts": {
-    "build": "bun run build:types && rspack build",
+    "build": "every-plugin build",
     "build:types": "tsc -p tsconfig.contract.json",
-    "deploy": "bun run build:types && DEPLOY=true rspack build",
-    "dev": "bun run build:types && rspack serve",
+    "deploy": "pnpm run build:types && DEPLOY=true rspack build",
+    "dev": "every-plugin dev",
     "test": "vitest run --root . --pool=forks",
     "test:watch": "vitest --root .",
     "coverage": "vitest run --root . --coverage",

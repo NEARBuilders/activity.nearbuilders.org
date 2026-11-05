@@ -1,5 +1,5 @@
+import { ORPCError } from "@orpc/server";
 import { and, eq, inArray, isNull, lte, or } from "drizzle-orm";
-import { ORPCError } from "every-plugin/orpc";
 import type { Database } from "../db";
 import {
   activityEventTypes as eventTypesTable,

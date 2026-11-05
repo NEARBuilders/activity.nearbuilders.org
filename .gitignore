@@ -321,6 +321,8 @@ docker-compose.yml
 !api/src/lib/*.gen.ts
 !ui/src/lib/*.gen.ts
 !ui/src/routeTree.gen.ts
+**/*.gen.tsx
+**/*.gen.json
 
 # Module Federation DTS artifacts
 .mf
@@ -348,3 +350,5 @@ node_modules/.federation
 !CONTEXT-MAP.md
 !**/CONTEXT.md
 .bos/sync-backup/
+
+.claude/

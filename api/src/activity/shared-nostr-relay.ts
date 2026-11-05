@@ -77,7 +77,9 @@ export class SharedNostrRelayAdapter implements ActivityRelayAdapter {
     if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) {
       throw new Error("Activity Nostr RPC URL must be HTTP(S) without credentials");
     }
-    const client = createORPCClient<SharedNostrClient>(new RPCLink({ url: url.href }));
+    const client = createORPCClient<SharedNostrClient>(
+      new RPCLink({ origin: url.origin, url: `${url.pathname}${url.search}` as `/${string}` }),
+    );
     return new SharedNostrRelayAdapter(client, relayUrl);
   }
 

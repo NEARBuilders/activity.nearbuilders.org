@@ -41,3 +41,14 @@ export function activityLeaderboardOptions(
     retry: 1,
   });
 }
+
+export function currentTenantOptions(
+  apiClient: Pick<ApiClient, "resolveTenant">,
+  accountId: string,
+) {
+  return queryOptions({
+    queryKey: ["current-tenant", accountId],
+    queryFn: () => apiClient.resolveTenant({ accountId }),
+    staleTime: 60_000,
+  });
+}

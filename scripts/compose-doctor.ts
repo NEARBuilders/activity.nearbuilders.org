@@ -1,5 +1,5 @@
-#!/usr/bin/env bun
-// `bun run compose:doctor` — fails loudly, before the gateway starts, if two
+#!/usr/bin/env -S pnpm exec tsx
+// `pnpm run compose:doctor` — fails loudly, before the gateway starts, if two
 // compose files bind the same host port. Exists because docker-compose.yml
 // is regenerated from the upstream everything-dev template on every
 // `bos sync`/`bos upgrade` and can silently reintroduce a collision with
@@ -7,6 +7,7 @@
 // guards against, and why it can't just be fixed in docker-compose.yml).
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { parse } from "yaml";
 import { extractHostPorts } from "./lib/compose-ports";
 
 interface Binding {
@@ -15,7 +16,7 @@ interface Binding {
   hostPort: number;
 }
 
-const root = join(import.meta.dir, "..");
+const root = join(import.meta.dirname, "..");
 const composeFiles = readdirSync(root)
   .filter((name) => /^(docker-)?compose.*\.ya?ml$/.test(name))
   .sort();
@@ -29,7 +30,7 @@ if (composeFiles.length === 0) {
 
 const bindings: Binding[] = [];
 for (const file of composeFiles) {
-  const parsed = Bun.YAML.parse(readFileSync(join(root, file), "utf8")) as {
+  const parsed = parse(readFileSync(join(root, file), "utf8")) as {
     services?: Record<string, { ports?: unknown }>;
   };
   for (const [service, definition] of Object.entries(parsed.services ?? {})) {

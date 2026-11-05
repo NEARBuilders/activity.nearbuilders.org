@@ -1,3 +1,5 @@
+import "@orpc/openapi/extensions/route";
+import { eventIterator, oc } from "@orpc/contract";
 import {
   BAD_REQUEST,
   FORBIDDEN,
@@ -5,8 +7,7 @@ import {
   SERVICE_UNAVAILABLE,
   UNAUTHORIZED,
 } from "every-plugin/errors";
-import { eventIterator, oc } from "every-plugin/orpc";
-import { z } from "every-plugin/zod";
+import { z } from "zod";
 
 export const NEAR_ACCOUNT_ID_REGEX =
   /^(?=.{2,64}$)([a-z0-9]+(?:[-_][a-z0-9]+)*)(\.([a-z0-9]+(?:[-_][a-z0-9]+)*))*$/;
@@ -617,7 +618,7 @@ export const contract = oc.router({
       UNAUTHORIZED,
       FORBIDDEN,
       NOT_FOUND,
-      CONFLICT: { status: 409 },
+      CONFLICT: {},
     }),
 
   updateActivitySourceTrust: oc
@@ -646,7 +647,7 @@ export const contract = oc.router({
       UNAUTHORIZED,
       FORBIDDEN,
       NOT_FOUND,
-      CONFLICT: { status: 409 },
+      CONFLICT: {},
     }),
 
   getActivitySigningIdentity: oc
@@ -756,7 +757,7 @@ export const contract = oc.router({
       BAD_REQUEST,
       NOT_FOUND,
       SERVICE_UNAVAILABLE,
-      TOO_MANY_REQUESTS: { status: 429 },
+      TOO_MANY_REQUESTS: {},
     }),
 
   searchNearbuildersProjects: oc
@@ -799,13 +800,13 @@ export const contract = oc.router({
       }),
     )
     .output(ActivityBindingSessionSchema)
-    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST, CONFLICT: { status: 409 } }),
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST, CONFLICT: {} }),
 
   revealActivityBindingSessionKey: oc
     .route({ method: "POST", path: "/activity/binding-sessions/reveal" })
     .input(z.object({ sessionToken: z.string().min(1).max(200) }))
     .output(z.object({ sourceId: z.string(), secret: z.string(), apiKeyId: z.string() }))
-    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT: { status: 409 } }),
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, CONFLICT: {} }),
 
   getActivitySourceTestStatus: oc
     .route({ method: "GET", path: "/activity/sources/{sourceId}/test-status" })
@@ -851,8 +852,8 @@ export const contract = oc.router({
       FORBIDDEN,
       BAD_REQUEST,
       SERVICE_UNAVAILABLE,
-      CONFLICT: { status: 409 },
-      TOO_MANY_REQUESTS: { status: 429 },
+      CONFLICT: {},
+      TOO_MANY_REQUESTS: {},
     }),
 
   listActivityEvents: oc
@@ -990,7 +991,7 @@ export const contract = oc.router({
       FORBIDDEN,
       NOT_FOUND,
       SERVICE_UNAVAILABLE,
-      CONFLICT: { status: 409 },
+      CONFLICT: {},
     }),
 
   retractActivityEvent: oc
@@ -1015,7 +1016,7 @@ export const contract = oc.router({
       FORBIDDEN,
       NOT_FOUND,
       SERVICE_UNAVAILABLE,
-      CONFLICT: { status: 409 },
+      CONFLICT: {},
     }),
 
   listHiddenActivityEvents: oc
@@ -1069,7 +1070,7 @@ export const contract = oc.router({
       tags: ["Activity"],
     })
     .output(ActivityHealthSchema)
-    .errors({ SERVICE_UNAVAILABLE: { status: 503, data: ActivityHealthSchema } }),
+    .errors({ SERVICE_UNAVAILABLE: { data: ActivityHealthSchema } }),
 });
 
 export type ContractType = typeof contract;

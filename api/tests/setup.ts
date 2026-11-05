@@ -4,12 +4,13 @@ import { RPCLink } from "@orpc/client/fetch";
 import type { ContractRouterClient } from "@orpc/contract";
 import { OpenAPIHandler } from "@orpc/openapi/node";
 import { RPCHandler } from "@orpc/server/node";
+import { Context } from "effect";
 import { createPluginRuntime } from "every-plugin";
 import { type Filter, matchFilters } from "nostr-tools/filter";
 import type { Event } from "nostr-tools/pure";
 import { type WebSocket, WebSocketServer } from "ws";
 import type { contract } from "@/contract";
-import Plugin from "@/index";
+import Plugin, { ApiServicesTag } from "@/index";
 import type { ActivityCredentialsService } from "@/services/activity-credentials";
 import { ActivityGithubService } from "@/services/activity-github";
 import type { ActivityLeaderboard } from "@/services/activity-leaderboard";
@@ -154,8 +155,9 @@ export async function getPluginClient(
 ) {
   if (!server) {
     const { router, initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, await getTestConfig());
-    activityCredentialsService = initialized.context.activityCredentials;
-    activityLeaderboardService = initialized.context.activityLeaderboard;
+    const services = Context.get(initialized.effectContext, ApiServicesTag);
+    activityCredentialsService = services.activityCredentials;
+    activityLeaderboardService = services.activityLeaderboard;
     const rpcHandler = new RPCHandler(router);
     const openApiHandler = new OpenAPIHandler(router);
 
@@ -206,7 +208,8 @@ export async function getPluginClient(
   }
 
   const link = new RPCLink({
-    url: `${baseUrl}/rpc`,
+    origin: baseUrl,
+    url: "/rpc",
     fetch: globalThis.fetch,
     headers: {
       ...headers,
@@ -225,7 +228,7 @@ export async function getPluginBaseUrl(): Promise<string> {
 
 export async function getActivitySourcesService() {
   const { initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, await getTestConfig());
-  return initialized.context.activitySources;
+  return Context.get(initialized.effectContext, ApiServicesTag).activitySources;
 }
 
 export async function getActivityCredentialsService() {
@@ -243,13 +246,14 @@ export async function getActivityLeaderboardService() {
 export async function restartActivityGithubService() {
   await getPluginClient();
   const { initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, await getTestConfig());
-  initialized.context.activityGithub.stop();
+  const services = Context.get(initialized.effectContext, ApiServicesTag);
+  services.activityGithub.stop();
   const restarted = new ActivityGithubService({
-    db: initialized.context.database,
-    ingestion: initialized.context.activityIngestion,
+    db: services.database,
+    ingestion: services.activityIngestion,
   });
   restarted.start();
-  initialized.context.activityGithub = restarted;
+  services.activityGithub = restarted;
 }
 
 export function authedContext(userId = "user-1"): Record<string, unknown> {

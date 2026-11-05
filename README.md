@@ -9,7 +9,7 @@ The product scope comes from [NEAR Builders' Activity Service proposal](https://
 ## Guides
 
 These are published on the site at [`/docs`](https://activity.nearbuilders.org/docs), rendered from
-the Markdown below. Edit the files in `docs/`, then run `bun run docs:sync`; CI fails if the
+the Markdown below. Edit the files in `docs/`, then run `pnpm run docs:sync`; CI fails if the
 published copies are stale.
 
 | If you are | Read |
@@ -229,20 +229,20 @@ These can later integrate through the same event gateway without changing the co
 
 ### Requirements
 
-- [Bun](https://bun.sh/)
+- [pnpm](https://pnpm.io/)
 - Docker with Compose
 
 ### Start the service
 
 ```bash
-bun install
-bun run dev:activity-infra
-bun run dev
+pnpm install
+pnpm run dev:activity-infra
+pnpm run dev
 ```
 
 The initializer creates a local `.env` from `.env.example`. Keep secrets out of version control.
 The Activity infrastructure command starts the pinned local Nostr relay on port `7447` and Redis
-on port `6379`; both use Docker named volumes. Run `bun run dev:activity-infra:down` to stop them.
+on port `6379`; both use Docker named volumes. Run `pnpm run dev:activity-infra:down` to stop them.
 
 Local development uses a deterministic signing master key only when
 `ACTIVITY_SIGNING_MASTER_KEYS` is empty. Generated contents stay deterministic so the local
@@ -256,8 +256,8 @@ key. The active version is selected by `ACTIVITY_SIGNING_ACTIVE_KEY_VERSION`. A 
 matching version line can be produced locally with:
 
 ```bash
-bun run keys:gen                         # version defaults to v1
-bun run keys:gen --version=v2            # when adding a new rotation target
+pnpm run keys:gen                         # version defaults to v1
+pnpm run keys:gen --version=v2            # when adding a new rotation target
 ```
 
 The script prints the exact env lines to paste into `.env` or your secret store:
@@ -275,7 +275,7 @@ empty; once you set a real value, that value is what production boot will use.
 
 Every deployed environment — preview, staging, mainnet — **must** provide a real keyring. The API
 runtime refuses to boot with an empty `ACTIVITY_SIGNING_MASTER_KEYS` when
-`NODE_ENV=production`, and the message points back at `bun run keys:gen`. Provisioning is the
+`NODE_ENV=production`, and the message points back at `pnpm run keys:gen`. Provisioning is the
 operator's responsibility: store the keyring in the host's secret manager, set the env var during
 deployment, and back up the keyring in a second location before the first event is published.
 
@@ -316,11 +316,11 @@ explicit API variables in `bos.config.json`; local API-only runs may override th
 ### Useful commands
 
 ```bash
-bun run typecheck
-bun run test
-bun run test:activity
-bun run lint
-bun run build
+pnpm run typecheck
+pnpm run test
+pnpm run test:activity
+pnpm run lint
+pnpm run build
 ```
 
 The Activity integration test uses only the local containers and includes a real relay restart.

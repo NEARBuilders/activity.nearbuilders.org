@@ -1,4 +1,4 @@
-import { getEventMeta } from "every-plugin/orpc";
+import { getEventMeta } from "@orpc/server";
 import { afterAll, describe, expect, it } from "vitest";
 import {
   adminContext,

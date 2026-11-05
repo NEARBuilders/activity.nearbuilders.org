@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomInt } from "node:crypto";
+import { ORPCError } from "@orpc/server";
 import { and, count, eq, gte, isNotNull, isNull } from "drizzle-orm";
-import { ORPCError } from "every-plugin/orpc";
 import type { Database } from "../db";
 import {
   activityBindingSessions as sessionsTable,

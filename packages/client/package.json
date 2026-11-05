@@ -14,18 +14,20 @@
     }
   },
   "dependencies": {
-    "@orpc/client": "1.14.3",
-    "@orpc/contract": "1.14.3",
-    "every-plugin": "^2.10.1"
+    "@orpc/client": "catalog:",
+    "@orpc/contract": "catalog:",
+    "@orpc/openapi": "catalog:",
+    "every-plugin": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "typescript": "^5.9.3",
-    "vitest": "^4.1.8"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json",
-    "prepack": "bun run build"
+    "prepack": "pnpm run build"
   }
 }
