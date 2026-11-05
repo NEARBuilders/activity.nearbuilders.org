@@ -4,7 +4,7 @@
 // below. Nav labels are runtime-only (route options, not manifests).
 // See docs/agents/runtime-map.md for the investigation workflows.
 
-export const RUNTIME_MAP_GENERATED_AT = "2026-11-05T17:46:41.975Z";
+export const RUNTIME_MAP_GENERATED_AT = "2026-11-05T22:12:47.714Z";
 export const RUNTIME_MAP_ENV = "development";
 export const RUNTIME_RELEASE = "2.0.0-rc.39";
 
@@ -15,15 +15,6 @@ export const RUNTIME_SOURCES = [
     "source": "local",
     "location": "ui",
     "manifestUrl": null,
-    "digest": null,
-    "note": null
-  },
-  {
-    "key": "auth",
-    "kind": "auth-ui",
-    "source": "remote",
-    "location": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/auth-ui",
-    "manifestUrl": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/auth-ui/manifest.gen.json",
     "digest": null,
     "note": null
   }
@@ -63,22 +54,7 @@ export const RUNTIME_BACKENDS = [
 export type RuntimeBackend = (typeof RUNTIME_BACKENDS)[number];
 
 /** Routes owned by a plugin/remote ui source (not the core). */
-export const REMOTE_ROUTES = [
-  {
-    "id": "_public/onboard",
-    "path": "/onboard",
-    "mount": "public",
-    "owner": "auth",
-    "type": "route"
-  },
-  {
-    "id": "_authenticated/admin/users",
-    "path": "/admin/users",
-    "mount": "authenticated",
-    "owner": "auth",
-    "type": "route"
-  }
-] as const;
+export const REMOTE_ROUTES = [] as const;
 export type RemoteRoute = (typeof REMOTE_ROUTES)[number];
 export type RemotePath = RemoteRoute["path"];
 
@@ -94,74 +70,7 @@ export const RUNTIME_MOUNTS = [
     "recordId": "_public"
   }
 ] as const;
-export const SHADOWED_ROUTES = [
-  {
-    "id": "_authenticated/settings",
-    "owner": "auth",
-    "kind": "route",
-    "reason": "path \"/settings\" is claimed by \"ui:_authenticated/settings\""
-  },
-  {
-    "id": "_public/login",
-    "owner": "auth",
-    "kind": "route",
-    "reason": "path \"/login\" is claimed by \"ui:_public/login\""
-  },
-  {
-    "id": "_authenticated/settings/api-keys",
-    "owner": "auth",
-    "kind": "route",
-    "reason": "parent \"_authenticated/settings\" is shadowed"
-  },
-  {
-    "id": "_authenticated/settings/auth-methods",
-    "owner": "auth",
-    "kind": "route",
-    "reason": "parent \"_authenticated/settings\" is shadowed"
-  },
-  {
-    "id": "_authenticated/settings/profile",
-    "owner": "auth",
-    "kind": "route",
-    "reason": "parent \"_authenticated/settings\" is shadowed"
-  },
-  {
-    "id": "_authenticated/settings/referrals",
-    "owner": "auth",
-    "kind": "route",
-    "reason": "parent \"_authenticated/settings\" is shadowed"
-  },
-  {
-    "id": "_authenticated/settings/security",
-    "owner": "auth",
-    "kind": "route",
-    "reason": "parent \"_authenticated/settings\" is shadowed"
-  },
-  {
-    "id": "_authenticated/settings/",
-    "owner": "auth",
-    "kind": "route",
-    "reason": "parent \"_authenticated/settings\" is shadowed"
-  },
-  {
-    "id": "_public/login/",
-    "owner": "auth",
-    "kind": "route",
-    "reason": "parent \"_public/login\" is shadowed"
-  },
-  {
-    "id": "_public/login/device/approve",
-    "owner": "auth",
-    "kind": "route",
-    "reason": "parent \"_public/login\" is shadowed"
-  },
-  {
-    "id": "_public/login/device/",
-    "owner": "auth",
-    "kind": "route",
-    "reason": "parent \"_public/login\" is shadowed"
-  }
-] as const;
+export const SHADOWED_ROUTES = [] as const;
 
 export const UNRESOLVED_SOURCES = [] as const;
 export type UnresolvedSource = (typeof UNRESOLVED_SOURCES)[number];

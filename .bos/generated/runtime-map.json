@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-05T17:46:41.975Z",
+  "generatedAt": "2026-11-05T22:12:47.714Z",
   "env": "development",
   "release": "2.0.0-rc.39",
   "extends": "/Users/elliot.braem/workspace/product/activity.nearbuilders.org/bos.app.ts → bos://dev.everything.near/everything.dev",
@@ -10,15 +10,6 @@
       "source": "local",
       "location": "ui",
       "manifestUrl": null,
-      "digest": null,
-      "note": null
-    },
-    {
-      "key": "auth",
-      "kind": "auth-ui",
-      "source": "remote",
-      "location": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/auth-ui",
-      "manifestUrl": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/auth-ui/manifest.gen.json",
       "digest": null,
       "note": null
     }
@@ -294,94 +285,7 @@
       "fullPath": "/docs/",
       "core": true,
       "nav": null
-    },
-    {
-      "id": "_public/onboard",
-      "owner": "auth",
-      "mount": "public",
-      "type": "route",
-      "path": "/onboard",
-      "fullPath": "/onboard",
-      "core": false,
-      "nav": null
-    },
-    {
-      "id": "_authenticated/admin/users",
-      "owner": "auth",
-      "mount": "authenticated",
-      "type": "route",
-      "path": "/admin/users",
-      "fullPath": "/admin/users",
-      "core": false,
-      "nav": null
     }
   ],
-  "shadowed": [
-    {
-      "id": "_authenticated/settings",
-      "owner": "auth",
-      "kind": "route",
-      "reason": "path \"/settings\" is claimed by \"ui:_authenticated/settings\""
-    },
-    {
-      "id": "_public/login",
-      "owner": "auth",
-      "kind": "route",
-      "reason": "path \"/login\" is claimed by \"ui:_public/login\""
-    },
-    {
-      "id": "_authenticated/settings/api-keys",
-      "owner": "auth",
-      "kind": "route",
-      "reason": "parent \"_authenticated/settings\" is shadowed"
-    },
-    {
-      "id": "_authenticated/settings/auth-methods",
-      "owner": "auth",
-      "kind": "route",
-      "reason": "parent \"_authenticated/settings\" is shadowed"
-    },
-    {
-      "id": "_authenticated/settings/profile",
-      "owner": "auth",
-      "kind": "route",
-      "reason": "parent \"_authenticated/settings\" is shadowed"
-    },
-    {
-      "id": "_authenticated/settings/referrals",
-      "owner": "auth",
-      "kind": "route",
-      "reason": "parent \"_authenticated/settings\" is shadowed"
-    },
-    {
-      "id": "_authenticated/settings/security",
-      "owner": "auth",
-      "kind": "route",
-      "reason": "parent \"_authenticated/settings\" is shadowed"
-    },
-    {
-      "id": "_authenticated/settings/",
-      "owner": "auth",
-      "kind": "route",
-      "reason": "parent \"_authenticated/settings\" is shadowed"
-    },
-    {
-      "id": "_public/login/",
-      "owner": "auth",
-      "kind": "route",
-      "reason": "parent \"_public/login\" is shadowed"
-    },
-    {
-      "id": "_public/login/device/approve",
-      "owner": "auth",
-      "kind": "route",
-      "reason": "parent \"_public/login\" is shadowed"
-    },
-    {
-      "id": "_public/login/device/",
-      "owner": "auth",
-      "kind": "route",
-      "reason": "parent \"_public/login\" is shadowed"
-    }
-  ]
+  "shadowed": []
 }

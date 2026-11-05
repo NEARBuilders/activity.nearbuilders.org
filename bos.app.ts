@@ -37,5 +37,9 @@ export default App({
       "ACTIVITY_RELAY_URL",
     ],
   },
+  auth: {
+    extends: "bos://nearbuilding.near/nearbuilders.org#app.auth",
+    ui: false,
+  },
   plugins: {},
 });
