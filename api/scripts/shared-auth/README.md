@@ -128,13 +128,14 @@ Run the endorsement backfill against the copies too, in the same rehearsal:
 
 - `BETTER_AUTH_SECRET` must be identical in the activity and nearbuilders.org deployments. Use
   nearbuilders.org's value, because its sessions already live in the shared DB.
-- `AUTH_DATABASE_URL` on the activity Railway service points at the shared DB.
+- `AUTH_DATABASE_URL` on the activity Railway service points at the shared DB. Railway is the
+  source of truth for the variable — GitHub-side workflows cannot see it, so there is no CI
+  gate here; the fail-closed boot-time guard is tracked upstream
+  ([everything-dev#804](https://github.com/NEARBuilders/everything-dev/issues/804)). Until it
+  lands, the flip in step 5 depends on setting the variable correctly: never boot prod with it
+  unset, or the host silently falls back to a local database (nb#380 / audit #341).
 - Provider tokens copied for activity-only users were written under activity's old secret. They
   are refreshed on the user's next sign-in.
-
-The deploy workflow refuses to run without `AUTH_DATABASE_URL` set as a repo secret (fail-closed
-guard; nb#380 / security audit #341). The host itself still needs the upstream boot-time guard —
-filed on NEARBuilders/everything-dev — until then, never run a prod boot with the variable unset.
 
 ### 5. Cut over production (quiet window, in this order)
 
