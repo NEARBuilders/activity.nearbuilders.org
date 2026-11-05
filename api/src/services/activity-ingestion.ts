@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { ORPCError } from "@orpc/server";
-import { and, count, eq, gte, isNull } from "drizzle-orm";
+import { and, count, eq, gte, isNull, sql } from "drizzle-orm";
 import { type Event, validateEvent, verifyEvent } from "nostr-tools/pure";
 import { ACTIVITY_EVENT_KIND, type ActivityRelay } from "../activity/activity-relay";
 import { ACTIVITY_TEST_EVENT_TYPE } from "../contract";
@@ -113,38 +113,6 @@ export class ActivityIngestionService {
     };
   }
 
-  async #enforceDailySubmissionLimit(
-    sourceRecordId: string,
-    idempotencyKey: string,
-    limit: number,
-    message: string,
-  ) {
-    const [existing] = await this.#db
-      .select({ id: submissionsTable.id })
-      .from(submissionsTable)
-      .where(
-        and(
-          eq(submissionsTable.sourceRecordId, sourceRecordId),
-          eq(submissionsTable.idempotencyKey, idempotencyKey),
-        ),
-      )
-      .limit(1);
-    if (existing) return;
-    const since = new Date(this.#now().getTime() - 24 * 60 * 60 * 1_000);
-    const [recent] = await this.#db
-      .select({ total: count() })
-      .from(submissionsTable)
-      .where(
-        and(
-          eq(submissionsTable.sourceRecordId, sourceRecordId),
-          gte(submissionsTable.createdAt, since),
-        ),
-      );
-    if ((recent?.total ?? 0) >= limit) {
-      throw new ORPCError("TOO_MANY_REQUESTS", { message });
-    }
-  }
-
   async #submitWithCredential(
     credential: ActivityEventWriteCredential,
     input: ActivityEventSubmission,
@@ -182,38 +150,59 @@ export class ActivityIngestionService {
       throw new ORPCError("NOT_FOUND", { message: "Activity Source not found" });
     }
     const quota = this.#resolveDailySubmissionQuota(source);
-    if (quota) {
-      await this.#enforceDailySubmissionLimit(
-        sourceRow.id,
-        input.idempotencyKey,
-        quota.limit,
-        quota.message,
-      );
-    }
     const requestHash = hashSubmission(input);
-    const [created] = await this.#db
-      .insert(submissionsTable)
-      .values({
-        sourceRecordId: sourceRow.id,
-        idempotencyKey: input.idempotencyKey,
-        requestHash,
-      })
-      .onConflictDoNothing()
-      .returning();
-    const submission =
-      created ??
-      (
-        await this.#db
-          .select()
+    const submission = await this.#db.transaction(async (tx) => {
+      if (quota) {
+        await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${sourceRow.id}))`);
+      }
+      const [existing] = await tx
+        .select()
+        .from(submissionsTable)
+        .where(
+          and(
+            eq(submissionsTable.sourceRecordId, sourceRow.id),
+            eq(submissionsTable.idempotencyKey, input.idempotencyKey),
+          ),
+        )
+        .limit(1);
+      if (existing) return existing;
+      if (quota) {
+        const since = new Date(this.#now().getTime() - 24 * 60 * 60 * 1_000);
+        const [recent] = await tx
+          .select({ total: count() })
           .from(submissionsTable)
           .where(
             and(
               eq(submissionsTable.sourceRecordId, sourceRow.id),
-              eq(submissionsTable.idempotencyKey, input.idempotencyKey),
+              gte(submissionsTable.createdAt, since),
             ),
-          )
-          .limit(1)
-      )[0];
+          );
+        if ((recent?.total ?? 0) >= quota.limit) {
+          throw new ORPCError("TOO_MANY_REQUESTS", { message: quota.message });
+        }
+      }
+      const [created] = await tx
+        .insert(submissionsTable)
+        .values({
+          sourceRecordId: sourceRow.id,
+          idempotencyKey: input.idempotencyKey,
+          requestHash,
+        })
+        .onConflictDoNothing()
+        .returning();
+      if (created) return created;
+      const [reserved] = await tx
+        .select()
+        .from(submissionsTable)
+        .where(
+          and(
+            eq(submissionsTable.sourceRecordId, sourceRow.id),
+            eq(submissionsTable.idempotencyKey, input.idempotencyKey),
+          ),
+        )
+        .limit(1);
+      return reserved;
+    });
     if (!submission) {
       throw new ORPCError("INTERNAL_SERVER_ERROR", {
         message: "Activity event reservation failed",
