@@ -20,7 +20,7 @@ type ActivityEndorsementEvents = {
 
 export class ActivityEndorsementsService {
   readonly publisher = new MemoryPublisher<ActivityEndorsementEvents>({
-    resume: { enabled: true, seconds: 120 },
+    resume: { enabled: true, ttl: 120_000 },
   });
   readonly #db: Database;
 
