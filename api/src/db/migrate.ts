@@ -4,13 +4,60 @@ import { join, resolve } from "node:path";
 import type { Migration } from "virtual:drizzle-migrations.sql";
 import { sql } from "drizzle-orm";
 import { Effect } from "effect";
-import {
-  extractExpectedTables,
-  getMigrationStorage,
-  type MigrationStorage,
-  toSqlArray,
-} from "everything-dev/db";
+import { getMigrationStorage, type MigrationStorage } from "everything-dev/db";
 import { type Database, DatabaseError } from "./index";
+
+/**
+ * Postgres array literal for `= ANY(...)` — driver-agnostic placeholder binding
+ * emits `ANY(($1))` with a single string, which Postgres rejects as a malformed
+ * array literal.
+ */
+function toSqlArray(arr: string[]): string {
+  if (arr.length === 0) return `'{}'::text[]`;
+  return `'{${arr
+    .map((v) => v.replace(/\\/g, "\\\\").replace(/"/g, '\\"'))
+    .map((v) => `"${v}"`)
+    .join(",")}}'::text[]`;
+}
+
+const IDENT = String.raw`(?:"([^"]+)"|(\w+))`;
+const QUALIFIED = String.raw`(?:${IDENT}\.)?`;
+
+function extractExpectedTables(migrations: Migration[]): string[] {
+  const tables = new Set<string>();
+  const createRe = new RegExp(
+    String.raw`CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?${QUALIFIED}${IDENT}`,
+    "gi",
+  );
+  const dropRe = new RegExp(
+    String.raw`DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?${QUALIFIED}${IDENT}`,
+    "gi",
+  );
+  const renameRe = new RegExp(
+    String.raw`ALTER\s+TABLE\s+(?:IF\s+EXISTS\s+)?${QUALIFIED}${IDENT}\s+RENAME\s+TO\s+${IDENT}`,
+    "gi",
+  );
+  for (const migration of migrations)
+    for (const stmt of migration.sql) {
+      for (const match of stmt.matchAll(createRe)) {
+        const tableName = match[3] ?? match[4];
+        if (tableName) tables.add(tableName);
+      }
+      for (const match of stmt.matchAll(dropRe)) {
+        const tableName = match[3] ?? match[4];
+        if (tableName) tables.delete(tableName);
+      }
+      for (const match of stmt.matchAll(renameRe)) {
+        const from = match[3] ?? match[4];
+        const to = match[5] ?? match[6];
+        if (from && to) {
+          tables.delete(from);
+          tables.add(to);
+        }
+      }
+    }
+  return [...tables];
+}
 
 function normalizeRows<T>(result: unknown): T[] {
   if (Array.isArray(result)) return result as T[];
