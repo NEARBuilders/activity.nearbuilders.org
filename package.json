@@ -13,6 +13,7 @@
     "setup:check": "tsx scripts/setup-check.ts",
     "compose:doctor": "tsx scripts/compose-doctor.ts",
     "seed:demo": "tsx scripts/seed-demo-data.ts",
+    "backfill:endorsement-owners": "tsx scripts/backfill-endorsement-owners.ts",
     "docs:sync": "tsx scripts/sync-docs.ts",
     "keys:gen": "tsx scripts/keys-gen.ts",
     "build": "bos build",

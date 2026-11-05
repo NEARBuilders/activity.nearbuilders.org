@@ -60,6 +60,7 @@ import {
   type ActivitySourcesService,
   ActivitySourcesTag,
 } from "./services/activity-sources";
+import { callerIdentity } from "./services/caller-identity";
 import { NearbuildersProjectsClient } from "./services/nearbuilders-projects";
 import { TenantsLive, type TenantsService, TenantsTag } from "./services/tenants";
 
@@ -121,6 +122,12 @@ function requestClientKey(headers: Headers | undefined): string | null {
     .map((address) => address.trim())
     .filter(Boolean);
   return forwarded?.at(-1) || headers?.get("x-real-ip") || null;
+}
+
+function requireCallerIdentity(context: Parameters<typeof callerIdentity>[0]) {
+  const caller = callerIdentity(context);
+  if (!caller) throw new ORPCError("UNAUTHORIZED", { message: "Authentication required" });
+  return caller;
 }
 
 function mainnetNearAccountIds(
@@ -902,22 +909,29 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .use(requireAuth)
         .handler(async ({ input, context }) => {
           await requireVisibleActivityEvent(input.eventId);
-          return getServices().activityEndorsements.endorse(input.eventId, context.userId);
+          return getServices().activityEndorsements.endorse(
+            input.eventId,
+            requireCallerIdentity(context),
+          );
         }),
 
       unendorseActivityEvent: builder.unendorseActivityEvent
         .use(requireAuth)
         .handler(async ({ input, context }) =>
-          getServices().activityEndorsements.unendorse(input.eventId, context.userId),
+          getServices().activityEndorsements.unendorse(
+            input.eventId,
+            requireCallerIdentity(context),
+          ),
         ),
 
       getActivityEventEndorsements: builder.getActivityEventEndorsements.handler(
         async ({ input, context }) =>
-          getServices().activityEndorsements.getStates(input.eventIds, context.userId ?? undefined),
+          getServices().activityEndorsements.getStates(input.eventIds, callerIdentity(context)),
       ),
 
       streamActivityEventEndorsements: builder.streamActivityEventEndorsements.handler(
         async function* ({ context, signal, lastEventId }) {
+          const viewerIds = callerIdentity(context)?.ids ?? [];
           const iterator = getServices().activityEndorsements.publisher.subscribe("endorsement", {
             signal,
             lastEventId,
@@ -928,7 +942,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
               eventId: update.eventId,
               timestamp: update.timestamp,
               totalCount: update.totalCount,
-              changedByCurrentUser: context.userId === update.userId,
+              changedByCurrentUser: update.endorserIds.some((id) => viewerIds.includes(id)),
             };
           }
         },
