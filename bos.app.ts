@@ -37,5 +37,13 @@ export default App({
       "ACTIVITY_RELAY_URL",
     ],
   },
+  // Follow nearbuilders.org's published auth entry instead of the base platform's,
+  // so every nearbuilders.org app resolves the same auth plugin and only
+  // nearbuilders.org boots can migrate the shared auth DB (#122). ui: false drops
+  // nearbuilders.org's attached site UI.
+  auth: {
+    extends: "bos://nearbuilding.near/nearbuilders.org#app.auth",
+    ui: false,
+  },
   plugins: {},
 });
