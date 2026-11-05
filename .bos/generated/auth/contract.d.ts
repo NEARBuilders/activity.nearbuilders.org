@@ -4212,7 +4212,7 @@ export declare const contract: {
     health: import("@orpc/contract").ProcedureContract<import("@orpc/contract").InitialInputSchema, import("zod").ZodObject<{
         status: import("zod").ZodLiteral<"ok">;
         timestamp: import("zod").ZodString;
-    }, import("zod/v4/core").$strip>, object>;
+    }, import("zod/v4/core").$strip>, Record<never, never>>;
     getSession: import("@orpc/contract").ProcedureContract<import("@orpc/contract").InitialInputSchema, import("zod").ZodObject<{
         session: import("zod").ZodNullable<import("zod").ZodObject<{
             id: import("zod").ZodString;
