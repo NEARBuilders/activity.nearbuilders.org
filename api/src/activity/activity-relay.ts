@@ -2,6 +2,7 @@ import type { Filter } from "nostr-tools";
 import { SimplePool, useWebSocketImplementation } from "nostr-tools/pool";
 import { type Event, verifyEvent } from "nostr-tools/pure";
 import WebSocket from "ws";
+import { ACTIVITY_EVENT_DEDUPLICATION_LIMIT, BoundedEventIdSet } from "./bounded-event-id-set";
 
 useWebSocketImplementation(WebSocket);
 
@@ -127,13 +128,19 @@ const DIRECT_QUERY_LIMIT = 500;
 export class NostrRelayAdapter implements ActivityRelayAdapter {
   readonly maxQueryLimit: number;
   readonly #relayUrl: string;
-  readonly #pool = new SimplePool({ enablePing: true, enableReconnect: false });
+  readonly #pool: SimplePool;
+  readonly #maxDeduplicationIds: number;
   readonly #subscriptionClosers = new Set<() => void>();
   #destroyed = false;
 
-  constructor(relayUrl: string, options: { maxQueryLimit?: number } = {}) {
+  constructor(
+    relayUrl: string,
+    options: { maxQueryLimit?: number; maxDeduplicationIds?: number; pool?: SimplePool } = {},
+  ) {
     this.#relayUrl = relayUrl;
     this.maxQueryLimit = options.maxQueryLimit ?? DIRECT_QUERY_LIMIT;
+    this.#maxDeduplicationIds = options.maxDeduplicationIds ?? ACTIVITY_EVENT_DEDUPLICATION_LIMIT;
+    this.#pool = options.pool ?? new SimplePool({ enablePing: true, enableReconnect: false });
   }
 
   async publish(event: Event): Promise<string> {
@@ -192,7 +199,7 @@ export class NostrRelayAdapter implements ActivityRelayAdapter {
     let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
     let subscription: { close: (reason?: string) => void } | undefined;
     let lastEventTimestamp = filter.since;
-    const deliveredEventIds = new Set<string>();
+    const deliveredEventIds = new BoundedEventIdSet(this.#maxDeduplicationIds);
     const reconnectBackoffMs = [250, 500, 1_000, 2_000, 5_000] as const;
 
     const scheduleReconnect = () => {
@@ -237,6 +244,7 @@ export class NostrRelayAdapter implements ActivityRelayAdapter {
       closed = true;
       if (reconnectTimer) clearTimeout(reconnectTimer);
       subscription?.close();
+      deliveredEventIds.clear();
       this.#subscriptionClosers.delete(close);
     };
     this.#subscriptionClosers.add(close);
