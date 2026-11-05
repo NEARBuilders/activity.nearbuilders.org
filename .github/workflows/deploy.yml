@@ -26,8 +26,27 @@ permissions:
   packages: write
 
 jobs:
+  # Fail closed (#118, nearbuilders.org#380, security audit #341): without
+  # AUTH_DATABASE_URL the host falls back to a local database and scatters
+  # auth tables into the wrong storage. Production deploys must not run
+  # until the secret is set. The boot-time guard belongs upstream — tracked
+  # on NEARBuilders/everything-dev; this job is the child-side stopgap.
+  auth-database-guard:
+    name: Require AUTH_DATABASE_URL
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the prod auth DB is configured
+        env:
+          HAS_AUTH_DB: ${{ secrets.AUTH_DATABASE_URL != '' }}
+        run: |
+          if [ "$HAS_AUTH_DB" != "true" ]; then
+            echo "::error::AUTH_DATABASE_URL is not set as a repo secret. Prod must not boot with the framework's local-DB fallback (nb#380). Set the secret, then re-run the deploy."
+            exit 1
+          fi
+
   deploy:
     name: Deploy
+    needs: [auth-database-guard]
     uses: NEARBuilders/everything-dev/.github/workflows/consumer-deploy.yml@v2.0.0-rc.39
     with:
       working_directory: .
