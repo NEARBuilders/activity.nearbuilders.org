@@ -406,6 +406,44 @@ describe("Activity event ingestion", () => {
     );
   });
 
+  it("enforces the pending daily limit for concurrent distinct submissions", async () => {
+    const { secret } = await provisionIngestionSource({
+      sourceId: "concurrent-quota-source",
+      ownerId: "concurrent-quota-owner",
+      organizationId: "org-concurrent-quota",
+      eventType: "quota.recorded",
+      approve: false,
+    });
+    const gateway = await getPluginClient(undefined, {
+      authorization: `Bearer ${secret}`,
+    });
+    const submit = (sequence: number) =>
+      gateway.submitActivityEvent({
+        eventType: "quota.recorded",
+        actor: "quota-actor.near",
+        idempotencyKey: `quota:${sequence}`,
+        payload: { sequence },
+      });
+    resetTestRelayEvents();
+
+    await submit(1);
+    await submit(2);
+    const results = await Promise.allSettled([submit(3), submit(4), submit(5)]);
+
+    expect(results.filter(({ status }) => status === "fulfilled")).toHaveLength(1);
+    const rejected = results.filter(
+      (result): result is PromiseRejectedResult => result.status === "rejected",
+    );
+    expect(rejected).toHaveLength(2);
+    expect(rejected.every(({ reason }) => reason?.code === "TOO_MANY_REQUESTS")).toBe(true);
+    expect(
+      rejected.every(({ reason }) =>
+        String(reason).includes("Activity Sources under review may submit up to 3 events per day"),
+      ),
+    ).toBe(true);
+    expect(getTestRelayEvents()).toHaveLength(3);
+  });
+
   it("enforces a daily limit for approved standard sources", async () => {
     const { secret } = await provisionIngestionSource({
       sourceId: "approved-ingestion-source",

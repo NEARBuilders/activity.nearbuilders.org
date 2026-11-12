@@ -304,7 +304,8 @@ is published; do not rely on the dev fallback locally if you plan to promote tha
 
 Master key rotation does not retire a source's Signing Identity. Signing Identity rotation retires
 the old public identity, creates a new encrypted one, and requires a new NEAR binding without
-modifying historical events. See [`docs/activity-protocol.md`](docs/activity-protocol.md#source-credentials-and-signing)
+modifying historical events. After rotation, ingestion returns `403` until the new identity is
+re-bound on-chain. See [`docs/activity-protocol.md`](docs/activity-protocol.md#source-credentials-and-signing)
 for the per-identity signing history.
 
 #### NEAR binding variables
