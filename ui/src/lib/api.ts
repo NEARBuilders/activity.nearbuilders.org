@@ -8,14 +8,12 @@
 import type { ContractRouterClient } from "@orpc/contract";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { useRouter } from "@tanstack/react-router";
-import { createRpcClient } from "every-plugin/client";
+import { createApiClient as createFrameworkApiClient } from "everything-dev/ui/api";
 import { apiConnectionError } from "@/app";
 import type { ApiContract } from "./api-types.gen";
 
 export type { ApiContract };
 export type ApiClient = ContractRouterClient<ApiContract>;
-
-let browserApiClient: ApiClient | null = null;
 
 export function createApiClient(
   runtimeConfig: { hostUrl: string; rpcBase: string },
@@ -25,24 +23,14 @@ export function createApiClient(
     throw new Error("Missing runtime host URL");
   }
 
-  if (typeof window !== "undefined" && !headers && browserApiClient) {
-    return browserApiClient;
-  }
-
-  const client: ApiClient = createRpcClient<ApiContract>(
+  return createFrameworkApiClient<ApiContract>(
     {
       hostUrl: runtimeConfig.hostUrl,
-      path: runtimeConfig.rpcBase as `/${string}`,
+      rpcBase: runtimeConfig.rpcBase as `/${string}`,
       connectionError: apiConnectionError,
     },
     headers,
   );
-
-  if (typeof window !== "undefined" && !headers) {
-    browserApiClient = client;
-  }
-
-  return client;
 }
 
 export function useApiClient(): ApiClient {

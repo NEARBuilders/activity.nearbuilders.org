@@ -1,0 +1,42 @@
+{
+  "schemaVersion": 2,
+  "kind": "everything-dev/composition-lockfile",
+  "runtimeRef": "bos://nearbuilding.near/activity.nearbuilders.org",
+  "release": "2.0.0-rc.44",
+  "remotes": {
+    "app.host": {
+      "kind": "descriptor",
+      "base": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/host/",
+      "digest": {
+        "manifest": "versions/3e37dfef1799bf87.json",
+        "integrity": "sha384-cP/HY0FMqCIaGpIto592Nugvkw2CU9bpkD2l+h46QUDbyMaTxqTzNadnK5GSObfB"
+      }
+    },
+    "app.ui": {
+      "kind": "descriptor",
+      "base": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/ui/",
+      "digest": {
+        "manifest": "versions/0ad24f671da7ac3f.json",
+        "integrity": "sha384-P45/wZLjsnsE6dP63LZMq6FcwXCh5xN7CWsb5oO6MIPI+jNXc4BFCuUcrUWb4Fe8"
+      }
+    },
+    "app.api": {
+      "kind": "descriptor",
+      "base": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/api/",
+      "digest": {
+        "manifest": "versions/968c2b6d44e0f6eb.json",
+        "integrity": "sha384-FDKeUX44vGvIRKLtKeEfVsqZ0MBbvkbDtvpWOh9bG5lwYm/uSage8P62jbaBCHxU"
+      }
+    },
+    "app.auth": {
+      "kind": "descriptor",
+      "base": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/auth/",
+      "digest": {
+        "manifest": "versions/f6835d88fcb01fdd.json",
+        "integrity": "sha384-KYhYj9y/Zp45DCOrki2osT8y98d+qNkHDvPUCRS/nIuOm91v76kYjB3QWNdnNKXT"
+      }
+    }
+  },
+  "pointerDigest": "23a76a2501c8a73d",
+  "resolvedAt": "2026-11-12T07:08:28.715Z"
+}
