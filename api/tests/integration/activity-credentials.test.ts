@@ -7,6 +7,7 @@ import {
   getTestRelayEvents,
   orgOwnerContext,
   resetTestRelayEvents,
+  TEST_FASTNEAR_API_KEY,
   teardown,
 } from "../setup";
 import { provisionIngestionSource } from "./activity-test-helpers";
@@ -40,7 +41,8 @@ describe("Activity source credentials", () => {
       boundNearAccountId: null,
       boundAt: null,
       keyVersion: "v1",
-      createdBy: "credential-owner",
+      // Recorded by the owner's primary NEAR account, not their user id (#107).
+      createdBy: "credential-owner.near",
       createdAt: expect.any(String),
       retiredBy: null,
       retirementReason: null,
@@ -78,7 +80,7 @@ describe("Activity source credentials", () => {
       expect.arrayContaining([
         expect.objectContaining({
           publicKey: identity.publicKey,
-          retiredBy: "credential-owner",
+          retiredBy: "credential-owner.near",
           retirementReason: "Routine credential rotation",
           retiredAt: expect.any(String),
         }),
@@ -505,6 +507,58 @@ describe("Activity source credentials", () => {
       ).resolves.toMatchObject({ bindingStatus: "bound" });
     } finally {
       legacy.mockRestore();
+    }
+  });
+
+  it("sends the FastNear API key on binding reads and stays pending when FastKV refuses", async () => {
+    const owner = await getPluginClient(orgOwnerContext("fastkv-owner", "org-fastkv"));
+    await owner.createActivitySource({
+      sourceId: "fastkv-source",
+      displayName: "FastKV Source",
+      nearAccountId: "fastkv-owner.near",
+      eventTypes: [{ name: "fastkv.event", description: "", enabled: true, pointValue: 1 }],
+    });
+    await owner.createActivitySigningIdentity({ sourceId: "fastkv-source" });
+    const prepared = await owner.prepareActivitySigningIdentityBinding({
+      sourceId: "fastkv-source",
+    });
+
+    const respondWith = (status: number, body: unknown) => {
+      const authorizations: (string | null)[] = [];
+      const originalFetch = globalThis.fetch;
+      const spy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+        if (String(input).startsWith("https://kv.main.fastnear.com/")) {
+          authorizations.push(new Headers(init?.headers).get("authorization"));
+          return new Response(JSON.stringify(body), { status });
+        }
+        return originalFetch(input, init);
+      });
+      return { spy, authorizations };
+    };
+    const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const refused = respondWith(429, { error: "quota" });
+    try {
+      await expect(
+        owner.confirmActivitySigningIdentityBinding({ sourceId: "fastkv-source" }),
+      ).rejects.toMatchObject({ code: "SERVICE_UNAVAILABLE" });
+      expect(refused.authorizations).toEqual([`Bearer ${TEST_FASTNEAR_API_KEY}`]);
+    } finally {
+      refused.spy.mockRestore();
+    }
+    await expect(
+      owner.getActivitySigningIdentity({ sourceId: "fastkv-source" }),
+    ).resolves.toMatchObject({ bindingStatus: "pending" });
+    logged.mockRestore();
+
+    const bound = respondWith(200, { entries: [{ value: JSON.parse(prepared.value) }] });
+    try {
+      await expect(
+        owner.confirmActivitySigningIdentityBinding({ sourceId: "fastkv-source" }),
+      ).resolves.toMatchObject({ bindingStatus: "bound" });
+      expect(bound.authorizations).toEqual([`Bearer ${TEST_FASTNEAR_API_KEY}`]);
+    } finally {
+      bound.spy.mockRestore();
     }
   });
 });

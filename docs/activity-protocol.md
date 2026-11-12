@@ -15,10 +15,12 @@ The JSON payload is stored in `content`. Fields that relays must index are dupli
 | NEAR actor | `n` | `["n", "alice.near"]` |
 | source-scoped idempotency key | `i` | `["i", "github:pr:42"]` |
 
-Consumers query these fields with NIP-01 tag filters (`#s`, `#t`, `#n`, and `#i`). Redis projection
-uses the `[source, idempotency key]` pair as its atomic deduplication identity, so separately signed
-events carrying the same source-scoped idempotency key count once. Projected counters are also
-source-scoped and cannot merge event types declared by different Activity Sources.
+Consumers query these fields with NIP-01 tag filters (`#s`, `#t`, `#n`, and `#i`). A relay serves
+any kind-1701 event it stores, whoever signed it, so a relay read is untrusted until the consumer
+verifies it; the [integration guide](integration-guide.md#read-a-relay-directly) lists the checks.
+Redis projection uses the `[source, idempotency key]` pair as its atomic deduplication identity, so
+separately signed events carrying the same source-scoped idempotency key count once. Projected
+counters are also source-scoped and cannot merge event types declared by different Activity Sources.
 
 `POST /api/v1/events` accepts JSON payloads up to 16 KiB after serialization. The gateway rejects
 larger payloads before reserving an idempotency key, signing an event, or contacting the relay.
@@ -124,6 +126,21 @@ makes those omissions observable to clients. The provenance object states exactl
 implies that payload claims were independently checked. A malformed cursor returns `400 Bad Request`;
 a relay timeout or unsafe scan-limit result returns `503 Service Unavailable` rather than leaving the
 request open or returning an incomplete page.
+
+### Signing keys
+
+`GET /api/v1/signing-keys` is public. It lists the source ID and public key of every bound Signing
+Identity, current and retired, for each Activity Source that is not rejected, and nothing else:
+
+```json
+{ "data": [{ "sourceId": "feedback-rounds", "publicKey": "<64-character Nostr public key>" }] }
+```
+
+With its signing key check enabled, relay.nearbuilders.org uses it to refuse new kind-1701 writes
+from any other key, and consumers reading a relay directly use it to check that an event's key is
+bound to the source in its `s` tag. It does not include signing windows, so it cannot show that an
+event falls inside its key's active window or that a backdated event came from Activity's submission
+ledger; only the feed above checks both.
 
 ## Event endorsements
 
@@ -238,6 +255,18 @@ must use the Activity Source's exact mainnet NEAR account, and only that account
 own namespace. The wallet submits the transaction directly; no relayer is required. The gateway marks
 the identity bound only after FastNear mainnet returns the same public key, and the same source ID,
 from `activity/<source-id>` under the source's account.
+
+The gateway reads FastKV with the deployment's `FASTNEAR_API_KEY` secret as a bearer token, so binding
+reads are not limited to FastNear's free tier; without the key (local development) it reads
+unauthenticated. Confirmation always fails closed. A binding FastKV does not return yet fails with
+`BAD_REQUEST` "The NEAR-to-Nostr binding is not available yet". When FastKV refuses the read itself,
+confirmation fails with `SERVICE_UNAVAILABLE` and the gateway logs
+`[ActivityBinding] FastKV refused the binding read for <account>/<key>: HTTP <status> (<reason>)`:
+HTTP 429 means the key's quota is exhausted ("FastKV quota is exhausted, try again later"), and HTTP
+401 or 403 means FastKV rejected the key ("FastKV rejected the API key"), or, when the deployment has
+no key configured, that FastKV requires one ("FastKV requires an API key"). None of these is a binding
+mismatch, and the identity stays pending until a later confirmation succeeds. A FastKV 5xx, timeout,
+or network error is logged as `FastKV binding read failed` and still reads as not available yet.
 
 Because each source has its own slot, one NEAR account can own up to 10 Activity Sources, each with
 its own signing key, and binding never touches the account's personal `nostr/<account>` identity

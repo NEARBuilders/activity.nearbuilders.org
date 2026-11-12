@@ -19,9 +19,9 @@ import { SharedNostrRelayAdapter } from "./activity/shared-nostr-relay";
 import { type ActivityFeedEvent, contract, NEAR_ACCOUNT_ID_REGEX } from "./contract";
 import type { Database } from "./db";
 import { DatabaseLive, DatabaseTag } from "./db/layer";
+import { ActivityContextSchema } from "./lib/activity-context";
 import { createActivitySseStream } from "./lib/activity-sse";
 import { createAuthMiddleware } from "./lib/auth";
-import { ContextSchema } from "./lib/context";
 import type { PluginsClient } from "./lib/plugins-types.gen";
 import { ActivityBindingSessionsService } from "./services/activity-binding-sessions";
 import {
@@ -50,15 +50,19 @@ import {
   DatabaseActivityPointValueProvider,
 } from "./services/activity-leaderboard";
 import { DatabaseActivityLeaderboardHistory } from "./services/activity-leaderboard-history";
+import { ActivityMcpServer } from "./services/activity-mcp";
 import {
   ActivityModerationService,
   DatabaseActivityModerationStore,
+  sourceRequesterId,
 } from "./services/activity-moderation";
 import {
   ActivitySourcesLive,
   type ActivitySourcesService,
   ActivitySourcesTag,
 } from "./services/activity-sources";
+import { retractionForSource, sourceForCaller } from "./services/actor-visibility";
+import { callerIdentity } from "./services/caller-identity";
 import { NearbuildersProjectsClient } from "./services/nearbuilders-projects";
 import { TenantsLive, type TenantsService, TenantsTag } from "./services/tenants";
 
@@ -122,6 +126,12 @@ function requestClientKey(headers: Headers | undefined): string | null {
   return forwarded?.at(-1) || headers?.get("x-real-ip") || null;
 }
 
+function requireCallerIdentity(context: Parameters<typeof callerIdentity>[0]) {
+  const caller = callerIdentity(context);
+  if (!caller) throw new ORPCError("UNAUTHORIZED", { message: "Authentication required" });
+  return caller;
+}
+
 function mainnetNearAccountIds(
   linkedAccounts: Array<{ accountId: string; network: string }>,
 ): string[] {
@@ -169,6 +179,7 @@ export type ApiServices = {
   activityLeaderboard: ActivityLeaderboard;
   activityRelay: ActivityRelay;
   activityHealth: ActivityHealthService;
+  activityMcp: ActivityMcpServer;
 };
 
 export class ApiServicesTag extends Context.Service<ApiServicesTag, ApiServices>()(
@@ -211,9 +222,10 @@ export default createPlugin.withPlugins<PluginsClient>()({
     ACTIVITY_SIGNING_ACTIVE_KEY_VERSION: z.string().default("v1"),
     ACTIVITY_REDIS_URL: z.string(),
     ACTIVITY_GITHUB_TOKEN: z.string().optional(),
+    FASTNEAR_API_KEY: z.string().optional(),
   }),
 
-  context: ContextSchema,
+  context: ActivityContextSchema,
 
   contract,
 
@@ -244,6 +256,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
           contractId: config.variables.activityNostrBindingContract,
           relay: config.variables.activityNostrBindingRelay,
           kvApiUrl: config.variables.activityNostrKvApiUrl,
+          kvApiKey: config.secrets.FASTNEAR_API_KEY,
         }).pipe(Layer.provide(databaseLayer)),
       );
       const relayUrl = resolveActivityRelayUrl(config.variables.activityRelayUrl);
@@ -352,6 +365,11 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityLeaderboard,
         activityRelay,
         activityHealth: activityHealthService,
+        activityMcp: new ActivityMcpServer(
+          activityBindingSessionsService,
+          activitySourcesService,
+          activityIngestionService,
+        ),
       };
 
       yield* Effect.addFinalizer(() =>
@@ -566,19 +584,21 @@ export default createPlugin.withPlugins<PluginsClient>()({
               mainnetNearAccountIds(context.near.linkedAccounts),
             );
           }
-          return await getServices().activitySources.createSource({
+          const source = await getServices().activitySources.createSource({
             ...input,
             organizationId: context.organization.activeOrganizationId,
           });
+          return sourceForCaller(source, context);
         }),
 
       listActivitySources: builder.listActivitySources
         .use(requireOrgRole("owner", "admin", "member"))
-        .handler(async ({ context }) =>
-          getServices().activitySources.listSourcesByOrganization(
+        .handler(async ({ context }) => {
+          const sources = await getServices().activitySources.listSourcesByOrganization(
             context.organization.activeOrganizationId,
-          ),
-        ),
+          );
+          return sources.map((source) => sourceForCaller(source, context));
+        }),
 
       updateActivitySource: builder.updateActivitySource
         .use(requireOrgRole("owner"))
@@ -607,7 +627,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
               );
             }
           }
-          return await getServices().activitySources.updateSource(
+          const source = await getServices().activitySources.updateSource(
             context.organization.activeOrganizationId,
             input.sourceId,
             {
@@ -616,6 +636,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
               eventTypes: input.eventTypes,
             },
           );
+          return sourceForCaller(source, context);
         }),
 
       listActivitySourcesForReview: builder.listActivitySourcesForReview
@@ -629,7 +650,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .handler(async ({ input, context }) =>
           getServices().activitySources.reviewSource({
             ...input,
-            administratorId: context.userId,
+            administratorId: requireCallerIdentity(context).ownerId,
           }),
         ),
 
@@ -638,7 +659,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .handler(async ({ input, context }) =>
           getServices().activitySources.updateSourceTrust({
             ...input,
-            administratorId: context.userId,
+            administratorId: requireCallerIdentity(context).ownerId,
           }),
         ),
 
@@ -648,7 +669,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
           getServices().activityCredentials.createSigningIdentity(
             context.organization.activeOrganizationId,
             input.sourceId,
-            context.userId,
+            requireCallerIdentity(context).ownerId,
           ),
         ),
 
@@ -676,7 +697,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
           getServices().activityCredentials.rotateSigningIdentity(
             context.organization.activeOrganizationId,
             input.sourceId,
-            context.userId,
+            requireCallerIdentity(context).ownerId,
             input.reason ?? "Signing Identity rotated by Source Owner",
           ),
         ),
@@ -850,7 +871,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
             sessionToken: input.sessionToken,
             organizationId: context.organization.activeOrganizationId,
             sourceId: input.sourceId,
-            actorId: context.userId,
+            actorId: requireCallerIdentity(context).ownerId,
           }),
         ),
 
@@ -893,22 +914,29 @@ export default createPlugin.withPlugins<PluginsClient>()({
         .use(requireAuth)
         .handler(async ({ input, context }) => {
           await requireVisibleActivityEvent(input.eventId);
-          return getServices().activityEndorsements.endorse(input.eventId, context.userId);
+          return getServices().activityEndorsements.endorse(
+            input.eventId,
+            requireCallerIdentity(context),
+          );
         }),
 
       unendorseActivityEvent: builder.unendorseActivityEvent
         .use(requireAuth)
         .handler(async ({ input, context }) =>
-          getServices().activityEndorsements.unendorse(input.eventId, context.userId),
+          getServices().activityEndorsements.unendorse(
+            input.eventId,
+            requireCallerIdentity(context),
+          ),
         ),
 
       getActivityEventEndorsements: builder.getActivityEventEndorsements.handler(
         async ({ input, context }) =>
-          getServices().activityEndorsements.getStates(input.eventIds, context.userId ?? undefined),
+          getServices().activityEndorsements.getStates(input.eventIds, callerIdentity(context)),
       ),
 
       streamActivityEventEndorsements: builder.streamActivityEventEndorsements.handler(
         async function* ({ context, signal, lastEventId }) {
+          const viewerIds = callerIdentity(context)?.ids ?? [];
           const iterator = getServices().activityEndorsements.publisher.subscribe("endorsement", {
             signal,
             lastEventId,
@@ -919,7 +947,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
               eventId: update.eventId,
               timestamp: update.timestamp,
               totalCount: update.totalCount,
-              changedByCurrentUser: context.userId === update.userId,
+              changedByCurrentUser: update.endorserIds.some((id) => viewerIds.includes(id)),
             };
           }
         },
@@ -986,10 +1014,13 @@ export default createPlugin.withPlugins<PluginsClient>()({
       hideActivityEvent: builder.hideActivityEvent
         .use(requireAdmin)
         .handler(async ({ input, context }) => {
+          const caller = requireCallerIdentity(context);
           try {
             return await getServices().activityModeration.hide({
               ...input,
-              administratorId: context.userId,
+              administratorId: caller.ownerId,
+              // A retry after a primary-account switch still finds the first request (#117).
+              requesterIds: caller.ids,
             });
           } catch (error) {
             if (
@@ -1012,10 +1043,11 @@ export default createPlugin.withPlugins<PluginsClient>()({
         const credential =
           await getServices().activityCredentials.authenticateEventWriteKey(apiKey);
         try {
-          return await getServices().activityModeration.retract({
+          const result = await getServices().activityModeration.retract({
             ...input,
             sourceId: credential.sourceId,
           });
+          return retractionForSource(result, sourceRequesterId(credential.sourceId));
         } catch (error) {
           if (
             error instanceof ActivityRelayQueryTimeoutError ||
@@ -1048,6 +1080,30 @@ export default createPlugin.withPlugins<PluginsClient>()({
         } catch {
           throw new ORPCError("SERVICE_UNAVAILABLE", {
             message: "Activity leaderboard projection status is unavailable",
+          });
+        }
+      }),
+
+      handleActivityMcpRequest: builder.handleActivityMcpRequest.handler(
+        async ({ input, context }) =>
+          getServices().activityMcp.handle(input, {
+            origin: requestOrigin(context.reqHeaders),
+            clientKey: requestClientKey(context.reqHeaders),
+          }),
+      ),
+
+      openActivityMcpStream: builder.openActivityMcpStream.handler(async ({ errors }) => {
+        throw errors.METHOD_NOT_SUPPORTED({
+          message: "The Activity MCP server does not stream; send JSON-RPC requests with POST",
+        });
+      }),
+
+      listActivitySigningKeys: builder.listActivitySigningKeys.handler(async () => {
+        try {
+          return { data: await getServices().activityFeed.listSigningKeys() };
+        } catch {
+          throw new ORPCError("SERVICE_UNAVAILABLE", {
+            message: "Activity signing keys are unavailable",
           });
         }
       }),

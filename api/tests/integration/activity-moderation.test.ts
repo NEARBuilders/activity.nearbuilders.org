@@ -289,6 +289,45 @@ describe("Activity event moderation", () => {
     }
   });
 
+  it("replays a hide retried after the administrator switched primary account (#117)", async () => {
+    const { secret } = await provisionIngestionSource({
+      sourceId: "moderation-switch-source",
+      ownerId: "moderation-switch-owner",
+      organizationId: "org-moderation-switch",
+      eventType: "feedback.submitted",
+    });
+    const gateway = await getPluginClient(undefined, { authorization: `Bearer ${secret}` });
+    const target = await gateway.submitActivityEvent({
+      eventType: "feedback.submitted",
+      actor: "alice.near",
+      idempotencyKey: "moderation-switch:target",
+      payload: { sequence: 1 },
+    });
+    const linkedAccounts = [
+      { accountId: "moderator-a.near", network: "mainnet", publicKey: "", isPrimary: false },
+      { accountId: "moderator-b.near", network: "mainnet", publicKey: "", isPrimary: false },
+    ];
+    const asPrimary = (primaryAccountId: string) =>
+      getPluginClient({
+        ...adminContext("moderator-switch"),
+        near: { primaryAccountId, linkedAccounts, hasNearAccount: true },
+      });
+    const request = {
+      eventId: target.eventId,
+      reason: "Contains private feedback",
+      idempotencyKey: "hide-switch-v1",
+    };
+
+    const first = await (await asPrimary("moderator-a.near")).hideActivityEvent(request);
+    const retried = await (await asPrimary("moderator-b.near")).hideActivityEvent(request);
+
+    expect(first.requestReplayed).toBe(false);
+    expect(retried.requestReplayed).toBe(true);
+    expect(retried.hiddenEvent.moderationHistory).toEqual([
+      expect.objectContaining({ administratorId: "moderator-a.near", applied: true }),
+    ]);
+  });
+
   it("rejects an unknown trusted-format event ID", async () => {
     const administrator = await getPluginClient(adminContext("moderator-unknown"));
 

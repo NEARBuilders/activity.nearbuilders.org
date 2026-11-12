@@ -18,17 +18,19 @@ export interface ActivitySourceView {
   reviewHistory: Array<{
     decision: "approved" | "rejected";
     reason: string;
-    administratorId: string;
+    /** Only platform administrators receive it. */
+    administratorId?: string;
     reviewedAt: string;
   }>;
   trustHistory: Array<{
     trustStatus: "standard" | "trusted";
     scoreMultiplier: number;
     reason: string;
-    administratorId: string;
+    /** Only platform administrators receive it. */
+    administratorId?: string;
     changedAt: string;
   }>;
-  reviewedBy: string | null;
+  reviewedBy?: string | null;
   reviewReason: string | null;
   reviewedAt: string | null;
   createdAt: string;

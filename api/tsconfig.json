@@ -23,7 +23,8 @@
     "declarationMap": false,
     "plugins": [
       {
-        "name": "@effect/language-service"
+        "name": "@effect/language-service",
+        "diagnostics": false
       }
     ],
     "paths": {
@@ -31,6 +32,6 @@
     }
   },
   "files": ["tests/types.d.ts"],
-  "include": ["src/**/*", "tests/**/*", "plugin.dev.ts"],
+  "include": ["src/**/*", "scripts/**/*", "tests/**/*", "plugin.dev.ts"],
   "exclude": ["node_modules", "dist"]
 }

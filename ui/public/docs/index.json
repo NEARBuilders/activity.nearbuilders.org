@@ -41,6 +41,11 @@
         "slug": "binding-session-api"
       },
       {
+        "depth": 3,
+        "text": "MCP server",
+        "slug": "mcp-server"
+      },
+      {
         "depth": 2,
         "text": "1. Register a source",
         "slug": "1-register-a-source"
@@ -59,6 +64,11 @@
         "depth": 2,
         "text": "3. Query history and cursors",
         "slug": "3-query-history-and-cursors"
+      },
+      {
+        "depth": 3,
+        "text": "Read a relay directly",
+        "slug": "read-a-relay-directly"
       },
       {
         "depth": 2,
@@ -185,6 +195,11 @@
         "depth": 2,
         "text": "Public feed",
         "slug": "public-feed"
+      },
+      {
+        "depth": 3,
+        "text": "Signing keys",
+        "slug": "signing-keys"
       },
       {
         "depth": 2,

@@ -77,7 +77,8 @@ export const ActivityEventTypeSchema = z.object({
 export const ActivitySourceReviewSchema = z.object({
   decision: z.enum(["approved", "rejected"]),
   reason: z.string(),
-  administratorId: z.string(),
+  /** Platform administrator who decided. Only platform administrators receive it. */
+  administratorId: z.string().optional(),
   reviewedAt: z.string(),
 });
 
@@ -85,7 +86,8 @@ export const ActivitySourceTrustChangeSchema = z.object({
   trustStatus: ActivitySourceTrustStatusSchema,
   scoreMultiplier: ActivityScoreMultiplierSchema,
   reason: z.string(),
-  administratorId: z.string(),
+  /** Platform administrator who changed trust. Only platform administrators receive it. */
+  administratorId: z.string().optional(),
   changedAt: z.string(),
 });
 
@@ -102,7 +104,8 @@ export const ActivitySourceSchema = z.object({
   eventTypes: z.array(ActivityEventTypeSchema),
   reviewHistory: z.array(ActivitySourceReviewSchema),
   trustHistory: z.array(ActivitySourceTrustChangeSchema),
-  reviewedBy: z.string().nullable(),
+  /** Only platform administrators receive it. */
+  reviewedBy: z.string().nullable().optional(),
   reviewReason: z.string().nullable(),
   reviewedAt: z.string().nullable(),
   createdAt: z.string(),
@@ -219,11 +222,17 @@ export const ActivityGithubQuarantineSchema = z.object({
   createdAt: z.string(),
 });
 
+const ActivityEventPayloadSchema = z
+  .custom<z.core.util.JSONType>((value) => z.json().safeParse(value).success, {
+    message: "Expected a JSON value",
+  })
+  .describe("Any JSON value");
+
 export const ActivityEventSubmissionSchema = z.object({
   eventType: ActivityEventTypeNameSchema,
   actor: NearAccountIdSchema,
   idempotencyKey: z.string().trim().min(1).max(200),
-  payload: z.json(),
+  payload: ActivityEventPayloadSchema,
   /**
    * When the activity actually happened, for importing history. Must be in the past and within the
    * relay's accepted age. Omitted means "now", which is what live producers should send.
@@ -294,7 +303,8 @@ export const ActivityEndorsementUpdateSchema = z.object({
 
 export const ActivityModerationHistorySchema = z.object({
   id: z.string().uuid(),
-  administratorId: z.string(),
+  /** Requester: an administrator's owner id, or "source:<id>". Omitted when the caller may not see it. */
+  administratorId: z.string().optional(),
   idempotencyKey: z.string(),
   reason: z.string(),
   applied: z.boolean(),
@@ -304,7 +314,8 @@ export type ActivityModerationHistory = z.infer<typeof ActivityModerationHistory
 
 export const HiddenActivityEventSchema = z.object({
   event: ActivityFeedEventSchema,
-  hiddenBy: z.string(),
+  /** Omitted when the caller may not see who hid the event. */
+  hiddenBy: z.string().optional(),
   reason: z.string(),
   hiddenAt: z.iso.datetime(),
   moderationHistory: z.array(ActivityModerationHistorySchema),
@@ -387,6 +398,17 @@ export const ActivityHealthSchema = z.object({
     relay: ActivityHealthCheckSchema,
   }),
 });
+
+export const ActivitySigningKeySchema = z.object({
+  sourceId: z.string(),
+  publicKey: z.string().regex(/^[a-f0-9]{64}$/),
+});
+
+export const ActivitySigningKeysSchema = z.object({
+  data: z.array(ActivitySigningKeySchema),
+});
+
+export type ActivitySigningKey = z.infer<typeof ActivitySigningKeySchema>;
 
 export type ActivityHealthCheck = z.infer<typeof ActivityHealthCheckSchema>;
 export type ActivityHealth = z.infer<typeof ActivityHealthSchema>;
@@ -686,7 +708,7 @@ export const contract = oc.router({
     })
     .input(z.object({ sourceId: z.string() }))
     .output(ActivitySigningIdentitySchema)
-    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST }),
+    .errors({ UNAUTHORIZED, FORBIDDEN, NOT_FOUND, BAD_REQUEST, SERVICE_UNAVAILABLE }),
 
   createActivitySourceApiKey: oc
     .route({ method: "POST", path: "/activity/sources/{sourceId}/api-keys" })
@@ -1058,6 +1080,48 @@ export const contract = oc.router({
       tags: ["Activity"],
     })
     .output(ActivityLeaderboardProjectionStatusSchema)
+    .errors({ SERVICE_UNAVAILABLE }),
+
+  handleActivityMcpRequest: oc
+    .route({
+      method: "POST",
+      path: "/v1/mcp",
+      summary: "Activity MCP server",
+      description:
+        "Stateless Model Context Protocol endpoint (Streamable HTTP, JSON responses) with tools to register a project as an Activity Source through a binding session and to submit events. Starting a registration needs no credential; the person approves it in the browser.",
+      tags: ["Activity"],
+      outputStructure: "detailed",
+    })
+    .input(z.unknown())
+    .output(
+      z.object({
+        status: z.union([z.literal(200), z.literal(202)]),
+        body: z.unknown().optional(),
+      }),
+    ),
+
+  openActivityMcpStream: oc
+    .route({
+      method: "GET",
+      path: "/v1/mcp",
+      summary: "Activity MCP server-sent events",
+      description:
+        "The Activity MCP server sends no server-initiated messages, so this returns 405.",
+      tags: ["Activity"],
+    })
+    .output(z.object({}))
+    .errors({ METHOD_NOT_SUPPORTED: {} }),
+
+  listActivitySigningKeys: oc
+    .route({
+      method: "GET",
+      path: "/v1/signing-keys",
+      summary: "List Activity signing keys",
+      description:
+        "Lists the public keys of bound Signing Identities, current and retired, for every Activity Source that is not rejected. Relays use it to accept kind-1701 writes only from these keys; consumers still verify each event's source tag and signing window.",
+      tags: ["Activity"],
+    })
+    .output(ActivitySigningKeysSchema)
     .errors({ SERVICE_UNAVAILABLE }),
 
   getActivityHealth: oc

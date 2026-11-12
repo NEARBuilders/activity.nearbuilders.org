@@ -46,6 +46,13 @@ export async function linkSourceOnChain(
   sourceId: string,
 ) {
   await owner.createActivitySigningIdentity({ sourceId });
+  await confirmBindingOnChain(owner, sourceId);
+}
+
+export async function confirmBindingOnChain(
+  owner: Awaited<ReturnType<typeof getPluginClient>>,
+  sourceId: string,
+) {
   const prepared = await owner.prepareActivitySigningIdentityBinding({ sourceId });
   const bindingValue = JSON.parse(prepared.value);
   const originalFetch = globalThis.fetch;

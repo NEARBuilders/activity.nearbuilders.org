@@ -214,6 +214,10 @@ export const activityEventSubmissions = pgTable(
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
+    historyCursorIdx: index("activity_event_submissions_history_cursor_idx").on(
+      table.createdAt,
+      table.id,
+    ),
     sourceIdempotencyIdx: uniqueIndex("activity_event_submissions_source_idempotency_idx").on(
       table.sourceRecordId,
       table.idempotencyKey,
@@ -226,15 +230,25 @@ export const activityEventEndorsements = pgTable(
   {
     id: uuid("id").defaultRandom().primaryKey(),
     eventId: text("event_id").notNull(),
-    userId: text("user_id").notNull(),
+    // Canonical owner id: the endorser's primary NEAR account, or their user id if they have
+    // none (#103). Null only on rows written before this column, until they are backfilled.
+    ownerAccountId: text("owner_account_id"),
+    userId: text("user_id"),
     createdAt: timestamp("created_at", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => ({
-    eventUserIdx: uniqueIndex("activity_event_endorsements_event_user_idx").on(
+    // Only legacy rows (no owner id yet) are unique per user. Once keyed on the owner id, a user
+    // who unlinks the account they endorsed with must be able to endorse again under a new one.
+    eventUserIdx: uniqueIndex("activity_event_endorsements_event_user_idx")
+      .on(table.eventId, table.userId)
+      .where(sql`${table.ownerAccountId} IS NULL`),
+    eventOwnerIdx: uniqueIndex("activity_event_endorsements_event_owner_idx").on(
       table.eventId,
-      table.userId,
+      table.ownerAccountId,
     ),
     eventIdx: index("activity_event_endorsements_event_idx").on(table.eventId),
+    ownerIdx: index("activity_event_endorsements_owner_idx").on(table.ownerAccountId),
+    userIdx: index("activity_event_endorsements_user_idx").on(table.userId),
   }),
 );
 

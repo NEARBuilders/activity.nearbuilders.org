@@ -117,6 +117,7 @@ export interface ActivityBindingConfig {
   contractId: string;
   relay: string;
   kvApiUrl: string;
+  kvApiKey?: string;
 }
 
 export class ActivityCredentialsTag extends Context.Service<
@@ -222,18 +223,68 @@ function legacyNostrBindingKey(nearAccountId: string): string {
 
 type OnChainBinding = { npub?: unknown; bound_at?: unknown; sourceId?: unknown };
 
-async function readOnChainBinding(
-  config: { kvApiUrl: string; contractId: string },
+const FASTKV_REFUSALS = {
+  quotaExhausted: {
+    reason: "quota exhausted",
+    message: "Binding confirmation is unavailable: FastKV quota is exhausted, try again later",
+  },
+  apiKeyRejected: {
+    reason: "API key rejected",
+    message: "Binding confirmation is unavailable: FastKV rejected the API key",
+  },
+  apiKeyMissing: {
+    reason: "API key required, none configured",
+    message: "Binding confirmation is unavailable: FastKV requires an API key",
+  },
+} as const;
+
+function fastKvRefusal(status: number, apiKeySent: boolean) {
+  if (status === 429) return FASTKV_REFUSALS.quotaExhausted;
+  if (status !== 401 && status !== 403) return null;
+  return apiKeySent ? FASTKV_REFUSALS.apiKeyRejected : FASTKV_REFUSALS.apiKeyMissing;
+}
+
+function logBindingRead(
+  outcome: "refused the binding read" | "binding read failed",
+  slot: string,
+  detail: string,
+) {
+  console.error(`[ActivityBinding] FastKV ${outcome} for ${slot}: ${detail}`);
+}
+
+export async function readOnChainBinding(
+  config: Pick<ActivityBindingConfig, "kvApiUrl" | "kvApiKey" | "contractId">,
   nearAccountId: string,
   key: string,
 ): Promise<OnChainBinding | null> {
   const keyPath = key.split("/").map(encodeURIComponent).join("/");
   const url = `${config.kvApiUrl.replace(/\/$/, "")}/v0/latest/${encodeURIComponent(config.contractId)}/${encodeURIComponent(nearAccountId)}/${keyPath}`;
+  const apiKey = config.kvApiKey?.trim();
   let response: Response;
   try {
-    response = await fetch(url, { signal: AbortSignal.timeout(5_000) });
-  } catch {
+    response = await fetch(url, {
+      headers: apiKey ? { authorization: `Bearer ${apiKey}` } : undefined,
+      signal: AbortSignal.timeout(5_000),
+    });
+  } catch (error) {
+    logBindingRead(
+      "binding read failed",
+      `${nearAccountId}/${key}`,
+      error instanceof Error ? error.name : "unknown error",
+    );
     return null;
+  }
+  const refusal = fastKvRefusal(response.status, Boolean(apiKey));
+  if (refusal) {
+    logBindingRead(
+      "refused the binding read",
+      `${nearAccountId}/${key}`,
+      `HTTP ${response.status} (${refusal.reason})`,
+    );
+    throw new ORPCError("SERVICE_UNAVAILABLE", { message: refusal.message });
+  }
+  if (response.status >= 500) {
+    logBindingRead("binding read failed", `${nearAccountId}/${key}`, `HTTP ${response.status}`);
   }
   if (!response.ok) return null;
   const data = (await response.json().catch(() => null)) as {
