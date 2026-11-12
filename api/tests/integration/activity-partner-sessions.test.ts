@@ -1,38 +1,31 @@
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import {
   adminContext,
   getPluginClient,
   getTestRelayEvents,
   orgOwnerContext,
   resetTestRelayEvents,
+  stubNearbuildersProjects,
   teardown,
 } from "../setup";
 import { linkSourceOnChain, provisionIngestionSource } from "./activity-test-helpers";
 
 afterAll(teardown);
 
-const realFetch = globalThis.fetch;
-
 const eventTypes = [{ name: "listing.published", description: "", enabled: true, pointValue: 10 }];
 
 function mockProjects(projects: Record<string, { ownerId: string }>) {
-  return vi.spyOn(globalThis, "fetch").mockImplementation(async (request, init) => {
-    const match = String(request).match(
-      /^https:\/\/nearbuilders\.org\/api\/v1\/projects\/([^/?]+)$/,
-    );
-    const project = match ? projects[decodeURIComponent(match[1] ?? "")] : undefined;
-    if (match && project) {
-      const id = decodeURIComponent(match[1] ?? "");
-      return new Response(
-        JSON.stringify({
-          data: { id, slug: `${id}-a1b2c3`, title: id, domain: null, apps: [], ...project },
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      );
-    }
-    if (match) return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
-    return realFetch(request, init);
-  });
+  return stubNearbuildersProjects(
+    Object.entries(projects).map(([id, project]) => ({
+      id,
+      slug: `${id}-a1b2c3`,
+      title: id,
+      domain: null,
+      logoUrl: null,
+      apps: [],
+      ...project,
+    })),
+  );
 }
 
 async function trustedPartnerKey(sourceId: string) {
@@ -55,7 +48,7 @@ async function trustedPartnerKey(sourceId: string) {
 describe("Partner binding sessions", () => {
   it("lets a trusted partner start a session whose key is shown once on the page", async () => {
     const partnerSecret = await trustedPartnerKey("nb-partner");
-    const projects = mockProjects({ proj_partner: { ownerId: "partner-owner.near" } });
+    const restoreProjects = mockProjects({ proj_partner: { ownerId: "partner-owner.near" } });
     try {
       const partner = await getPluginClient(undefined, {
         authorization: `Bearer ${partnerSecret}`,
@@ -98,7 +91,7 @@ describe("Partner binding sessions", () => {
         nearbuildersProjectId: "proj_partner",
         eventTypes,
       });
-      projects.mockRestore();
+      restoreProjects();
       await linkSourceOnChain(owner, "partner-project");
       await owner.completeActivityBindingSession({ sessionToken, sourceId: "partner-project" });
 
@@ -154,7 +147,7 @@ describe("Partner binding sessions", () => {
         anonymous.getNearbuildersProjectActivity({ projectId: "proj_partner" }),
       ).resolves.toMatchObject({ status: "tracked" });
     } finally {
-      projects.mockRestore();
+      restoreProjects();
     }
   });
 
@@ -179,7 +172,7 @@ describe("Partner binding sessions", () => {
   });
 
   it("reports none and rejected project statuses", async () => {
-    const projects = mockProjects({ proj_rejected: { ownerId: "rejected-owner.near" } });
+    const restoreProjects = mockProjects({ proj_rejected: { ownerId: "rejected-owner.near" } });
     try {
       const anonymous = await getPluginClient();
       await expect(
@@ -216,7 +209,7 @@ describe("Partner binding sessions", () => {
         reviewReason: "Events do not match the project",
       });
     } finally {
-      projects.mockRestore();
+      restoreProjects();
     }
   });
 });

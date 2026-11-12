@@ -1,8 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { ORPCError } from "@orpc/server";
+import { describe, expect, it, vi } from "vitest";
 import {
   deriveNearbuildersProjectDraft,
   type NearbuildersProject,
   NearbuildersProjectsClient,
+  type ProjectsRpcClient,
   parseNearbuildersProjectReference,
 } from "@/services/nearbuilders-projects";
 
@@ -12,14 +14,32 @@ const activityProject: NearbuildersProject = {
   title: "activity.nearbuilders.org",
   ownerId: "nearbuilding.near",
   domain: null,
+  logoUrl: null,
   apps: [],
 };
 
-function respond(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json" },
-  });
+type Calls = Array<[string, unknown]>;
+
+function fakeProjects(
+  handlers: {
+    list?: (input: unknown) => NearbuildersProject[];
+    get?: (input: unknown) => NearbuildersProject;
+    bySlug?: (input: unknown) => NearbuildersProject;
+  },
+  calls: Calls = [],
+): NearbuildersProjectsClient {
+  const call = (name: string, handler?: (input: unknown) => unknown) =>
+    vi.fn(async (input: unknown) => {
+      calls.push([name, input]);
+      if (!handler) throw new ORPCError("NOT_FOUND");
+      return { data: handler(input) };
+    });
+  const rpc = {
+    listProjects: call("listProjects", handlers.list ?? (() => [])),
+    getProject: call("getProject", handlers.get),
+    getProjectBySlug: call("getProjectBySlug", handlers.bySlug),
+  } as unknown as ProjectsRpcClient;
+  return new NearbuildersProjectsClient(rpc);
 }
 
 describe("parseNearbuildersProjectReference", () => {
@@ -84,7 +104,7 @@ describe("deriveNearbuildersProjectDraft", () => {
       ...activityProject,
       slug: "legion-clash-weekly-arena-y1u7id",
       title: "Legion Clash: weekly arena",
-      apps: [{ accountId: null }, { accountId: "legion-clash.near" }],
+      apps: [{ accountId: "not a near account" }, { accountId: "legion-clash.near" }],
     });
 
     expect(draft.sourceId).toBe("legion-clash-weekly-arena");
@@ -107,30 +127,33 @@ describe("deriveNearbuildersProjectDraft", () => {
 });
 
 describe("NearbuildersProjectsClient", () => {
-  it("resolves a pasted link through the by-slug endpoint", async () => {
-    const requested: string[] = [];
-    const client = new NearbuildersProjectsClient("https://nearbuilders.test/api/", async (url) => {
-      requested.push(String(url));
-      return respond({ data: activityProject });
-    });
+  it("resolves a pasted link through getProjectBySlug", async () => {
+    const calls: Calls = [];
+    const client = fakeProjects({ bySlug: () => activityProject }, calls);
 
     await expect(
       client.resolve("https://nearbuilders.org/projects/activity-nearbuilders-org-2erd1k"),
     ).resolves.toMatchObject({ sourceId: "activity.nearbuilders.org" });
-    expect(requested).toEqual([
-      "https://nearbuilders.test/api/v1/projects/by-slug/activity-nearbuilders-org-2erd1k",
-    ]);
+    expect(calls).toEqual([["getProjectBySlug", { slug: "activity-nearbuilders-org-2erd1k" }]]);
+  });
+
+  it("resolves a project id through getProject", async () => {
+    const calls: Calls = [];
+    const client = fakeProjects({ get: () => activityProject }, calls);
+
+    await expect(client.resolve(activityProject.id)).resolves.toMatchObject({
+      project: { id: activityProject.id },
+    });
+    expect(calls).toEqual([["getProject", { id: activityProject.id }]]);
   });
 
   it("searches by name, preferring an exact title match", async () => {
-    const client = new NearbuildersProjectsClient("https://nearbuilders.test/api", async () =>
-      respond({
-        data: [
-          { ...activityProject, id: "proj_a", title: "Test Project Extended", slug: "a-1a2b3c" },
-          { ...activityProject, id: "proj_b", title: "Test Project", slug: "test-project-9z8y7x" },
-        ],
-      }),
-    );
+    const client = fakeProjects({
+      list: () => [
+        { ...activityProject, id: "proj_a", title: "Test Project Extended", slug: "a-1a2b3c" },
+        { ...activityProject, id: "proj_b", title: "Test Project", slug: "test-project-9z8y7x" },
+      ],
+    });
 
     await expect(client.resolve("test project")).resolves.toMatchObject({
       project: { id: "proj_b" },
@@ -139,14 +162,12 @@ describe("NearbuildersProjectsClient", () => {
   });
 
   it("lists candidate links when a name is ambiguous", async () => {
-    const client = new NearbuildersProjectsClient("https://nearbuilders.test/api", async () =>
-      respond({
-        data: [
-          { ...activityProject, title: "Legion Clash", slug: "legion-clash-y1u7id" },
-          { ...activityProject, title: "Legion Clash", slug: "legion-clash-9xxnri" },
-        ],
-      }),
-    );
+    const client = fakeProjects({
+      list: () => [
+        { ...activityProject, title: "Legion Clash", slug: "legion-clash-y1u7id" },
+        { ...activityProject, title: "Legion Clash", slug: "legion-clash-9xxnri" },
+      ],
+    });
 
     await expect(client.resolve("Legion Clash")).rejects.toThrow(
       /https:\/\/nearbuilders\.org\/projects\/legion-clash-y1u7id/,
@@ -154,55 +175,64 @@ describe("NearbuildersProjectsClient", () => {
   });
 
   it("reports a missing linked project without falling back to a name search", async () => {
-    const requested: string[] = [];
-    const client = new NearbuildersProjectsClient("https://nearbuilders.test/api", async (url) => {
-      requested.push(String(url));
-      return respond({}, 404);
-    });
+    const calls: Calls = [];
+    const client = fakeProjects({}, calls);
 
     await expect(
       client.resolve("https://nearbuilders.org/projects/project/gone-a1b2c3?kind=project"),
     ).rejects.toThrow(
       "No nearbuilders.org project exists at https://nearbuilders.org/projects/project/gone-a1b2c3?kind=project",
     );
-    expect(requested).toEqual(["https://nearbuilders.test/api/v1/projects/by-slug/gone-a1b2c3"]);
+    expect(calls).toEqual([["getProjectBySlug", { slug: "gone-a1b2c3" }]]);
   });
 
-  it("reports a missing project and an unreachable site distinctly", async () => {
-    const missing = new NearbuildersProjectsClient("https://nearbuilders.test/api", async (url) =>
-      String(url).includes("by-slug") ? respond({}, 404) : respond({ data: [] }),
-    );
-    await expect(missing.resolve("no-such-project")).rejects.toThrow(
+  it("reports a missing project, an unreachable site and an upstream error distinctly", async () => {
+    await expect(fakeProjects({}).resolve("no-such-project")).rejects.toThrow(
       'No nearbuilders.org project matches "no-such-project"',
     );
+    await expect(fakeProjects({}).getOwnerAccountIds("proj_gone")).rejects.toMatchObject({
+      code: "NOT_FOUND",
+    });
 
-    const offline = new NearbuildersProjectsClient("https://nearbuilders.test/api", async () => {
-      throw new TypeError("fetch failed");
+    const offline = fakeProjects({
+      bySlug: () => {
+        throw new TypeError("fetch failed");
+      },
     });
     await expect(offline.resolve("nearly-trade")).rejects.toThrow(
       "nearbuilders.org could not be reached",
+    );
+
+    const failing = fakeProjects({
+      list: () => {
+        throw new ORPCError("INTERNAL_SERVER_ERROR");
+      },
+    });
+    await expect(failing.search("activity")).rejects.toMatchObject({
+      code: "SERVICE_UNAVAILABLE",
+      message: "nearbuilders.org returned INTERNAL_SERVER_ERROR. Try again shortly.",
+    });
+
+    const malformed = fakeProjects({
+      bySlug: () => undefined as unknown as NearbuildersProject,
+    });
+    await expect(malformed.resolve("nearly-trade")).rejects.toThrow(
+      "nearbuilders.org returned an unexpected response",
     );
   });
 });
 
 describe("NearbuildersProjectsClient.search", () => {
   it("asks for real projects only and returns linkable summaries", async () => {
-    const requested: string[] = [];
-    const client = new NearbuildersProjectsClient(
-      "https://nearbuilders.org/api/",
-      async (input) => {
-        requested.push(String(input));
-        return respond({
-          data: [{ ...activityProject, logoUrl: "https://example.com/logo.png" }],
-        });
-      },
+    const calls: Calls = [];
+    const client = fakeProjects(
+      { list: () => [{ ...activityProject, logoUrl: "https://example.com/logo.png" }] },
+      calls,
     );
 
     const results = await client.search("  activity ");
 
-    expect(requested).toEqual([
-      "https://nearbuilders.org/api/v1/projects?query=activity&kind=project&limit=8",
-    ]);
+    expect(calls).toEqual([["listProjects", { query: "activity", kind: "project", limit: 8 }]]);
     expect(results).toEqual([
       {
         id: "proj_1791152600182_r4z661r",
@@ -218,14 +248,11 @@ describe("NearbuildersProjectsClient.search", () => {
   });
 
   it("skips the request for queries shorter than two characters", async () => {
-    let calls = 0;
-    const client = new NearbuildersProjectsClient("https://nearbuilders.org/api", async () => {
-      calls += 1;
-      return respond({ data: [] });
-    });
+    const calls: Calls = [];
+    const client = fakeProjects({}, calls);
 
     expect(await client.search(" a ")).toEqual([]);
-    expect(calls).toBe(0);
+    expect(calls).toHaveLength(0);
   });
 
   it("caps the results even when the site returns more", async () => {
@@ -234,9 +261,7 @@ describe("NearbuildersProjectsClient.search", () => {
       id: `proj_${index}`,
       slug: `project-${index}`,
     }));
-    const client = new NearbuildersProjectsClient("https://nearbuilders.org/api", async () =>
-      respond({ data: many }),
-    );
+    const client = fakeProjects({ list: () => many });
 
     expect(await client.search("project")).toHaveLength(8);
   });

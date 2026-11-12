@@ -4,7 +4,7 @@
 // below. Nav labels are runtime-only (route options, not manifests).
 // See docs/agents/runtime-map.md for the investigation workflows.
 
-export const RUNTIME_MAP_GENERATED_AT = "2026-11-12T07:10:22.672Z";
+export const RUNTIME_MAP_GENERATED_AT = "2026-11-12T07:23:35.229Z";
 export const RUNTIME_MAP_ENV = "development";
 export const RUNTIME_RELEASE = "2.0.0-rc.44";
 
@@ -51,6 +51,17 @@ export const RUNTIME_BACKENDS = [
     "integrity": "sha384-outQaOt4wS2vf+UIeSfN3xIt074Ixerg2sLKtYSVyrEH9SUY4Sx6GQ8WZkkwdPdU",
     "pluginVersion": "2.0.0-rc.8",
     "contractSha256": "c8022b18e4cedfc30d591060b8a9d81e65fdb3cf80658db441d3d4cd9401ee4d"
+  },
+  {
+    "key": "projects",
+    "kind": "plugin",
+    "name": "projects",
+    "source": "remote",
+    "location": "https://nearbuilders.org",
+    "pluginManifestUrl": "https://cdn.everything.dev/bundles/nearbuilding.near/nearbuilders.org/projects/plugin.manifest.json",
+    "callOnly": true,
+    "pluginVersion": "1.4.0",
+    "contractSha256": "9e920e55fee7831884e1442c9cccbcbd17c3b2c459a364fa62be6f911754cfc1"
   }
 ] as const;
 export type RuntimeBackend = (typeof RUNTIME_BACKENDS)[number];

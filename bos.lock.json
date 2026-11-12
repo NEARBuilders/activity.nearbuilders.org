@@ -35,8 +35,11 @@
         "manifest": "versions/f6835d88fcb01fdd.json",
         "integrity": "sha384-KYhYj9y/Zp45DCOrki2osT8y98d+qNkHDvPUCRS/nIuOm91v76kYjB3QWNdnNKXT"
       }
+    },
+    "plugins.projects": {
+      "kind": "descriptor"
     }
   },
-  "pointerDigest": "23a76a2501c8a73d",
-  "resolvedAt": "2026-11-12T07:08:28.715Z"
+  "pointerDigest": "c0698d04fa560e36",
+  "resolvedAt": "2026-11-12T07:23:15.993Z"
 }

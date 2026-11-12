@@ -41,5 +41,10 @@ export default App({
     extends: "bos://nearbuilding.near/nearbuilders.org#app.auth",
     ui: false,
   },
-  plugins: {},
+  plugins: {
+    projects: {
+      contract: "bos://nearbuilding.near/nearbuilders.org#plugins.projects",
+      proxy: "https://nearbuilders.org",
+    },
+  },
 });

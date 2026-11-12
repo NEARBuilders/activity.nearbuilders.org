@@ -1,9 +1,10 @@
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import {
   getPluginClient,
   getTestRelayEvents,
   orgOwnerContext,
   resetTestRelayEvents,
+  stubNearbuildersProjects,
   teardown,
 } from "../setup";
 import { linkSourceOnChain } from "./activity-test-helpers";
@@ -124,28 +125,17 @@ describe("Activity binding sessions", () => {
   });
 
   it("prefills a session from a nearbuilders.org project link, keeping the agent's own fields", async () => {
-    const originalFetch = globalThis.fetch;
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (request, init) => {
-      if (
-        String(request) ===
-        "https://nearbuilders.org/api/v1/projects/by-slug/activity-nearbuilders-org-2erd1k"
-      ) {
-        return new Response(
-          JSON.stringify({
-            data: {
-              id: "proj_1791152600182_r4z661r",
-              slug: "activity-nearbuilders-org-2erd1k",
-              title: "activity.nearbuilders.org",
-              ownerId: "nearbuilding.near",
-              domain: null,
-              apps: [],
-            },
-          }),
-          { status: 200, headers: { "content-type": "application/json" } },
-        );
-      }
-      return originalFetch(request, init);
-    });
+    const restoreProjects = stubNearbuildersProjects([
+      {
+        id: "proj_1791152600182_r4z661r",
+        slug: "activity-nearbuilders-org-2erd1k",
+        title: "activity.nearbuilders.org",
+        ownerId: "nearbuilding.near",
+        domain: null,
+        logoUrl: null,
+        apps: [],
+      },
+    ]);
     try {
       const agent = await getPluginClient();
       const session = await agent.createActivityBindingSession({
@@ -187,7 +177,7 @@ describe("Activity binding sessions", () => {
         }),
       ).rejects.toThrow("Paste a project link like https://nearbuilders.org/projects/<slug>");
     } finally {
-      fetchSpy.mockRestore();
+      restoreProjects();
     }
   });
 
@@ -224,28 +214,16 @@ describe("Activity binding sessions", () => {
   });
 
   it("refuses to complete a project session with a source registered for something else", async () => {
-    const originalFetch = globalThis.fetch;
     const project = {
       id: "proj_session_owned",
       slug: "session-owned-project-a1b2c3",
       title: "Session Owned Project",
       ownerId: "session-owner.near",
       domain: null,
+      logoUrl: null,
       apps: [],
     };
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (request, init) => {
-      const url = String(request);
-      if (
-        url === `https://nearbuilders.org/api/v1/projects/by-slug/${project.slug}` ||
-        url === `https://nearbuilders.org/api/v1/projects/${project.id}`
-      ) {
-        return new Response(JSON.stringify({ data: project }), {
-          status: 200,
-          headers: { "content-type": "application/json" },
-        });
-      }
-      return originalFetch(request, init);
-    });
+    const restoreProjects = stubNearbuildersProjects([project]);
     try {
       const agent = await getPluginClient();
       const session = await agent.createActivityBindingSession({
@@ -272,7 +250,7 @@ describe("Activity binding sessions", () => {
         "This Activity Source was not registered for the project this session is for",
       );
     } finally {
-      fetchSpy.mockRestore();
+      restoreProjects();
     }
   });
 });

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-12T07:10:22.672Z",
+  "generatedAt": "2026-11-12T07:23:35.229Z",
   "env": "development",
   "release": "2.0.0-rc.44",
   "extends": "bos.app.ts → bos://dev.everything.near/everything.dev",
@@ -42,6 +42,17 @@
       "integrity": "sha384-outQaOt4wS2vf+UIeSfN3xIt074Ixerg2sLKtYSVyrEH9SUY4Sx6GQ8WZkkwdPdU",
       "pluginVersion": "2.0.0-rc.8",
       "contractSha256": "c8022b18e4cedfc30d591060b8a9d81e65fdb3cf80658db441d3d4cd9401ee4d"
+    },
+    {
+      "key": "projects",
+      "kind": "plugin",
+      "name": "projects",
+      "source": "remote",
+      "location": "https://nearbuilders.org",
+      "pluginManifestUrl": "https://cdn.everything.dev/bundles/nearbuilding.near/nearbuilders.org/projects/plugin.manifest.json",
+      "callOnly": true,
+      "pluginVersion": "1.4.0",
+      "contractSha256": "9e920e55fee7831884e1442c9cccbcbd17c3b2c459a364fa62be6f911754cfc1"
     }
   ],
   "unresolved": [],
@@ -291,9 +302,9 @@
   ],
   "shadowed": [],
   "lockfile": {
-    "pointerDigest": "23a76a2501c8a73d",
+    "pointerDigest": "c0698d04fa560e36",
     "release": "2.0.0-rc.44",
-    "resolvedAt": "2026-11-12T07:08:28.715Z",
+    "resolvedAt": "2026-11-12T07:23:15.993Z",
     "drift": []
   }
 }
