@@ -1,9 +1,10 @@
-import { afterAll, describe, expect, it, vi } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 import {
   adminContext,
   getPluginClient,
   orgMemberContext,
   orgOwnerContext,
+  stubNearbuildersProjects,
   teardown,
 } from "../setup";
 
@@ -495,7 +496,7 @@ describe("Activity sources", () => {
   });
 
   it("links a source to one nearbuilders.org project at most", async () => {
-    const projects = mockNearbuildersProjects({
+    const restoreProjects = mockNearbuildersProjects({
       proj_linked_example: { ownerId: "project-link.near", apps: ["project-copy.near"] },
     });
     try {
@@ -528,12 +529,12 @@ describe("Activity sources", () => {
         data: { field: "project" },
       });
     } finally {
-      projects.mockRestore();
+      restoreProjects();
     }
   });
 
   it("refuses to let anyone but the project owner claim a nearbuilders.org project", async () => {
-    const projects = mockNearbuildersProjects({
+    const restoreProjects = mockNearbuildersProjects({
       proj_owned: { ownerId: "real-owner.near", apps: [] },
     });
     try {
@@ -594,36 +595,21 @@ describe("Activity sources", () => {
         "Only the project owner's NEAR account (real-owner.near) can register this nearbuilders.org project",
       );
     } finally {
-      projects.mockRestore();
+      restoreProjects();
     }
   });
 });
 
-function mockNearbuildersProjects(
-  projects: Record<string, { ownerId: string | null; apps: string[] }>,
-) {
-  const originalFetch = globalThis.fetch;
-  return vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
-    const url = String(input);
-    const match = url.match(/^https:\/\/nearbuilders\.org\/api\/v1\/projects\/([^/?]+)$/);
-    if (match) {
-      const id = decodeURIComponent(match[1] ?? "");
-      const project = projects[id];
-      if (!project) return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
-      return new Response(
-        JSON.stringify({
-          data: {
-            id,
-            slug: id,
-            title: id,
-            domain: null,
-            ownerId: project.ownerId,
-            apps: project.apps.map((accountId) => ({ accountId })),
-          },
-        }),
-        { status: 200, headers: { "content-type": "application/json" } },
-      );
-    }
-    return originalFetch(input, init);
-  });
+function mockNearbuildersProjects(projects: Record<string, { ownerId: string; apps: string[] }>) {
+  return stubNearbuildersProjects(
+    Object.entries(projects).map(([id, project]) => ({
+      id,
+      slug: id,
+      title: id,
+      domain: null,
+      logoUrl: null,
+      ownerId: project.ownerId,
+      apps: project.apps.map((accountId) => ({ accountId })),
+    })),
+  );
 }

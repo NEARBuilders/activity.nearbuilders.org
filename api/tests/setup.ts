@@ -3,6 +3,7 @@ import { createORPCClient } from "@orpc/client";
 import { RPCLink } from "@orpc/client/fetch";
 import type { ContractRouterClient } from "@orpc/contract";
 import { OpenAPIHandler } from "@orpc/openapi/node";
+import { ORPCError } from "@orpc/server";
 import { RPCHandler } from "@orpc/server/node";
 import { Context } from "effect";
 import { createPluginRuntime } from "every-plugin";
@@ -14,6 +15,7 @@ import Plugin, { ApiServicesTag } from "@/index";
 import type { ActivityCredentialsService } from "@/services/activity-credentials";
 import { ActivityGithubService } from "@/services/activity-github";
 import type { ActivityLeaderboard } from "@/services/activity-leaderboard";
+import type { NearbuildersProject, ProjectsRpcClient } from "@/services/nearbuilders-projects";
 import pluginDevConfig from "../plugin.dev";
 
 const TEST_PLUGIN_ID = pluginDevConfig.pluginId;
@@ -50,6 +52,35 @@ const TEST_REGISTRY = {
     description: "API integration test runtime",
   },
 } as const;
+
+let nearbuildersProjects: NearbuildersProject[] = [];
+
+function findNearbuildersProject(match: (project: NearbuildersProject) => boolean) {
+  const project = nearbuildersProjects.find(match);
+  if (!project) throw new ORPCError("NOT_FOUND");
+  return { data: project };
+}
+
+const testProjectsClient = {
+  getProject: async ({ id }: { id: string }) => findNearbuildersProject((p) => p.id === id),
+  getProjectBySlug: async ({ slug }: { slug: string }) =>
+    findNearbuildersProject((p) => p.slug === slug),
+  listProjects: async ({ query = "" }: { query?: string }) => ({
+    data: nearbuildersProjects.filter(
+      ({ title, slug }) =>
+        title.toLowerCase().includes(query.toLowerCase()) || slug.includes(query.toLowerCase()),
+    ),
+  }),
+} as unknown as ProjectsRpcClient;
+
+const TEST_PLUGINS = { projects: { client: () => testProjectsClient } };
+
+export function stubNearbuildersProjects(projects: NearbuildersProject[]): () => void {
+  nearbuildersProjects = projects;
+  return () => {
+    nearbuildersProjects = [];
+  };
+}
 
 const runtime = createPluginRuntime({
   registry: TEST_REGISTRY,
@@ -159,7 +190,11 @@ export async function getPluginClient(
   headers: Record<string, string> = {},
 ) {
   if (!server) {
-    const { router, initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, await getTestConfig());
+    const { router, initialized } = await runtime.usePlugin(
+      TEST_PLUGIN_ID,
+      await getTestConfig(),
+      TEST_PLUGINS,
+    );
     const services = Context.get(initialized.effectContext, ApiServicesTag);
     activityCredentialsService = services.activityCredentials;
     activityLeaderboardService = services.activityLeaderboard;
@@ -232,7 +267,11 @@ export async function getPluginBaseUrl(): Promise<string> {
 }
 
 export async function getActivitySourcesService() {
-  const { initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, await getTestConfig());
+  const { initialized } = await runtime.usePlugin(
+    TEST_PLUGIN_ID,
+    await getTestConfig(),
+    TEST_PLUGINS,
+  );
   return Context.get(initialized.effectContext, ApiServicesTag).activitySources;
 }
 
@@ -250,7 +289,11 @@ export async function getActivityLeaderboardService() {
 
 export async function restartActivityGithubService() {
   await getPluginClient();
-  const { initialized } = await runtime.usePlugin(TEST_PLUGIN_ID, await getTestConfig());
+  const { initialized } = await runtime.usePlugin(
+    TEST_PLUGIN_ID,
+    await getTestConfig(),
+    TEST_PLUGINS,
+  );
   const services = Context.get(initialized.effectContext, ApiServicesTag);
   services.activityGithub.stop();
   const restarted = new ActivityGithubService({

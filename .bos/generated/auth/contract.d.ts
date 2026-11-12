@@ -2,6 +2,817 @@ import type { InferContractRouterInputs, InferContractRouterOutputs } from "@orp
 export { type AuthErrors, Errors } from "./contract/errors";
 export { apiKeySchema } from "./contract/schemas";
 export declare const contract: {
+    adminListOrganizations: import("@orpc/contract").ProcedureContract<import("zod").ZodOptional<import("zod").ZodObject<{
+        search: import("zod").ZodOptional<import("zod").ZodString>;
+        status: import("zod").ZodOptional<import("zod").ZodEnum<{
+            active: "active";
+            pending: "pending";
+            rejected: "rejected";
+        }>>;
+        personal: import("zod").ZodOptional<import("zod").ZodBoolean>;
+        limit: import("zod").ZodOptional<import("zod").ZodNumber>;
+        offset: import("zod").ZodOptional<import("zod").ZodNumber>;
+    }, import("zod/v4/core").$strip>>, import("zod").ZodObject<{
+        organizations: import("zod").ZodArray<import("zod").ZodObject<{
+            id: import("zod").ZodString;
+            name: import("zod").ZodString;
+            slug: import("zod").ZodString;
+            logo: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
+            metadata: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodRecord<import("zod").ZodString, import("zod").ZodUnknown>>>;
+            status: import("zod").ZodDefault<import("zod").ZodEnum<{
+                active: "active";
+                pending: "pending";
+                rejected: "rejected";
+            }>>;
+            createdAt: import("zod").ZodDate;
+            memberCount: import("zod").ZodNumber;
+            teamCount: import("zod").ZodNumber;
+        }, import("zod/v4/core").$strip>>;
+        total: import("zod").ZodNumber;
+    }, import("zod/v4/core").$strip>, {
+        readonly UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: import("zod").ZodObject<{
+                apiKeyProvided: import("zod").ZodBoolean;
+                provider: import("zod").ZodOptional<import("zod").ZodString>;
+                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly FORBIDDEN: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                action: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                resource: import("zod").ZodOptional<import("zod").ZodString>;
+                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
+                    field: import("zod").ZodString;
+                    message: import("zod").ZodString;
+                    code: import("zod").ZodOptional<import("zod").ZodString>;
+                }, import("zod/v4/core").$strip>>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly SERVICE_UNAVAILABLE: {
+            readonly status: 503;
+            readonly data: import("zod").ZodObject<{
+                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
+                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
+                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+    }>;
+    adminGetOrganizationFull: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
+        organizationId: import("zod").ZodString;
+    }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
+        id: import("zod").ZodString;
+        name: import("zod").ZodString;
+        slug: import("zod").ZodString;
+        logo: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
+        metadata: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodRecord<import("zod").ZodString, import("zod").ZodUnknown>>>;
+        status: import("zod").ZodDefault<import("zod").ZodEnum<{
+            active: "active";
+            pending: "pending";
+            rejected: "rejected";
+        }>>;
+        createdAt: import("zod").ZodDate;
+        members: import("zod").ZodArray<import("zod").ZodObject<{
+            id: import("zod").ZodString;
+            userId: import("zod").ZodString;
+            organizationId: import("zod").ZodString;
+            role: import("zod").ZodString;
+            createdAt: import("zod").ZodDate;
+            user: import("zod").ZodNullable<import("zod").ZodObject<{
+                id: import("zod").ZodString;
+                name: import("zod").ZodNullable<import("zod").ZodString>;
+                email: import("zod").ZodNullable<import("zod").ZodString>;
+                image: import("zod").ZodNullable<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>>;
+        }, import("zod/v4/core").$strip>>;
+        invitations: import("zod").ZodArray<import("zod").ZodObject<{
+            id: import("zod").ZodString;
+            organizationId: import("zod").ZodString;
+            email: import("zod").ZodNullable<import("zod").ZodString>;
+            role: import("zod").ZodNullable<import("zod").ZodString>;
+            status: import("zod").ZodString;
+            expiresAt: import("zod").ZodDate;
+            inviterId: import("zod").ZodString;
+            teamId: import("zod").ZodNullable<import("zod").ZodString>;
+            nearAccountId: import("zod").ZodNullable<import("zod").ZodString>;
+            nearNetwork: import("zod").ZodNullable<import("zod").ZodEnum<{
+                mainnet: "mainnet";
+                testnet: "testnet";
+            }>>;
+        }, import("zod/v4/core").$strip>>;
+        teams: import("zod").ZodArray<import("zod").ZodObject<{
+            id: import("zod").ZodString;
+            name: import("zod").ZodString;
+            organizationId: import("zod").ZodString;
+            areas: import("zod").ZodArray<import("zod").ZodString>;
+            createdAt: import("zod").ZodDate;
+            updatedAt: import("zod").ZodDate;
+        }, import("zod/v4/core").$strip>>;
+    }, import("zod/v4/core").$strip>, {
+        readonly UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: import("zod").ZodObject<{
+                apiKeyProvided: import("zod").ZodBoolean;
+                provider: import("zod").ZodOptional<import("zod").ZodString>;
+                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly FORBIDDEN: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                action: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                resource: import("zod").ZodOptional<import("zod").ZodString>;
+                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
+                    field: import("zod").ZodString;
+                    message: import("zod").ZodString;
+                    code: import("zod").ZodOptional<import("zod").ZodString>;
+                }, import("zod/v4/core").$strip>>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly SERVICE_UNAVAILABLE: {
+            readonly status: 503;
+            readonly data: import("zod").ZodObject<{
+                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
+                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
+                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+    }>;
+    adminCreateOrganizationForUser: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
+        userId: import("zod").ZodString;
+        name: import("zod").ZodString;
+        slug: import("zod").ZodOptional<import("zod").ZodString>;
+        logo: import("zod").ZodOptional<import("zod").ZodString>;
+        metadata: import("zod").ZodOptional<import("zod").ZodRecord<import("zod").ZodString, import("zod").ZodUnknown>>;
+    }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
+        id: import("zod").ZodString;
+        name: import("zod").ZodString;
+        slug: import("zod").ZodString;
+        logo: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
+        metadata: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodRecord<import("zod").ZodString, import("zod").ZodUnknown>>>;
+        status: import("zod").ZodDefault<import("zod").ZodEnum<{
+            active: "active";
+            pending: "pending";
+            rejected: "rejected";
+        }>>;
+        createdAt: import("zod").ZodDate;
+    }, import("zod/v4/core").$strip>, {
+        readonly UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: import("zod").ZodObject<{
+                apiKeyProvided: import("zod").ZodBoolean;
+                provider: import("zod").ZodOptional<import("zod").ZodString>;
+                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly FORBIDDEN: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                action: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                resource: import("zod").ZodOptional<import("zod").ZodString>;
+                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
+                    field: import("zod").ZodString;
+                    message: import("zod").ZodString;
+                    code: import("zod").ZodOptional<import("zod").ZodString>;
+                }, import("zod/v4/core").$strip>>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly SERVICE_UNAVAILABLE: {
+            readonly status: 503;
+            readonly data: import("zod").ZodObject<{
+                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
+                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
+                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+    }>;
+    adminUpdateOrganization: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
+        organizationId: import("zod").ZodString;
+        data: import("zod").ZodObject<{
+            name: import("zod").ZodOptional<import("zod").ZodString>;
+            slug: import("zod").ZodOptional<import("zod").ZodString>;
+            logo: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
+            status: import("zod").ZodOptional<import("zod").ZodEnum<{
+                active: "active";
+                pending: "pending";
+                rejected: "rejected";
+            }>>;
+            metadata: import("zod").ZodOptional<import("zod").ZodRecord<import("zod").ZodString, import("zod").ZodUnknown>>;
+        }, import("zod/v4/core").$strip>;
+    }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
+        id: import("zod").ZodString;
+        name: import("zod").ZodString;
+        slug: import("zod").ZodString;
+        logo: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
+        metadata: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodRecord<import("zod").ZodString, import("zod").ZodUnknown>>>;
+        status: import("zod").ZodDefault<import("zod").ZodEnum<{
+            active: "active";
+            pending: "pending";
+            rejected: "rejected";
+        }>>;
+    }, import("zod/v4/core").$strip>, {
+        readonly UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: import("zod").ZodObject<{
+                apiKeyProvided: import("zod").ZodBoolean;
+                provider: import("zod").ZodOptional<import("zod").ZodString>;
+                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly FORBIDDEN: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                action: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                resource: import("zod").ZodOptional<import("zod").ZodString>;
+                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
+                    field: import("zod").ZodString;
+                    message: import("zod").ZodString;
+                    code: import("zod").ZodOptional<import("zod").ZodString>;
+                }, import("zod/v4/core").$strip>>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly SERVICE_UNAVAILABLE: {
+            readonly status: 503;
+            readonly data: import("zod").ZodObject<{
+                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
+                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
+                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+    }>;
+    adminDeleteOrganization: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
+        organizationId: import("zod").ZodString;
+    }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
+        success: import("zod").ZodBoolean;
+    }, import("zod/v4/core").$strip>, {
+        readonly UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: import("zod").ZodObject<{
+                apiKeyProvided: import("zod").ZodBoolean;
+                provider: import("zod").ZodOptional<import("zod").ZodString>;
+                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly FORBIDDEN: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                action: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                resource: import("zod").ZodOptional<import("zod").ZodString>;
+                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
+                    field: import("zod").ZodString;
+                    message: import("zod").ZodString;
+                    code: import("zod").ZodOptional<import("zod").ZodString>;
+                }, import("zod/v4/core").$strip>>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly SERVICE_UNAVAILABLE: {
+            readonly status: 503;
+            readonly data: import("zod").ZodObject<{
+                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
+                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
+                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+    }>;
+    adminAddMember: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
+        organizationId: import("zod").ZodString;
+        userId: import("zod").ZodString;
+        role: import("zod").ZodEnum<{
+            admin: "admin";
+            member: "member";
+            owner: "owner";
+        }>;
+    }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
+        id: import("zod").ZodString;
+        userId: import("zod").ZodString;
+        organizationId: import("zod").ZodString;
+        role: import("zod").ZodString;
+        createdAt: import("zod").ZodDate;
+    }, import("zod/v4/core").$strip>, {
+        readonly UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: import("zod").ZodObject<{
+                apiKeyProvided: import("zod").ZodBoolean;
+                provider: import("zod").ZodOptional<import("zod").ZodString>;
+                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly FORBIDDEN: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                action: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                resource: import("zod").ZodOptional<import("zod").ZodString>;
+                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
+                    field: import("zod").ZodString;
+                    message: import("zod").ZodString;
+                    code: import("zod").ZodOptional<import("zod").ZodString>;
+                }, import("zod/v4/core").$strip>>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly SERVICE_UNAVAILABLE: {
+            readonly status: 503;
+            readonly data: import("zod").ZodObject<{
+                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
+                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
+                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+    }>;
+    adminRemoveMember: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
+        organizationId: import("zod").ZodString;
+        userId: import("zod").ZodString;
+    }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
+        success: import("zod").ZodBoolean;
+    }, import("zod/v4/core").$strip>, {
+        readonly UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: import("zod").ZodObject<{
+                apiKeyProvided: import("zod").ZodBoolean;
+                provider: import("zod").ZodOptional<import("zod").ZodString>;
+                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly FORBIDDEN: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                action: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                resource: import("zod").ZodOptional<import("zod").ZodString>;
+                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
+                    field: import("zod").ZodString;
+                    message: import("zod").ZodString;
+                    code: import("zod").ZodOptional<import("zod").ZodString>;
+                }, import("zod/v4/core").$strip>>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly SERVICE_UNAVAILABLE: {
+            readonly status: 503;
+            readonly data: import("zod").ZodObject<{
+                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
+                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
+                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+    }>;
+    adminUpdateMemberRole: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
+        organizationId: import("zod").ZodString;
+        userId: import("zod").ZodString;
+        role: import("zod").ZodEnum<{
+            admin: "admin";
+            member: "member";
+            owner: "owner";
+        }>;
+    }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
+        id: import("zod").ZodString;
+        userId: import("zod").ZodString;
+        organizationId: import("zod").ZodString;
+        role: import("zod").ZodString;
+        createdAt: import("zod").ZodDate;
+    }, import("zod/v4/core").$strip>, {
+        readonly UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: import("zod").ZodObject<{
+                apiKeyProvided: import("zod").ZodBoolean;
+                provider: import("zod").ZodOptional<import("zod").ZodString>;
+                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly FORBIDDEN: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                action: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                resource: import("zod").ZodOptional<import("zod").ZodString>;
+                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
+                    field: import("zod").ZodString;
+                    message: import("zod").ZodString;
+                    code: import("zod").ZodOptional<import("zod").ZodString>;
+                }, import("zod/v4/core").$strip>>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly SERVICE_UNAVAILABLE: {
+            readonly status: 503;
+            readonly data: import("zod").ZodObject<{
+                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
+                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
+                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+    }>;
+    adminCreateTeam: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
+        organizationId: import("zod").ZodString;
+        name: import("zod").ZodString;
+        metadata: import("zod").ZodOptional<import("zod").ZodRecord<import("zod").ZodString, import("zod").ZodUnknown>>;
+        eventId: import("zod").ZodOptional<import("zod").ZodString>;
+    }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
+        id: import("zod").ZodString;
+        name: import("zod").ZodString;
+        organizationId: import("zod").ZodString;
+        areas: import("zod").ZodArray<import("zod").ZodString>;
+        createdAt: import("zod").ZodDate;
+        updatedAt: import("zod").ZodDate;
+    }, import("zod/v4/core").$strip>, {
+        readonly UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: import("zod").ZodObject<{
+                apiKeyProvided: import("zod").ZodBoolean;
+                provider: import("zod").ZodOptional<import("zod").ZodString>;
+                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly FORBIDDEN: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                action: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                resource: import("zod").ZodOptional<import("zod").ZodString>;
+                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
+                    field: import("zod").ZodString;
+                    message: import("zod").ZodString;
+                    code: import("zod").ZodOptional<import("zod").ZodString>;
+                }, import("zod/v4/core").$strip>>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly SERVICE_UNAVAILABLE: {
+            readonly status: 503;
+            readonly data: import("zod").ZodObject<{
+                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
+                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
+                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+    }>;
+    adminUpdateTeam: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
+        teamId: import("zod").ZodString;
+        data: import("zod").ZodObject<{
+            name: import("zod").ZodOptional<import("zod").ZodString>;
+            metadata: import("zod").ZodOptional<import("zod").ZodRecord<import("zod").ZodString, import("zod").ZodUnknown>>;
+        }, import("zod/v4/core").$strip>;
+    }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
+        id: import("zod").ZodString;
+        name: import("zod").ZodString;
+        organizationId: import("zod").ZodString;
+        areas: import("zod").ZodArray<import("zod").ZodString>;
+        createdAt: import("zod").ZodDate;
+        updatedAt: import("zod").ZodDate;
+    }, import("zod/v4/core").$strip>, {
+        readonly UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: import("zod").ZodObject<{
+                apiKeyProvided: import("zod").ZodBoolean;
+                provider: import("zod").ZodOptional<import("zod").ZodString>;
+                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly FORBIDDEN: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                action: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                resource: import("zod").ZodOptional<import("zod").ZodString>;
+                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
+                    field: import("zod").ZodString;
+                    message: import("zod").ZodString;
+                    code: import("zod").ZodOptional<import("zod").ZodString>;
+                }, import("zod/v4/core").$strip>>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly SERVICE_UNAVAILABLE: {
+            readonly status: 503;
+            readonly data: import("zod").ZodObject<{
+                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
+                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
+                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+    }>;
+    adminDeleteTeam: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
+        teamId: import("zod").ZodString;
+    }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
+        success: import("zod").ZodBoolean;
+    }, import("zod/v4/core").$strip>, {
+        readonly UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: import("zod").ZodObject<{
+                apiKeyProvided: import("zod").ZodBoolean;
+                provider: import("zod").ZodOptional<import("zod").ZodString>;
+                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly FORBIDDEN: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                action: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                resource: import("zod").ZodOptional<import("zod").ZodString>;
+                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
+                    field: import("zod").ZodString;
+                    message: import("zod").ZodString;
+                    code: import("zod").ZodOptional<import("zod").ZodString>;
+                }, import("zod/v4/core").$strip>>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly SERVICE_UNAVAILABLE: {
+            readonly status: 503;
+            readonly data: import("zod").ZodObject<{
+                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
+                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
+                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+    }>;
+    adminAddTeamMember: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
+        teamId: import("zod").ZodString;
+        userId: import("zod").ZodString;
+        role: import("zod").ZodOptional<import("zod").ZodString>;
+    }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
+        id: import("zod").ZodString;
+        teamId: import("zod").ZodString;
+        userId: import("zod").ZodString;
+        role: import("zod").ZodString;
+        createdAt: import("zod").ZodDate;
+    }, import("zod/v4/core").$strip>, {
+        readonly UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: import("zod").ZodObject<{
+                apiKeyProvided: import("zod").ZodBoolean;
+                provider: import("zod").ZodOptional<import("zod").ZodString>;
+                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly FORBIDDEN: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                action: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                resource: import("zod").ZodOptional<import("zod").ZodString>;
+                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
+                    field: import("zod").ZodString;
+                    message: import("zod").ZodString;
+                    code: import("zod").ZodOptional<import("zod").ZodString>;
+                }, import("zod/v4/core").$strip>>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly SERVICE_UNAVAILABLE: {
+            readonly status: 503;
+            readonly data: import("zod").ZodObject<{
+                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
+                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
+                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+    }>;
+    adminRemoveTeamMember: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
+        teamId: import("zod").ZodString;
+        userId: import("zod").ZodString;
+    }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
+        success: import("zod").ZodBoolean;
+    }, import("zod/v4/core").$strip>, {
+        readonly UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: import("zod").ZodObject<{
+                apiKeyProvided: import("zod").ZodBoolean;
+                provider: import("zod").ZodOptional<import("zod").ZodString>;
+                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly FORBIDDEN: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                action: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                resource: import("zod").ZodOptional<import("zod").ZodString>;
+                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
+                    field: import("zod").ZodString;
+                    message: import("zod").ZodString;
+                    code: import("zod").ZodOptional<import("zod").ZodString>;
+                }, import("zod/v4/core").$strip>>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly SERVICE_UNAVAILABLE: {
+            readonly status: 503;
+            readonly data: import("zod").ZodObject<{
+                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
+                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
+                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+    }>;
     adminListUsers: import("@orpc/contract").ProcedureContract<import("zod").ZodOptional<import("zod").ZodObject<{
         searchValue: import("zod").ZodOptional<import("zod").ZodString>;
         searchField: import("zod").ZodOptional<import("zod").ZodEnum<{
@@ -1457,6 +2268,12 @@ export declare const contract: {
                 estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
             }, import("zod/v4/core").$strip>;
         };
+        readonly ALREADY_MEMBER: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                organizationId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
     }>;
     rejectNearInvitation: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
         invitationId: import("zod").ZodString;
@@ -2772,20 +3589,20 @@ export declare const contract: {
         };
     }>;
     createOnboardingCode: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
-        eventId: import("zod").ZodString;
-        eventName: import("zod").ZodString;
+        eventId: import("zod").ZodOptional<import("zod").ZodString>;
+        eventName: import("zod").ZodOptional<import("zod").ZodString>;
         organizationId: import("zod").ZodOptional<import("zod").ZodString>;
         maxUses: import("zod").ZodOptional<import("zod").ZodNumber>;
-        expiresAt: import("zod").ZodOptional<import("zod").ZodDate>;
+        expiresAt: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodDate>>;
     }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
         id: import("zod").ZodString;
         eventId: import("zod").ZodNullable<import("zod").ZodString>;
-        eventName: import("zod").ZodString;
+        eventName: import("zod").ZodNullable<import("zod").ZodString>;
         teamId: import("zod").ZodString;
         role: import("zod").ZodString;
         maxUses: import("zod").ZodNumber;
         usedCount: import("zod").ZodNumber;
-        expiresAt: import("zod").ZodDate;
+        expiresAt: import("zod").ZodNullable<import("zod").ZodDate>;
         revokedAt: import("zod").ZodNullable<import("zod").ZodDate>;
         createdAt: import("zod").ZodDate;
         code: import("zod").ZodString;
@@ -2835,6 +3652,42 @@ export declare const contract: {
                 estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
             }, import("zod/v4/core").$strip>;
         };
+        readonly CODE_NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                codeId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_REVOKED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXPIRED: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                expiresAt: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXHAUSTED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                maxUses: import("zod").ZodOptional<import("zod").ZodNumber>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_NOT_FOUND: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_FULL: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly MEMBERSHIP_ENDED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                action: import("zod").ZodString;
+            }, import("zod/v4/core").$strip>;
+        };
     }>;
     listOnboardingCodes: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
         organizationId: import("zod").ZodOptional<import("zod").ZodString>;
@@ -2842,12 +3695,12 @@ export declare const contract: {
     }, import("zod/v4/core").$strip>, import("zod").ZodArray<import("zod").ZodObject<{
         id: import("zod").ZodString;
         eventId: import("zod").ZodNullable<import("zod").ZodString>;
-        eventName: import("zod").ZodString;
+        eventName: import("zod").ZodNullable<import("zod").ZodString>;
         teamId: import("zod").ZodString;
         role: import("zod").ZodString;
         maxUses: import("zod").ZodNumber;
         usedCount: import("zod").ZodNumber;
-        expiresAt: import("zod").ZodDate;
+        expiresAt: import("zod").ZodNullable<import("zod").ZodDate>;
         revokedAt: import("zod").ZodNullable<import("zod").ZodDate>;
         createdAt: import("zod").ZodDate;
     }, import("zod/v4/core").$strip>>, {
@@ -2894,6 +3747,251 @@ export declare const contract: {
                 retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
                 maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
                 estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                codeId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_REVOKED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXPIRED: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                expiresAt: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXHAUSTED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                maxUses: import("zod").ZodOptional<import("zod").ZodNumber>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_NOT_FOUND: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_FULL: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly MEMBERSHIP_ENDED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                action: import("zod").ZodString;
+            }, import("zod/v4/core").$strip>;
+        };
+    }>;
+    rotateStandingOnboardingCode: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
+        organizationId: import("zod").ZodOptional<import("zod").ZodString>;
+        eventId: import("zod").ZodOptional<import("zod").ZodString>;
+    }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
+        id: import("zod").ZodString;
+        eventId: import("zod").ZodNullable<import("zod").ZodString>;
+        eventName: import("zod").ZodNullable<import("zod").ZodString>;
+        teamId: import("zod").ZodString;
+        role: import("zod").ZodString;
+        maxUses: import("zod").ZodNumber;
+        usedCount: import("zod").ZodNumber;
+        expiresAt: import("zod").ZodNullable<import("zod").ZodDate>;
+        revokedAt: import("zod").ZodNullable<import("zod").ZodDate>;
+        createdAt: import("zod").ZodDate;
+        code: import("zod").ZodString;
+    }, import("zod/v4/core").$strip>, {
+        readonly UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: import("zod").ZodObject<{
+                apiKeyProvided: import("zod").ZodBoolean;
+                provider: import("zod").ZodOptional<import("zod").ZodString>;
+                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly FORBIDDEN: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                action: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                resource: import("zod").ZodOptional<import("zod").ZodString>;
+                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
+                    field: import("zod").ZodString;
+                    message: import("zod").ZodString;
+                    code: import("zod").ZodOptional<import("zod").ZodString>;
+                }, import("zod/v4/core").$strip>>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly SERVICE_UNAVAILABLE: {
+            readonly status: 503;
+            readonly data: import("zod").ZodObject<{
+                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
+                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
+                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                codeId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_REVOKED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXPIRED: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                expiresAt: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXHAUSTED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                maxUses: import("zod").ZodOptional<import("zod").ZodNumber>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_NOT_FOUND: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_FULL: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly MEMBERSHIP_ENDED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                action: import("zod").ZodString;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly RATE_LIMITED: {
+            readonly status: 429;
+            readonly data: import("zod").ZodObject<{
+                retryAfter: import("zod").ZodNumber;
+                remainingRequests: import("zod").ZodOptional<import("zod").ZodNumber>;
+                resetTime: import("zod").ZodOptional<import("zod").ZodString>;
+                limitType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    bandwidth: "bandwidth";
+                    requests: "requests";
+                    tokens: "tokens";
+                }>>;
+            }, import("zod/v4/core").$strip>;
+        };
+    }>;
+    getStandingOnboardingCode: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
+        organizationId: import("zod").ZodOptional<import("zod").ZodString>;
+        eventId: import("zod").ZodOptional<import("zod").ZodString>;
+    }, import("zod/v4/core").$strip>, import("zod").ZodNullable<import("zod").ZodObject<{
+        id: import("zod").ZodString;
+        eventId: import("zod").ZodNullable<import("zod").ZodString>;
+        eventName: import("zod").ZodNullable<import("zod").ZodString>;
+        teamId: import("zod").ZodString;
+        role: import("zod").ZodString;
+        maxUses: import("zod").ZodNumber;
+        usedCount: import("zod").ZodNumber;
+        expiresAt: import("zod").ZodNullable<import("zod").ZodDate>;
+        revokedAt: import("zod").ZodNullable<import("zod").ZodDate>;
+        createdAt: import("zod").ZodDate;
+        code: import("zod").ZodString;
+    }, import("zod/v4/core").$strip>>, {
+        readonly UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: import("zod").ZodObject<{
+                apiKeyProvided: import("zod").ZodBoolean;
+                provider: import("zod").ZodOptional<import("zod").ZodString>;
+                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly FORBIDDEN: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                action: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                resource: import("zod").ZodOptional<import("zod").ZodString>;
+                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
+                    field: import("zod").ZodString;
+                    message: import("zod").ZodString;
+                    code: import("zod").ZodOptional<import("zod").ZodString>;
+                }, import("zod/v4/core").$strip>>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly SERVICE_UNAVAILABLE: {
+            readonly status: 503;
+            readonly data: import("zod").ZodObject<{
+                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
+                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
+                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                codeId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_REVOKED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXPIRED: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                expiresAt: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXHAUSTED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                maxUses: import("zod").ZodOptional<import("zod").ZodNumber>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_NOT_FOUND: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_FULL: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly MEMBERSHIP_ENDED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                action: import("zod").ZodString;
             }, import("zod/v4/core").$strip>;
         };
     }>;
@@ -2948,6 +4046,42 @@ export declare const contract: {
                 estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
             }, import("zod/v4/core").$strip>;
         };
+        readonly CODE_NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                codeId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_REVOKED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXPIRED: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                expiresAt: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXHAUSTED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                maxUses: import("zod").ZodOptional<import("zod").ZodNumber>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_NOT_FOUND: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_FULL: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly MEMBERSHIP_ENDED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                action: import("zod").ZodString;
+            }, import("zod/v4/core").$strip>;
+        };
     }>;
     getOnboardingStation: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
         codeId: import("zod").ZodString;
@@ -2955,12 +4089,12 @@ export declare const contract: {
     }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
         id: import("zod").ZodString;
         eventId: import("zod").ZodNullable<import("zod").ZodString>;
-        eventName: import("zod").ZodString;
+        eventName: import("zod").ZodNullable<import("zod").ZodString>;
         teamId: import("zod").ZodString;
         role: import("zod").ZodString;
         maxUses: import("zod").ZodNumber;
         usedCount: import("zod").ZodNumber;
-        expiresAt: import("zod").ZodDate;
+        expiresAt: import("zod").ZodNullable<import("zod").ZodDate>;
         revokedAt: import("zod").ZodNullable<import("zod").ZodDate>;
         createdAt: import("zod").ZodDate;
         code: import("zod").ZodString;
@@ -3010,6 +4144,42 @@ export declare const contract: {
                 estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
             }, import("zod/v4/core").$strip>;
         };
+        readonly CODE_NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                codeId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_REVOKED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXPIRED: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                expiresAt: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXHAUSTED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                maxUses: import("zod").ZodOptional<import("zod").ZodNumber>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_NOT_FOUND: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_FULL: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly MEMBERSHIP_ENDED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                action: import("zod").ZodString;
+            }, import("zod/v4/core").$strip>;
+        };
     }>;
     getOnboardingStatus: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
         codeId: import("zod").ZodString;
@@ -3017,12 +4187,12 @@ export declare const contract: {
     }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
         id: import("zod").ZodString;
         eventId: import("zod").ZodNullable<import("zod").ZodString>;
-        eventName: import("zod").ZodString;
+        eventName: import("zod").ZodNullable<import("zod").ZodString>;
         teamId: import("zod").ZodString;
         role: import("zod").ZodString;
         maxUses: import("zod").ZodNumber;
         usedCount: import("zod").ZodNumber;
-        expiresAt: import("zod").ZodDate;
+        expiresAt: import("zod").ZodNullable<import("zod").ZodDate>;
         revokedAt: import("zod").ZodNullable<import("zod").ZodDate>;
         createdAt: import("zod").ZodDate;
         joined: import("zod").ZodArray<import("zod").ZodObject<{
@@ -3077,12 +4247,48 @@ export declare const contract: {
                 estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
             }, import("zod/v4/core").$strip>;
         };
+        readonly CODE_NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                codeId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_REVOKED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXPIRED: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                expiresAt: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXHAUSTED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                maxUses: import("zod").ZodOptional<import("zod").ZodNumber>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_NOT_FOUND: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_FULL: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly MEMBERSHIP_ENDED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                action: import("zod").ZodString;
+            }, import("zod/v4/core").$strip>;
+        };
     }>;
     getOnboardingCodeInfo: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
         code: import("zod").ZodString;
     }, import("zod/v4/core").$strip>, import("zod").ZodNullable<import("zod").ZodObject<{
         organizationName: import("zod").ZodString;
-        eventName: import("zod").ZodString;
+        eventName: import("zod").ZodNullable<import("zod").ZodString>;
         inviterName: import("zod").ZodNullable<import("zod").ZodString>;
         role: import("zod").ZodString;
         expired: import("zod").ZodBoolean;
@@ -3132,6 +4338,42 @@ export declare const contract: {
                 retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
                 maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
                 estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                codeId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_REVOKED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXPIRED: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                expiresAt: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXHAUSTED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                maxUses: import("zod").ZodOptional<import("zod").ZodNumber>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_NOT_FOUND: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_FULL: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly MEMBERSHIP_ENDED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                action: import("zod").ZodString;
             }, import("zod/v4/core").$strip>;
         };
     }>;
@@ -3196,6 +4438,42 @@ export declare const contract: {
                 estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
             }, import("zod/v4/core").$strip>;
         };
+        readonly CODE_NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                codeId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_REVOKED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXPIRED: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                expiresAt: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXHAUSTED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                maxUses: import("zod").ZodOptional<import("zod").ZodNumber>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_NOT_FOUND: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_FULL: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly MEMBERSHIP_ENDED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                action: import("zod").ZodString;
+            }, import("zod/v4/core").$strip>;
+        };
     }>;
     redeemOnboardingCode: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
         code: import("zod").ZodString;
@@ -3204,7 +4482,7 @@ export declare const contract: {
         alreadyRedeemed: import("zod").ZodBoolean;
         organizationId: import("zod").ZodString;
         organizationName: import("zod").ZodString;
-        eventName: import("zod").ZodString;
+        eventName: import("zod").ZodNullable<import("zod").ZodString>;
     }, import("zod/v4/core").$strip>, {
         readonly UNAUTHORIZED: {
             readonly status: 401;
@@ -3251,132 +4529,53 @@ export declare const contract: {
                 estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
             }, import("zod/v4/core").$strip>;
         };
-    }>;
-    listOrganizationRequests: import("@orpc/contract").ProcedureContract<import("@orpc/contract").InitialInputSchema, import("zod").ZodArray<import("zod").ZodObject<{
-        id: import("zod").ZodString;
-        name: import("zod").ZodString;
-        slug: import("zod").ZodString;
-        logo: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
-        metadata: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodRecord<import("zod").ZodString, import("zod").ZodUnknown>>>;
-        status: import("zod").ZodDefault<import("zod").ZodEnum<{
-            active: "active";
-            pending: "pending";
-            rejected: "rejected";
-        }>>;
-        requestedBy: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
-        rejectionReason: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
-        createdAt: import("zod").ZodDate;
-    }, import("zod/v4/core").$strip>>, {
-        readonly UNAUTHORIZED: {
-            readonly status: 401;
-            readonly data: import("zod").ZodObject<{
-                apiKeyProvided: import("zod").ZodBoolean;
-                provider: import("zod").ZodOptional<import("zod").ZodString>;
-                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
-                    apiKey: "apiKey";
-                    oauth: "oauth";
-                    token: "token";
-                }>>;
-            }, import("zod/v4/core").$strip>;
-        };
-        readonly FORBIDDEN: {
-            readonly status: 403;
-            readonly data: import("zod").ZodObject<{
-                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
-                action: import("zod").ZodOptional<import("zod").ZodString>;
-            }, import("zod/v4/core").$strip>;
-        };
-        readonly NOT_FOUND: {
+        readonly CODE_NOT_FOUND: {
             readonly status: 404;
             readonly data: import("zod").ZodObject<{
-                resource: import("zod").ZodOptional<import("zod").ZodString>;
-                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
+                codeId: import("zod").ZodOptional<import("zod").ZodString>;
             }, import("zod/v4/core").$strip>;
         };
-        readonly BAD_REQUEST: {
+        readonly CODE_REVOKED: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly CODE_EXPIRED: {
             readonly status: 400;
             readonly data: import("zod").ZodObject<{
-                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
-                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
-                    field: import("zod").ZodString;
-                    message: import("zod").ZodString;
-                    code: import("zod").ZodOptional<import("zod").ZodString>;
-                }, import("zod/v4/core").$strip>>>;
+                expiresAt: import("zod").ZodOptional<import("zod").ZodString>;
             }, import("zod/v4/core").$strip>;
         };
-        readonly SERVICE_UNAVAILABLE: {
-            readonly status: 503;
-            readonly data: import("zod").ZodObject<{
-                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
-                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
-                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
-            }, import("zod/v4/core").$strip>;
-        };
-    }>;
-    reviewOrganization: import("@orpc/contract").ProcedureContract<import("zod").ZodDiscriminatedUnion<[import("zod").ZodObject<{
-        organizationId: import("zod").ZodString;
-        decision: import("zod").ZodLiteral<"approve">;
-    }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
-        organizationId: import("zod").ZodString;
-        decision: import("zod").ZodLiteral<"reject">;
-        reason: import("zod").ZodString;
-    }, import("zod/v4/core").$strip>], "decision">, import("zod").ZodObject<{
-        id: import("zod").ZodString;
-        name: import("zod").ZodString;
-        slug: import("zod").ZodString;
-        logo: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
-        metadata: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodRecord<import("zod").ZodString, import("zod").ZodUnknown>>>;
-        status: import("zod").ZodDefault<import("zod").ZodEnum<{
-            active: "active";
-            pending: "pending";
-            rejected: "rejected";
-        }>>;
-        requestedBy: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
-        rejectionReason: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
-    }, import("zod/v4/core").$strip>, {
-        readonly UNAUTHORIZED: {
-            readonly status: 401;
-            readonly data: import("zod").ZodObject<{
-                apiKeyProvided: import("zod").ZodBoolean;
-                provider: import("zod").ZodOptional<import("zod").ZodString>;
-                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
-                    apiKey: "apiKey";
-                    oauth: "oauth";
-                    token: "token";
-                }>>;
-            }, import("zod/v4/core").$strip>;
-        };
-        readonly FORBIDDEN: {
+        readonly CODE_EXHAUSTED: {
             readonly status: 403;
             readonly data: import("zod").ZodObject<{
-                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
-                action: import("zod").ZodOptional<import("zod").ZodString>;
+                maxUses: import("zod").ZodOptional<import("zod").ZodNumber>;
             }, import("zod/v4/core").$strip>;
         };
-        readonly NOT_FOUND: {
-            readonly status: 404;
-            readonly data: import("zod").ZodObject<{
-                resource: import("zod").ZodOptional<import("zod").ZodString>;
-                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
-            }, import("zod/v4/core").$strip>;
-        };
-        readonly BAD_REQUEST: {
+        readonly ORG_NOT_FOUND: {
             readonly status: 400;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly ORG_FULL: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{}, import("zod/v4/core").$strip>;
+        };
+        readonly MEMBERSHIP_ENDED: {
+            readonly status: 403;
             readonly data: import("zod").ZodObject<{
-                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
-                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
-                    field: import("zod").ZodString;
-                    message: import("zod").ZodString;
-                    code: import("zod").ZodOptional<import("zod").ZodString>;
-                }, import("zod/v4/core").$strip>>>;
+                action: import("zod").ZodString;
             }, import("zod/v4/core").$strip>;
         };
-        readonly SERVICE_UNAVAILABLE: {
-            readonly status: 503;
+        readonly RATE_LIMITED: {
+            readonly status: 429;
             readonly data: import("zod").ZodObject<{
-                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
-                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
-                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+                retryAfter: import("zod").ZodNumber;
+                remainingRequests: import("zod").ZodOptional<import("zod").ZodNumber>;
+                resetTime: import("zod").ZodOptional<import("zod").ZodString>;
+                limitType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    bandwidth: "bandwidth";
+                    requests: "requests";
+                    tokens: "tokens";
+                }>>;
             }, import("zod/v4/core").$strip>;
         };
     }>;
@@ -3391,8 +4590,6 @@ export declare const contract: {
             pending: "pending";
             rejected: "rejected";
         }>>;
-        requestedBy: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
-        rejectionReason: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
         createdAt: import("zod").ZodDate;
     }, import("zod/v4/core").$strip>>, {
         readonly UNAUTHORIZED: {
@@ -3456,8 +4653,6 @@ export declare const contract: {
             pending: "pending";
             rejected: "rejected";
         }>>;
-        requestedBy: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
-        rejectionReason: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
         createdAt: import("zod").ZodDate;
         members: import("zod").ZodArray<import("zod").ZodObject<{
             id: import("zod").ZodString;
@@ -3549,8 +4744,6 @@ export declare const contract: {
             pending: "pending";
             rejected: "rejected";
         }>>;
-        requestedBy: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
-        rejectionReason: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
     }, import("zod/v4/core").$strip>>, {
         readonly UNAUTHORIZED: {
             readonly status: 401;
@@ -3603,6 +4796,7 @@ export declare const contract: {
         slug: import("zod").ZodString;
         logo: import("zod").ZodOptional<import("zod").ZodString>;
         metadata: import("zod").ZodOptional<import("zod").ZodRecord<import("zod").ZodString, import("zod").ZodUnknown>>;
+        activate: import("zod").ZodOptional<import("zod").ZodBoolean>;
     }, import("zod/v4/core").$strip>, import("zod").ZodObject<{
         id: import("zod").ZodString;
         name: import("zod").ZodString;
@@ -3614,10 +4808,69 @@ export declare const contract: {
             pending: "pending";
             rejected: "rejected";
         }>>;
-        requestedBy: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
-        rejectionReason: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
         createdAt: import("zod").ZodDate;
     }, import("zod/v4/core").$strip>, {
+        readonly UNAUTHORIZED: {
+            readonly status: 401;
+            readonly data: import("zod").ZodObject<{
+                apiKeyProvided: import("zod").ZodBoolean;
+                provider: import("zod").ZodOptional<import("zod").ZodString>;
+                authType: import("zod").ZodOptional<import("zod").ZodEnum<{
+                    apiKey: "apiKey";
+                    oauth: "oauth";
+                    token: "token";
+                }>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly FORBIDDEN: {
+            readonly status: 403;
+            readonly data: import("zod").ZodObject<{
+                requiredPermissions: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                action: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly NOT_FOUND: {
+            readonly status: 404;
+            readonly data: import("zod").ZodObject<{
+                resource: import("zod").ZodOptional<import("zod").ZodString>;
+                resourceId: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly BAD_REQUEST: {
+            readonly status: 400;
+            readonly data: import("zod").ZodObject<{
+                invalidFields: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodString>>;
+                validationErrors: import("zod").ZodOptional<import("zod").ZodArray<import("zod").ZodObject<{
+                    field: import("zod").ZodString;
+                    message: import("zod").ZodString;
+                    code: import("zod").ZodOptional<import("zod").ZodString>;
+                }, import("zod/v4/core").$strip>>>;
+            }, import("zod/v4/core").$strip>;
+        };
+        readonly SERVICE_UNAVAILABLE: {
+            readonly status: 503;
+            readonly data: import("zod").ZodObject<{
+                retryAfter: import("zod").ZodOptional<import("zod").ZodNumber>;
+                maintenanceWindow: import("zod").ZodDefault<import("zod").ZodBoolean>;
+                estimatedUptime: import("zod").ZodOptional<import("zod").ZodString>;
+            }, import("zod/v4/core").$strip>;
+        };
+    }>;
+    getOrganization: import("@orpc/contract").ProcedureContract<import("zod").ZodObject<{
+        organizationId: import("zod").ZodOptional<import("zod").ZodString>;
+        organizationSlug: import("zod").ZodOptional<import("zod").ZodString>;
+    }, import("zod/v4/core").$strip>, import("zod").ZodNullable<import("zod").ZodObject<{
+        id: import("zod").ZodString;
+        name: import("zod").ZodString;
+        slug: import("zod").ZodString;
+        logo: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
+        metadata: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodRecord<import("zod").ZodString, import("zod").ZodUnknown>>>;
+        status: import("zod").ZodDefault<import("zod").ZodEnum<{
+            active: "active";
+            pending: "pending";
+            rejected: "rejected";
+        }>>;
+    }, import("zod/v4/core").$strip>>, {
         readonly UNAUTHORIZED: {
             readonly status: 401;
             readonly data: import("zod").ZodObject<{
@@ -3734,8 +4987,6 @@ export declare const contract: {
             pending: "pending";
             rejected: "rejected";
         }>>;
-        requestedBy: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
-        rejectionReason: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
     }, import("zod/v4/core").$strip>, {
         readonly UNAUTHORIZED: {
             readonly status: 401;
@@ -4361,6 +5612,7 @@ export declare const contract: {
             }, import("zod/v4/core").$strip>>;
             hasNearAccount: import("zod").ZodBoolean;
         }, import("zod/v4/core").$strip>;
+        nearAccountId: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
         organization: import("zod").ZodObject<{
             activeOrganizationId: import("zod").ZodNullable<import("zod").ZodString>;
             organization: import("zod").ZodNullable<import("zod").ZodObject<{
@@ -4374,8 +5626,6 @@ export declare const contract: {
                     pending: "pending";
                     rejected: "rejected";
                 }>>;
-                requestedBy: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
-                rejectionReason: import("zod").ZodOptional<import("zod").ZodNullable<import("zod").ZodString>>;
             }, import("zod/v4/core").$strip>>;
             member: import("zod").ZodNullable<import("zod").ZodObject<{
                 id: import("zod").ZodString;

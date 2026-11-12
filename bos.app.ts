@@ -11,7 +11,7 @@ export default App({
   description:
     "Shared activity and reputation layer for the NEAR ecosystem — Activity Sources submit signed events through one HTTP gateway; Nostr relays store and distribute them.",
   repository: "https://github.com/NEARBuilders/activity.nearbuilders.org",
-  release: "2.0.0-rc.39",
+  release: "2.0.0-rc.44",
   ci: {
     railway: {
       service: "activity-app",
@@ -41,5 +41,10 @@ export default App({
     extends: "bos://nearbuilding.near/nearbuilders.org#app.auth",
     ui: false,
   },
-  plugins: {},
+  plugins: {
+    projects: {
+      contract: "bos://nearbuilding.near/nearbuilders.org#plugins.projects",
+      proxy: "https://nearbuilders.org",
+    },
+  },
 });

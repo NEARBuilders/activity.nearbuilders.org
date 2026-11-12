@@ -4,9 +4,9 @@
 // below. Nav labels are runtime-only (route options, not manifests).
 // See docs/agents/runtime-map.md for the investigation workflows.
 
-export const RUNTIME_MAP_GENERATED_AT = "2026-11-05T22:12:47.714Z";
+export const RUNTIME_MAP_GENERATED_AT = "2026-11-12T07:23:35.229Z";
 export const RUNTIME_MAP_ENV = "development";
-export const RUNTIME_RELEASE = "2.0.0-rc.39";
+export const RUNTIME_RELEASE = "2.0.0-rc.44";
 
 export const RUNTIME_SOURCES = [
   {
@@ -30,7 +30,8 @@ export const RUNTIME_BACKENDS = [
     "name": "host",
     "source": "remote",
     "location": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/host",
-    "integrity": "sha384-PsU9q6/jQS9heCznqcWkeG97L4hLl1aSENaOyK1y0syUzMK0M/gr2NTft3mkjx71"
+    "digest": "versions/3e37dfef1799bf87.json",
+    "integrity": "sha384-eEQI0AqhOr3tLmX2Y958qTtrISeBKBbIMgpMehyVqFVneXm0NVGhsKNMOO6CPJgs"
   },
   {
     "key": "api",
@@ -46,9 +47,21 @@ export const RUNTIME_BACKENDS = [
     "source": "remote",
     "location": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/auth",
     "pluginManifestUrl": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/auth/plugin.manifest.json",
-    "integrity": "sha384-FENdY7Q5xLCSYiT6gZOgFUFM0f0/9JVl8dVzmIs0oi1M9/eOwNA+4rT2mjl7NPQP",
+    "digest": "versions/f6835d88fcb01fdd.json",
+    "integrity": "sha384-outQaOt4wS2vf+UIeSfN3xIt074Ixerg2sLKtYSVyrEH9SUY4Sx6GQ8WZkkwdPdU",
     "pluginVersion": "2.0.0-rc.8",
-    "contractSha256": "11e86ebd0af6581a6348df858fc88b5e583366553f2ebcaa4f31d787569c7fca"
+    "contractSha256": "c8022b18e4cedfc30d591060b8a9d81e65fdb3cf80658db441d3d4cd9401ee4d"
+  },
+  {
+    "key": "projects",
+    "kind": "plugin",
+    "name": "projects",
+    "source": "remote",
+    "location": "https://nearbuilders.org",
+    "pluginManifestUrl": "https://cdn.everything.dev/bundles/nearbuilding.near/nearbuilders.org/projects/plugin.manifest.json",
+    "callOnly": true,
+    "pluginVersion": "1.4.0",
+    "contractSha256": "9e920e55fee7831884e1442c9cccbcbd17c3b2c459a364fa62be6f911754cfc1"
   }
 ] as const;
 export type RuntimeBackend = (typeof RUNTIME_BACKENDS)[number];

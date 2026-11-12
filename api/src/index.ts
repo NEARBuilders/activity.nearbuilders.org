@@ -213,7 +213,6 @@ export default createPlugin.withPlugins<PluginsClient>()({
       .positive()
       .default(APPROVED_SOURCE_DAILY_EVENT_LIMIT),
     activityTrustedSourceDailyEventLimit: z.number().int().positive().optional(),
-    nearbuildersApiUrl: z.string().default("https://nearbuilders.org/api"),
   }),
 
   secrets: z.object({
@@ -229,7 +228,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
 
   contract,
 
-  initialize: (config, _plugins) =>
+  initialize: (config, plugins) =>
     Effect.gen(function* () {
       const database = yield* buildScoped(
         DatabaseTag,
@@ -314,9 +313,7 @@ export default createPlugin.withPlugins<PluginsClient>()({
         activityLeaderboard,
       );
       const activityEndorsementsService = new ActivityEndorsementsService(database);
-      const nearbuildersProjects = new NearbuildersProjectsClient(
-        config.variables.nearbuildersApiUrl,
-      );
+      const nearbuildersProjects = new NearbuildersProjectsClient(plugins.projects.client());
       const activityBindingSessionsService = new ActivityBindingSessionsService(
         database,
         activityCredentialsService,

@@ -1,5 +1,6 @@
 import { ORPCError } from "@orpc/server";
 import { ACTIVITY_SOURCE_ID_REGEX, NEAR_ACCOUNT_ID_REGEX } from "../contract";
+import type { PluginsClient } from "../lib/plugins-types.gen";
 
 export const NEARBUILDERS_SITE_URL = "https://nearbuilders.org";
 
@@ -8,15 +9,15 @@ const RANDOM_SLUG_SUFFIX_REGEX = /-(?=[a-z0-9]{6}$)(?=[a-z]*\d)[a-z0-9]{6}$/;
 const NEARBUILDERS_HOSTS = new Set(["nearbuilders.org", "www.nearbuilders.org"]);
 const PROJECT_KIND_SEGMENTS = new Set(["project", "idea", "scope", "result"]);
 
-export interface NearbuildersProject {
-  id: string;
-  slug: string;
-  title: string;
-  ownerId: string | null;
-  domain: string | null;
-  logoUrl?: string | null;
-  apps?: Array<{ accountId: string | null }>;
-}
+export type ProjectsRpcClient = ReturnType<PluginsClient["projects"]["client"]>;
+
+type ProjectRecord = Awaited<ReturnType<ProjectsRpcClient["getProject"]>>["data"];
+type ProjectListItem = Awaited<ReturnType<ProjectsRpcClient["listProjects"]>>["data"][number];
+
+export type NearbuildersProject = Pick<
+  ProjectListItem,
+  "id" | "slug" | "title" | "ownerId" | "domain" | "logoUrl"
+> & { apps?: Array<Pick<ProjectRecord["apps"][number], "accountId">> };
 
 export interface NearbuildersProjectSummary {
   id: string;
@@ -121,25 +122,51 @@ export function deriveNearbuildersProjectDraft(
   };
 }
 
-export class NearbuildersProjectsClient {
-  readonly #apiUrl: string;
-  readonly #fetch: typeof fetch;
+const REQUEST_TIMEOUT_MS = 5_000;
 
-  constructor(apiUrl: string, fetcher: typeof fetch = (...args) => fetch(...args)) {
-    this.#apiUrl = apiUrl.replace(/\/$/, "");
-    this.#fetch = fetcher;
+const callOptions = () => ({ signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+
+function rpcErrorCode(error: unknown): string | null {
+  const code = (error as { code?: unknown } | null)?.code;
+  return typeof code === "string" ? code : null;
+}
+
+function unavailable(error: unknown): ORPCError<string, unknown> {
+  const code = rpcErrorCode(error);
+  if (code === "NOT_FOUND") {
+    return new ORPCError("NOT_FOUND", { message: "nearbuilders.org project not found" });
+  }
+  return new ORPCError("SERVICE_UNAVAILABLE", {
+    message: code
+      ? `nearbuilders.org returned ${code}. Try again shortly.`
+      : "nearbuilders.org could not be reached. Try again shortly.",
+  });
+}
+
+function expectData<T>(response: { data?: T } | null | undefined): T {
+  if (response?.data === undefined) {
+    throw new ORPCError("SERVICE_UNAVAILABLE", {
+      message: "nearbuilders.org returned an unexpected response",
+    });
+  }
+  return response.data;
+}
+
+export class NearbuildersProjectsClient {
+  readonly #rpc: ProjectsRpcClient;
+
+  constructor(rpc: ProjectsRpcClient) {
+    this.#rpc = rpc;
   }
 
   async resolve(input: string): Promise<NearbuildersProjectDraft> {
     const reference = parseNearbuildersProjectReference(input);
     if (reference.kind === "id") {
-      return deriveNearbuildersProjectDraft(
-        await this.#getProject(`/v1/projects/${encodeURIComponent(reference.id)}`, input),
-      );
+      return deriveNearbuildersProjectDraft(await this.#getProject(reference.id, input));
     }
     if (reference.kind === "slug") {
-      const project = await this.#findProject(
-        `/v1/projects/by-slug/${encodeURIComponent(reference.slug)}`,
+      const project = await this.#findProject(() =>
+        this.#rpc.getProjectBySlug({ slug: reference.slug }, callOptions()),
       );
       if (project) return deriveNearbuildersProjectDraft(project);
       if (reference.fromLink) {
@@ -153,19 +180,17 @@ export class NearbuildersProjectsClient {
   }
 
   async getOwnerAccountIds(projectId: string): Promise<string[]> {
-    const project = await this.#getProject(
-      `/v1/projects/${encodeURIComponent(projectId)}`,
-      projectId,
-    );
-    return projectOwnerAccountIds(project);
+    return projectOwnerAccountIds(await this.#getProject(projectId, projectId));
   }
 
   async search(query: string): Promise<NearbuildersProjectSummary[]> {
     const trimmed = query.trim().slice(0, 200);
     if (trimmed.length < 2) return [];
-    const matches = await this.#request<NearbuildersProject[]>(
-      `/v1/projects?query=${encodeURIComponent(trimmed)}&kind=project&limit=${NEARBUILDERS_PROJECT_SEARCH_LIMIT}`,
-    );
+    const matches = await this.#list({
+      query: trimmed,
+      kind: "project",
+      limit: NEARBUILDERS_PROJECT_SEARCH_LIMIT,
+    });
     return matches.slice(0, NEARBUILDERS_PROJECT_SEARCH_LIMIT).map((project) => ({
       id: project.id,
       slug: project.slug,
@@ -179,9 +204,7 @@ export class NearbuildersProjectsClient {
   }
 
   async #search(query: string, input: string): Promise<NearbuildersProject> {
-    const matches = await this.#request<NearbuildersProject[]>(
-      `/v1/projects?query=${encodeURIComponent(query.slice(0, 200))}`,
-    );
+    const matches = await this.#list({ query: query.slice(0, 200) });
     const wanted = query.trim().toLowerCase();
     const exact = matches.filter(
       ({ title, slug }) =>
@@ -204,8 +227,18 @@ export class NearbuildersProjectsClient {
     });
   }
 
-  async #getProject(path: string, input: string): Promise<NearbuildersProject> {
-    const project = await this.#findProject(path);
+  async #list(input: Parameters<ProjectsRpcClient["listProjects"]>[0]): Promise<ProjectListItem[]> {
+    let response: { data?: ProjectListItem[] };
+    try {
+      response = await this.#rpc.listProjects(input, callOptions());
+    } catch (error) {
+      throw unavailable(error);
+    }
+    return expectData(response);
+  }
+
+  async #getProject(id: string, input: string): Promise<NearbuildersProject> {
+    const project = await this.#findProject(() => this.#rpc.getProject({ id }, callOptions()));
     if (!project) {
       throw new ORPCError("NOT_FOUND", {
         message: `No nearbuilders.org project matches "${input.trim()}"`,
@@ -214,41 +247,17 @@ export class NearbuildersProjectsClient {
     return project;
   }
 
-  async #findProject(path: string): Promise<NearbuildersProject | null> {
+  async #findProject(
+    request: () => Promise<{ data?: ProjectRecord }>,
+  ): Promise<NearbuildersProject | null> {
+    let response: { data?: ProjectRecord };
     try {
-      return await this.#request<NearbuildersProject>(path);
+      response = await request();
     } catch (error) {
-      if (error instanceof ORPCError && error.code === "NOT_FOUND") return null;
-      throw error;
+      const failure = unavailable(error);
+      if (failure.code === "NOT_FOUND") return null;
+      throw failure;
     }
-  }
-
-  async #request<T>(path: string): Promise<T> {
-    let response: Response;
-    try {
-      response = await this.#fetch(`${this.#apiUrl}${path}`, {
-        headers: { accept: "application/json", "user-agent": "activity.nearbuilders.org" },
-        signal: AbortSignal.timeout(5_000),
-      });
-    } catch {
-      throw new ORPCError("SERVICE_UNAVAILABLE", {
-        message: "nearbuilders.org could not be reached. Try again shortly.",
-      });
-    }
-    if (response.status === 404) {
-      throw new ORPCError("NOT_FOUND", { message: "nearbuilders.org project not found" });
-    }
-    if (!response.ok) {
-      throw new ORPCError("SERVICE_UNAVAILABLE", {
-        message: `nearbuilders.org returned ${response.status}. Try again shortly.`,
-      });
-    }
-    const body = (await response.json()) as { data?: T };
-    if (body.data === undefined) {
-      throw new ORPCError("SERVICE_UNAVAILABLE", {
-        message: "nearbuilders.org returned an unexpected response",
-      });
-    }
-    return body.data;
+    return expectData(response);
   }
 }
