@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-11-05T22:12:47.714Z",
+  "generatedAt": "2026-11-12T07:10:22.672Z",
   "env": "development",
-  "release": "2.0.0-rc.39",
-  "extends": "/Users/elliot.braem/workspace/product/activity.nearbuilders.org/bos.app.ts → bos://dev.everything.near/everything.dev",
+  "release": "2.0.0-rc.44",
+  "extends": "bos.app.ts → bos://dev.everything.near/everything.dev",
   "sources": [
     {
       "key": "ui",
@@ -21,7 +21,8 @@
       "name": "host",
       "source": "remote",
       "location": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/host",
-      "integrity": "sha384-PsU9q6/jQS9heCznqcWkeG97L4hLl1aSENaOyK1y0syUzMK0M/gr2NTft3mkjx71"
+      "digest": "versions/3e37dfef1799bf87.json",
+      "integrity": "sha384-eEQI0AqhOr3tLmX2Y958qTtrISeBKBbIMgpMehyVqFVneXm0NVGhsKNMOO6CPJgs"
     },
     {
       "key": "api",
@@ -37,9 +38,10 @@
       "source": "remote",
       "location": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/auth",
       "pluginManifestUrl": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/auth/plugin.manifest.json",
-      "integrity": "sha384-FENdY7Q5xLCSYiT6gZOgFUFM0f0/9JVl8dVzmIs0oi1M9/eOwNA+4rT2mjl7NPQP",
+      "digest": "versions/f6835d88fcb01fdd.json",
+      "integrity": "sha384-outQaOt4wS2vf+UIeSfN3xIt074Ixerg2sLKtYSVyrEH9SUY4Sx6GQ8WZkkwdPdU",
       "pluginVersion": "2.0.0-rc.8",
-      "contractSha256": "11e86ebd0af6581a6348df858fc88b5e583366553f2ebcaa4f31d787569c7fca"
+      "contractSha256": "c8022b18e4cedfc30d591060b8a9d81e65fdb3cf80658db441d3d4cd9401ee4d"
     }
   ],
   "unresolved": [],
@@ -287,5 +289,11 @@
       "nav": null
     }
   ],
-  "shadowed": []
+  "shadowed": [],
+  "lockfile": {
+    "pointerDigest": "23a76a2501c8a73d",
+    "release": "2.0.0-rc.44",
+    "resolvedAt": "2026-11-12T07:08:28.715Z",
+    "drift": []
+  }
 }

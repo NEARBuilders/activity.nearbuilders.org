@@ -50,6 +50,7 @@
   "files": {
     "includes": [
       "**",
+      "!!repos",
       "!!**/.agents",
       "!!**/*.gen.ts",
       "!!**/.bos/generated",
