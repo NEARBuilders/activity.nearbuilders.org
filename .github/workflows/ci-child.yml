@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   activity:
+    timeout-minutes: 60
     name: Activity checks
     runs-on: ubuntu-latest
     steps:
