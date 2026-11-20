@@ -1,5 +1,17 @@
 # api
 
+## 3.2.0
+
+### Minor Changes
+
+- 57d293c: Add a stateless MCP server at `POST /api/v1/mcp` whose tools let a coding agent register a project through a binding session (`start_activity_registration`, `check_activity_registration`) and submit events (`submit_activity_event`, including `activity.test` and history with `occurredAt`). The `/skill` page gains a **Copy MCP prompt** button, and `skill.md` and the integration guide describe the MCP flow.
+- 99fc647: Send the `FASTNEAR_API_KEY` secret as a bearer token on FastKV binding reads. A 401, 403, or 429 from FastKV now fails binding confirmation with a distinct `SERVICE_UNAVAILABLE` error and log line instead of reporting that the binding is not available yet, and the dashboard stops polling and shows that error.
+- 3549d8d: Add the public `GET /v1/signing-keys` endpoint (`listActivitySigningKeys`), listing the source ID and public key of every bound Signing Identity, current and retired, for Activity Sources that are not rejected. relay.nearbuilders.org's write policy uses it to reject kind-1701 events from unregistered pubkeys.
+
+### Patch Changes
+
+- 68c4c64: Fix the host's generated MCP at `/api/mcp`, which returned 404. The `submitActivityEvent` payload was `z.json()`. That schema is recursive, so the OpenAPI spec emitted it as a `$ref` into `components`. The host builds each MCP tool's input schema without `components`, so Ajv failed on the unresolvable `$ref` and the whole MCP mount was skipped. The payload now validates exactly like `z.json()` but documents as a plain `{}` schema. A unit test now fails if any MCP tool input contains a `$ref`.
+
 ## 3.1.0
 
 ### Minor Changes
