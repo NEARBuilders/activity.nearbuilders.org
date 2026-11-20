@@ -1,11 +1,11 @@
-import { drizzle } from "drizzle-orm/pglite";
 import { PGlite } from "@electric-sql/pglite";
 import { sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/pglite";
 import { Effect } from "effect";
+import type { MigrationStorage } from "everything-dev/db";
 import { describe, expect, it } from "vitest";
 import type { Database } from "@/db";
 import { detectDrift, loadMigrations, migrate } from "@/db/migrate";
-import type { MigrationStorage } from "everything-dev/db";
 
 const STORAGE: MigrationStorage = {
   schema: "drizzle",

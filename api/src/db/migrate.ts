@@ -5,8 +5,8 @@ import {
   detectDrift as detectDriftFramework,
   getMigrationStorage,
   loadMigrations as loadMigrationsFramework,
-  runMigrations,
   type MigrationStorage,
+  runMigrations,
 } from "everything-dev/db";
 import { type Database, DatabaseError } from "./index";
 
@@ -70,8 +70,7 @@ function makeDropsIdempotent(statement: string): string {
 export function loadMigrations(): Effect.Effect<LoadedMigrations, DatabaseError> {
   return Effect.mapError(
     loadMigrationsFramework({
-      virtual: () =>
-        import("virtual:drizzle-migrations.sql") as Promise<{ default?: Migration[] }>,
+      virtual: () => import("virtual:drizzle-migrations.sql") as Promise<{ default?: Migration[] }>,
       fromDir: MIGRATIONS_DIR,
     }),
     toLocalError,
