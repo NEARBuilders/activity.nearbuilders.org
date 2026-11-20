@@ -4,9 +4,9 @@
 // below. Nav labels are runtime-only (route options, not manifests).
 // See docs/agents/runtime-map.md for the investigation workflows.
 
-export const RUNTIME_MAP_GENERATED_AT = "2026-11-05T22:12:47.714Z";
+export const RUNTIME_MAP_GENERATED_AT = "2026-11-20T14:22:49.212Z";
 export const RUNTIME_MAP_ENV = "development";
-export const RUNTIME_RELEASE = "2.0.0-rc.39";
+export const RUNTIME_RELEASE = "2.0.0-rc.46";
 
 export const RUNTIME_SOURCES = [
   {
@@ -30,7 +30,8 @@ export const RUNTIME_BACKENDS = [
     "name": "host",
     "source": "remote",
     "location": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/host",
-    "integrity": "sha384-PsU9q6/jQS9heCznqcWkeG97L4hLl1aSENaOyK1y0syUzMK0M/gr2NTft3mkjx71"
+    "digest": "versions/5527fc13e1a2dc8e.json",
+    "integrity": "sha384-yIQ2XrPaAj6NQEWX9QWl/0LDMCLgHwaXnaprmeFH/YlSw3eOatbbAiN4AE+uDVvh"
   },
   {
     "key": "api",
@@ -46,9 +47,10 @@ export const RUNTIME_BACKENDS = [
     "source": "remote",
     "location": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/auth",
     "pluginManifestUrl": "https://cdn.everything.dev/bundles/dev.everything.near/everything.dev/auth/plugin.manifest.json",
-    "integrity": "sha384-FENdY7Q5xLCSYiT6gZOgFUFM0f0/9JVl8dVzmIs0oi1M9/eOwNA+4rT2mjl7NPQP",
+    "digest": "versions/8f2f1624c5fe3ebb.json",
+    "integrity": "sha384-qXAEPjUhB2i8wvGa5PTPPEmwU3a8Z8nDTEBn23Oki4MUURPMrKTABaJsnO22YzFD",
     "pluginVersion": "2.0.0-rc.8",
-    "contractSha256": "11e86ebd0af6581a6348df858fc88b5e583366553f2ebcaa4f31d787569c7fca"
+    "contractSha256": "c1cd8cd12e2bdfe8e223b846bb1f739859328c37b1dfb8c2c96e0ac4a1a61997"
   }
 ] as const;
 export type RuntimeBackend = (typeof RUNTIME_BACKENDS)[number];

@@ -40,9 +40,6 @@
     "test:integration-guide": "pnpm --dir api test tests/integration/activity-client-example.test.ts",
     "test:activity": "pnpm run dev:activity-infra && ACTIVITY_INTEGRATION=1 pnpm --dir api test tests/integration/activity-boundary.test.ts",
     "benchmark:leaderboard": "pnpm run dev:activity-infra && tsx api/benchmarks/activity-leaderboard.ts",
-    "dev:postgres": "docker compose up -d --wait && pnpm run dev",
-    "dev:postgres:down": "docker compose down",
-    "dev:postgres:reset": "docker compose down -v && docker compose up -d --wait",
     "db:doctor": "bos db:doctor",
     "db:repair": "bos db:repair",
     "test:scripts": "vitest run scripts"
@@ -63,10 +60,11 @@
     "vitest": "catalog:",
     "yaml": "catalog:",
     "@effect/tsgo": "^0.63.0",
-    "@playwright/test": "^1.58.1",
+    "@playwright/test": "^1.65.0",
     "@shadcn/lint": "^0.2.0",
     "oxlint": "1.90.0",
-    "oxlint-tsgolint": "7.0.2005"
+    "oxlint-tsgolint": "7.0.2005",
+    "lefthook": "^2.2.2"
   },
   "dependencies": {
     "@better-auth/api-key": "catalog:",
