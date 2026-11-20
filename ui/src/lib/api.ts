@@ -8,7 +8,7 @@
 import type { ContractRouterClient } from "@orpc/contract";
 import { createTanstackQueryUtils } from "@orpc/tanstack-query";
 import { useRouter } from "@tanstack/react-router";
-import { createRpcClient } from "every-plugin/client";
+import { createApiClient as createServiceClient } from "everything-dev/ui/api";
 import { apiConnectionError } from "@/app";
 import type { ApiContract } from "./api-types.gen";
 
@@ -29,10 +29,10 @@ export function createApiClient(
     return browserApiClient;
   }
 
-  const client: ApiClient = createRpcClient<ApiContract>(
+  const client: ApiClient = createServiceClient<ApiContract>(
     {
       hostUrl: runtimeConfig.hostUrl,
-      path: runtimeConfig.rpcBase as `/${string}`,
+      rpcBase: runtimeConfig.rpcBase as `/${string}`,
       connectionError: apiConnectionError,
     },
     headers,

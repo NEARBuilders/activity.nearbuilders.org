@@ -4,14 +4,10 @@
  * copy is backed up under `.bos/sync-backup/`. To make a change permanent, file an
  * issue: https://github.com/NEARBuilders/everything-dev/issues
  */
-import { config } from "dotenv";
+import "dotenv/config";
 import type { PluginConfigInput } from "every-plugin";
 import packageJson from "./package.json" with { type: "json" };
 import type Plugin from "./src/index";
-
-// bos dev runs this with cwd=api/, so plain `dotenv/config` (cwd-relative)
-// silently misses the repo-root .env every local override depends on.
-config({ path: new URL("../.env", import.meta.url) });
 
 const DEVELOPMENT_MASTER_KEYS = JSON.stringify({
   v1: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=",
