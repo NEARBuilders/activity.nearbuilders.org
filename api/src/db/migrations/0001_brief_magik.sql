@@ -1,1 +1,1 @@
-ALTER TYPE "public"."tenant_status" ADD VALUE 'pending' BEFORE 'suspended';
+ALTER TYPE "public"."tenant_status" ADD VALUE IF NOT EXISTS 'pending' BEFORE 'suspended';
